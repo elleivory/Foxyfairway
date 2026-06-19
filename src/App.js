@@ -210,16 +210,14 @@ function calcLeaderboard(players, scores, holes, gameType) {
         const myS = scores.find((s) => s.player_id === p.id && s.hole_number === hole.hole_number);
         if (!myS) return;
         const allH = scores.filter((s) => s.hole_number === hole.hole_number);
-        if (allH.length < 2) return;
-        let lowest = Infinity, winner = null, tied = false;
-        allH.forEach((s) => {
-          const pl = players.find((pl) => pl.id === s.player_id); if (!pl) return;
-          const net = s.score - getHcpStrokes(pl.handicap, hole.stroke_index);
-          if (net < lowest) { lowest = net; winner = s.player_id; tied = false; }
-          else if (net === lowest) { tied = true; }
-        });
-        if (!tied) {
-          if (winner === p.id) myWon++;
+        if (!players.every((pl) => allH.some((s) => s.player_id === pl.id))) return;
+        // Find lowest net score
+        let lowestNet = Infinity;
+        allH.forEach((s) => { const pl = players.find((pl) => pl.id === s.player_id); if (!pl) return; const net = s.score - getHcpStrokes(pl.handicap, hole.stroke_index); if (net < lowestNet) lowestNet = net; });
+        const holeWinners = allH.filter((s) => { const pl = players.find((pl) => pl.id === s.player_id); if (!pl) return false; return (s.score - getHcpStrokes(pl.handicap, hole.stroke_index)) === lowestNet; }).map((s) => s.player_id);
+        const allTied = holeWinners.length === players.length;
+        if (!allTied) {
+          if (holeWinners.includes(p.id)) myWon++;
           else oppWon++;
         }
       });
@@ -1693,7 +1691,7 @@ function JoinRoundScreen({ onBack, onJoined, prefillCode }) {
       const blocked = await dbIsPlayerBlocked(name);
       if (blocked) { setErr("This name has been blocked. Please contact the organiser."); setLoading(false); return; }
       const existing = await dbFindPlayerByName(round.id, name);
-      const me = existing || await dbCreatePlayer({ name, handicap: parseFloat(hcp) || 0, round_id: round.id, team: round.game_type === "matchplay_teams" ? team : null, is_placeholder: false });
+      const me = existing || await dbCreatePlayer({ name, handicap: round.use_handicap === false ? 0 : (parseFloat(hcp) || 0), round_id: round.id, team: round.game_type === "matchplay_teams" ? team : null, is_placeholder: false });
       savePlayerProfile(name, parseFloat(hcp) || 0);
       const fullRound = { ...round, holes: getHolesForRound(round) };
       saveLastRound(fullRound, me);
@@ -1730,8 +1728,9 @@ function JoinRoundScreen({ onBack, onJoined, prefillCode }) {
             <p style={S.hint}>Already in this round? Enter the same name to rejoin your scores.</p>
             <label style={S.label}>Your name</label>
             <input style={S.input} placeholder="e.g. Chris" value={name} onChange={(e) => setName(e.target.value)} />
-            <label style={S.label}>Your handicap</label>
-            <input style={S.input} type="number" placeholder="0" value={hcp} onChange={(e) => setHcp(e.target.value)} />
+            {round.use_handicap !== false && <label style={S.label}>Your handicap</label>}
+            {round.use_handicap !== false && <input style={S.input} type="number" placeholder="0" value={hcp} onChange={(e) => setHcp(e.target.value)} />}
+            {round.use_handicap === false && <p style={{ ...S.hint, color: "#f59e0b" }}>This is a scratch round - no handicaps applied</p>}
             {round.game_type === "matchplay_teams" && (<>
               <label style={S.label}>Your team</label>
               <select style={S.input} value={team} onChange={(e) => setTeam(e.target.value)}>
@@ -1794,6 +1793,10 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
           </div>
           <div style={{ fontSize: 13, color: "#94a3b8" }}>Scan to join · Code: <span style={{ color: "#22c55e", fontWeight: 700, letterSpacing: 2 }}>{round.code}</span></div>
         </div>
+        <button style={{ ...S.btnPrimary, marginBottom: 16, fontSize: 17 }} onClick={onViewScorecard}>
+          ⛳ Live Scoring
+        </button>
+
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
           <h3 style={{ ...S.stepTitle, margin: 0 }}>Leaderboard</h3>
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -1910,9 +1913,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
             onDismiss={() => { setShowComplete(false); completeDismissedRef.current = true; }} />
         )}
 
-        <button style={{ ...S.btnPrimary, marginTop: 24, fontSize: 17 }} onClick={onViewScorecard}>
-          ⛳ Live Scoring
-        </button>
+
       </div>
 
       {showShare && <ShareModal round={round} onClose={() => setShowShare(false)} />}
@@ -1982,9 +1983,10 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
       }
       if (round.game_type === "banker") {
         const bankerData = await dbGetBanker(round.id);
-        // Always sync banker from Supabase
-        if (bankerData?.initial_banker_id) {
+        // ALWAYS sync banker from Supabase on every tick - fixes "waiting" bug
+        if (bankerData?.initial_banker_id && bankerData.initial_banker_id !== initialBankerId) {
           setInitialBankerId(bankerData.initial_banker_id);
+          setCurrentBankerId(bankerData.initial_banker_id);
         }
         // Sync current hole from Supabase (hole progression)
         if (bankerData?.current_hole && bankerData.current_hole > activeHole) {
@@ -2632,17 +2634,15 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                         else if (round.game_type === "matchplay") {
                           const holeScores = allScores.filter((s) => s.hole_number === h.hole_number);
                           const allPlayers3 = [...others, me];
-                          // Only show when all players have scored
                           if (!allPlayers3.every((p) => holeScores.some((s) => s.player_id === p.id))) { thirdValue = "—"; thirdColor = "#475569"; }
                           else {
-                            let lowest = Infinity, tied = [], winner = null;
-                            holeScores.forEach((s) => {
-                              const pl = allPlayers3.find((p) => p.id === s.player_id); if (!pl) return;
-                              const net = s.score - getHcpStrokes(pl.handicap, h.stroke_index);
-                              if (net < lowest) { lowest = net; tied = [s.player_id]; winner = s.player_id; } else if (net === lowest) tied.push(s.player_id);
-                            });
-                            if (tied.length > 1) { thirdValue = "T"; thirdColor = "#94a3b8"; }
-                            else if (winner === player.id) { thirdValue = "W"; thirdColor = "#22c55e"; }
+                            // Find lowest net
+                            let lowestNet3 = Infinity;
+                            holeScores.forEach((s) => { const pl = allPlayers3.find((p) => p.id === s.player_id); if (!pl) return; const net = s.score - getHcpStrokes(pl.handicap, h.stroke_index); if (net < lowestNet3) lowestNet3 = net; });
+                            const hWinners3 = holeScores.filter((s) => { const pl = allPlayers3.find((p) => p.id === s.player_id); if (!pl) return false; return (s.score - getHcpStrokes(pl.handicap, h.stroke_index)) === lowestNet3; }).map((s) => s.player_id);
+                            const allTied3 = hWinners3.length === allPlayers3.length;
+                            if (allTied3) { thirdValue = "T"; thirdColor = "#94a3b8"; }
+                            else if (hWinners3.includes(player.id)) { thirdValue = "W"; thirdColor = "#22c55e"; }
                             else { thirdValue = "L"; thirdColor = "#ef4444"; }
                           }
                         } else if (round.game_type === "banker") {
