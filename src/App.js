@@ -1874,6 +1874,14 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
       if (!showChat) {
         setLastMsgCount((prev) => { if (msgs.length > prev && prev > 0) setUnreadChat((u) => u + (msgs.length - prev)); return msgs.length; });
       }
+      // Reload banker if not set yet (other device may have selected it)
+      if (round.game_type === "banker" && !initialBankerId) {
+        const bankerData = await dbGetBanker(round.id);
+        if (bankerData?.initial_banker_id) {
+          setInitialBankerId(bankerData.initial_banker_id);
+          setCurrentBankerId(bankerData.initial_banker_id);
+        }
+      }
     }, 2000);
     return () => clearInterval(t);
   }, [round.id, me.id, showChat]);
@@ -2134,7 +2142,21 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                           <span style={{ fontSize: 16, fontWeight: 800, color: myBets[activeHole] ? "#22c55e" : "#f59e0b" }}>$</span>
                           <input style={{ ...S.customInput, width: 68, fontSize: 20, borderColor: myBets[activeHole] ? "#22c55e" : "#f59e0b" }}
                             type="number" min="1" placeholder="0" value={myBets[activeHole] || ""}
-                            onChange={(e) => { if (e.target.value) setMyBets((prev) => ({ ...prev, [activeHole]: parseInt(e.target.value) })); }} />
+                            onChange={(e) => { if (e.target.value) setMyBets((prev) => ({ ...prev, [activeHole]: parseInt(e.target.value) })); }}
+                            onBlur={async (e) => {
+                              if (e.target.value) {
+                                const betVal = parseInt(e.target.value);
+                                setMyBets((prev) => ({ ...prev, [activeHole]: betVal }));
+                                // Save bet to Supabase so other players see it
+                                const obj = { player_id: me.id, hole_number: activeHole, round_id: round.id, score: myScores[activeHole] || 0, bet: betVal };
+                                const thisBankerId = activeHole === 1 ? initialBankerId : currentBankerId;
+                                if (thisBankerId) obj.banker_id = thisBankerId;
+                                await dbSaveScore(obj);
+                                // Refresh scores so banker sees updated pot
+                                const updated = await dbGetScores(round.id);
+                                setAllScores(updated);
+                              }
+                            }} />
                         </div>
                       </>
                     )}
