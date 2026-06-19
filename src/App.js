@@ -469,7 +469,10 @@ async function dbDeleteRound(roundId) {
 }
 
 async function dbSaveBanker(roundId, bankerId) {
-  await supabase.from("rounds").update({ initial_banker_id: bankerId }).eq("id", roundId);
+  await supabase.from("rounds").update({ initial_banker_id: bankerId, current_banker_id: bankerId }).eq("id", roundId);
+}
+async function dbSaveCurrentBanker(roundId, bankerId) {
+  await supabase.from("rounds").update({ current_banker_id: bankerId }).eq("id", roundId);
 }
 
 async function dbSaveCurrentHole(roundId, holeNum) {
@@ -477,7 +480,7 @@ async function dbSaveCurrentHole(roundId, holeNum) {
 }
 
 async function dbGetBanker(roundId) {
-  const { data } = await supabase.from("rounds").select("initial_banker_id, created_by, current_hole").eq("id", roundId).single();
+  const { data } = await supabase.from("rounds").select("initial_banker_id, current_banker_id, created_by, current_hole").eq("id", roundId).single();
   return data || {};
 }
 
@@ -1983,10 +1986,15 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
       }
       if (round.game_type === "banker") {
         const bankerData = await dbGetBanker(round.id);
-        // ALWAYS sync banker from Supabase on every tick - fixes "waiting" bug
-        if (bankerData?.initial_banker_id && bankerData.initial_banker_id !== initialBankerId) {
-          setInitialBankerId(bankerData.initial_banker_id);
-          setCurrentBankerId(bankerData.initial_banker_id);
+        // ALWAYS sync banker from Supabase - fixes "waiting" bug on all devices
+        if (bankerData?.initial_banker_id) {
+          if (bankerData.initial_banker_id !== initialBankerId) {
+            setInitialBankerId(bankerData.initial_banker_id);
+          }
+          // Use current_banker_id from Supabase as the source of truth
+          if (bankerData.current_banker_id && bankerData.current_banker_id !== currentBankerId) {
+            setCurrentBankerId(bankerData.current_banker_id);
+          }
         }
         // Sync current hole from Supabase (hole progression)
         if (bankerData?.current_hole && bankerData.current_hole > activeHole) {
@@ -2015,6 +2023,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
             if (!tied && winner) runningBanker = winner;
           }
           setCurrentBankerId(runningBanker);
+          if (runningBanker !== bankerData?.current_banker_id) { dbSaveCurrentBanker(round.id, runningBanker); }
         }
       }
     }, 2000);
@@ -2060,7 +2069,10 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
           else if (net === lowest) { tied = true; }
         });
         // Only rotate if clear winner - tied hole keeps current banker
-        if (winner && !tied) setCurrentBankerId(winner);
+        if (winner && !tied) {
+          setCurrentBankerId(winner);
+          await dbSaveCurrentBanker(round.id, winner);
+        }
       }
     }
     
@@ -2286,7 +2298,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
             return (
               <>
                 {/* Hole 1 banker selector - only round creator can select */}
-                {activeHole === 1 && !initialBankerId && round.created_by === me.name && (
+                {!initialBankerId && round.created_by === me.name && (
                   <div style={{ backgroundColor: "#1e293b", border: "1.5px solid #f59e0b", borderRadius: 12, padding: "14px 16px", marginBottom: 12 }}>
                     <div style={{ fontSize: 12, fontWeight: 700, color: "#f59e0b", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>⚠ Select Initial Banker (Creator only)</div>
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -2304,7 +2316,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                   </div>
                 )}
                 {/* Show waiting message for non-creators when no banker set */}
-                {activeHole === 1 && !initialBankerId && round.created_by !== me.name && (
+                {!initialBankerId && round.created_by !== me.name && (
                   <div style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "12px 16px", marginBottom: 12, textAlign: "center" }}>
                     <div style={{ fontSize: 13, color: "#64748b" }}>⏳ Waiting for round creator to select the initial banker...</div>
                   </div>
@@ -2358,29 +2370,37 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                         {/* Bet input for non-banker players */}
                         <div style={{ marginTop: 4 }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                            <span style={{ fontSize: 14, color: "#64748b" }}>Bet $</span>
-                            <input style={{ ...S.customInput, width: 68, fontSize: 20, borderColor: myBets[activeHole] ? "#22c55e" : "#f59e0b" }}
-                              type="number" min="1" placeholder="0" value={myBets[activeHole] || ""}
-                              onChange={(e) => { if (e.target.value) setMyBets((prev) => ({ ...prev, [activeHole]: parseInt(e.target.value) })); }} />
-                            <button onClick={async () => {
-                              const betVal = myBets[activeHole];
-                              if (!betVal || betVal < 1) return;
-                              const thisBankerId2 = activeHole === 1 ? initialBankerId : currentBankerId;
-                              // Only save bet - don't touch score. Score saved separately when player taps score button
-                              const existingScore = allScores.find((s) => s.player_id === me.id && s.hole_number === activeHole);
-                              const obj = { 
-                                player_id: me.id, hole_number: activeHole, round_id: round.id, 
-                                score: existingScore?.score || 0, // preserve existing score
-                                bet: betVal 
-                              };
-                              if (thisBankerId2) obj.banker_id = thisBankerId2;
-                              await dbSaveScore(obj);
-                              setMyBets((prev) => ({ ...prev, [activeHole]: betVal }));
-                              const updated = await dbGetScores(round.id);
-                              setAllScores(updated);
-                            }} style={{ backgroundColor: myBets[activeHole] ? "#22c55e" : "#334155", color: myBets[activeHole] ? "#0f172a" : "#64748b", border: "none", borderRadius: 8, padding: "10px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>
-                              {myBets[activeHole] ? "✓ Locked" : "Submit"}
-                            </button>
+                            {myBets[activeHole] ? (
+                              // Bet locked - show confirmed state, no editing
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
+                                <div style={{ backgroundColor: "#022c22", border: "1.5px solid #22c55e", borderRadius: 8, padding: "10px 16px", fontSize: 20, fontWeight: 800, color: "#22c55e", flex: 1, textAlign: "center" }}>
+                                  ${isDoubled ? myBets[activeHole] * 2 : myBets[activeHole]}
+                                  {isDoubled && <span style={{ fontSize: 10, color: "#f59e0b", marginLeft: 6 }}>🔥x2</span>}
+                                </div>
+                                <div style={{ fontSize: 11, color: "#22c55e", fontWeight: 700 }}>✓ Locked</div>
+                              </div>
+                            ) : (
+                              <>
+                                <span style={{ fontSize: 14, color: "#64748b" }}>Bet $</span>
+                                <input style={{ ...S.customInput, width: 68, fontSize: 20, borderColor: "#f59e0b" }}
+                                  type="number" min="1" placeholder="0" value={myBets[activeHole] || ""}
+                                  onChange={(e) => { if (e.target.value) setMyBets((prev) => ({ ...prev, [activeHole]: parseInt(e.target.value) })); }} />
+                                <button onClick={async () => {
+                                  const betVal = myBets[activeHole];
+                                  if (!betVal || betVal < 1) return;
+                                  const thisBankerId2 = activeHole === 1 ? initialBankerId : currentBankerId;
+                                  const existingScore = allScores.find((s) => s.player_id === me.id && s.hole_number === activeHole);
+                                  const obj = { player_id: me.id, hole_number: activeHole, round_id: round.id, score: existingScore?.score || 0, bet: betVal, bet_locked: true };
+                                  if (thisBankerId2) obj.banker_id = thisBankerId2;
+                                  await dbSaveScore(obj);
+                                  setMyBets((prev) => ({ ...prev, [activeHole]: betVal }));
+                                  const updated = await dbGetScores(round.id);
+                                  setAllScores(updated);
+                                }} style={{ backgroundColor: "#f59e0b", color: "#0f172a", border: "none", borderRadius: 8, padding: "10px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>
+                                  Submit
+                                </button>
+                              </>
+                            )}
                           </div>
                           {!myBets[activeHole] && <div style={{ fontSize: 10, color: "#f59e0b", marginTop: 4 }}>Enter bet to unlock scoring</div>}
                           {myBets[activeHole] && isDoubled && (
@@ -2516,18 +2536,15 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                       if (myG) {
                         const holeScores = allScores.filter((s) => s.hole_number === h.hole_number);
                         const allPlayers2 = [...others, me];
-                        // Only show W/L/T when ALL players have scored this hole
                         const allScored2 = allPlayers2.every((p) => holeScores.some((s) => s.player_id === p.id));
                         if (allScored2) {
-                          let lowest = Infinity, tied = [], winner = null;
-                          holeScores.forEach((s) => {
-                            const pl = allPlayers2.find((p) => p.id === s.player_id); if (!pl) return;
-                            const net = s.score - getHcpStrokes(pl.handicap, h.stroke_index);
-                            if (net < lowest) { lowest = net; tied = [s.player_id]; winner = s.player_id; } else if (net === lowest) tied.push(s.player_id);
-                          });
-                          if (tied.length > 1) { label = "T"; color = "#94a3b8"; }
-                          else if (winner === me.id) { label = "W"; color = "#22c55e"; }
-                          else { label = "L"; color = "#ef4444"; }
+                          let lowestWL = Infinity;
+                          holeScores.forEach((s) => { const pl = allPlayers2.find((p) => p.id === s.player_id); if (!pl) return; const net = s.score - getHcpStrokes(pl.handicap, h.stroke_index); if (net < lowestWL) lowestWL = net; });
+                          const hWinnersWL = holeScores.filter((s) => { const pl = allPlayers2.find((p) => p.id === s.player_id); if (!pl) return false; return (s.score - getHcpStrokes(pl.handicap, h.stroke_index)) === lowestWL; }).map((s) => s.player_id);
+                          const allTiedWL = hWinnersWL.length === allPlayers2.length;
+                          if (allTiedWL) { label = "T"; color = "#94a3b8"; } // everyone same score
+                          else if (hWinnersWL.includes(me.id)) { label = "W"; color = "#22c55e"; } // I beat at least one
+                          else { label = "L"; color = "#ef4444"; } // I didn't match the lowest
                         }
                       }
                       return (<div key={"mp"+h.hole_number} style={S.scoreInfoCell}><div style={S.scoreInfoCellNumber}>{h.hole_number}</div><div style={{ ...S.scoreInfoCellValue, color }}>{label}</div></div>);
@@ -2641,9 +2658,9 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                             holeScores.forEach((s) => { const pl = allPlayers3.find((p) => p.id === s.player_id); if (!pl) return; const net = s.score - getHcpStrokes(pl.handicap, h.stroke_index); if (net < lowestNet3) lowestNet3 = net; });
                             const hWinners3 = holeScores.filter((s) => { const pl = allPlayers3.find((p) => p.id === s.player_id); if (!pl) return false; return (s.score - getHcpStrokes(pl.handicap, h.stroke_index)) === lowestNet3; }).map((s) => s.player_id);
                             const allTied3 = hWinners3.length === allPlayers3.length;
-                            if (allTied3) { thirdValue = "T"; thirdColor = "#94a3b8"; }
-                            else if (hWinners3.includes(player.id)) { thirdValue = "W"; thirdColor = "#22c55e"; }
-                            else { thirdValue = "L"; thirdColor = "#ef4444"; }
+                            if (allTied3) { thirdValue = "T"; thirdColor = "#94a3b8"; } // everyone same score = true tie
+                            else if (hWinners3.includes(player.id)) { thirdValue = "W"; thirdColor = "#22c55e"; } // beat at least one
+                            else { thirdValue = "L"; thirdColor = "#ef4444"; } // didn't match lowest
                           }
                         } else if (round.game_type === "banker") {
                           const bet = sc?.bet || 0;
@@ -2659,19 +2676,23 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                         }
                       }
                       return (
-                        <div key={player.id + h.hole_number} style={{ ...S.playerHoleCell, minWidth: 36, gap: 2 }}>
-                          <div style={S.playerHoleNumber}>{h.hole_number}</div>
-                          {g ? <div style={{ ...S.playerScoreValue, ...shapeStyle(gs) }}>{gn}</div> : <div style={S.playerScoreValue}>—</div>}
-                          {g ? <div style={{ ...S.playerScoreValue, ...shapeStyle(ns) }}>{nn}</div> : <div style={S.playerScoreValue}>—</div>}
+                        <div key={player.id + h.hole_number} style={{ minWidth: 36, flex: "0 0 auto", display: "flex", flexDirection: "column", alignItems: "center" }}>
+                          <div style={{ fontSize: 9, color: "#475569", height: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>{h.hole_number}</div>
+                          <div style={{ height: 28, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            {g ? <div style={{ ...shapeStyle(gs), fontSize: 11 }}>{gn}</div> : <div style={{ fontSize: 12, color: "#334155" }}>—</div>}
+                          </div>
+                          <div style={{ height: 28, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            {g ? <div style={{ ...shapeStyle(ns), fontSize: 11 }}>{nn}</div> : <div style={{ fontSize: 12, color: "#334155" }}>—</div>}
+                          </div>
                           {(round.game_type === "stableford" || round.game_type === "matchplay" || round.game_type === "banker") && (
-                            <div style={{ ...S.playerScoreValue, color: thirdColor, fontSize: 9 }}>{thirdValue}</div>
+                            <div style={{ height: 20, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: thirdColor }}>{thirdValue}</div>
                           )}
                         </div>
                       );
                     })}
                   </div>
                   {/* Running totals pinned right */}
-                  <div style={{ display: "flex", flexDirection: "column", gap: 2, paddingTop: 14, marginLeft: 6, paddingLeft: 6, borderLeft: "1px solid #334155", flexShrink: 0 }}>
+                  <div style={{ display: "flex", flexDirection: "column", paddingTop: 14, marginLeft: 6, paddingLeft: 6, borderLeft: "1px solid #334155", flexShrink: 0 }}>
                     <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800, color: pGrossTotal === 0 ? "#94a3b8" : pGrossTotal > 0 ? "#ef4444" : "#22c55e" }}>{formatToPar(pGrossTotal)}</div>
                     <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800, color: pNetTotal === 0 ? "#94a3b8" : pNetTotal > 0 ? "#ef4444" : "#22c55e" }}>{formatToPar(pNetTotal)}</div>
                     {round.game_type === "stableford" && (
