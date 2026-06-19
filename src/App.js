@@ -459,6 +459,25 @@ async function dbDeleteRound(roundId) {
   await supabase.from("rounds").delete().eq("id", roundId);
 }
 
+async function dbSaveBanker(roundId, bankerId) {
+  await supabase.from("rounds").update({ initial_banker_id: bankerId }).eq("id", roundId);
+}
+
+async function dbGetBanker(roundId) {
+  const { data } = await supabase.from("rounds").select("initial_banker_id, created_by").eq("id", roundId).single();
+  return data || {};
+}
+
+async function dbSaveRoundHistory(entry) {
+  await supabase.from("saved_rounds").upsert({ id: entry.id, player_name: entry.createdBy, data: entry }, { onConflict: "id" });
+}
+
+async function dbGetRoundHistory(playerName) {
+  const { data } = await supabase.from("saved_rounds").select("*").order("created_at", { ascending: false });
+  if (!data) return [];
+  return data.filter((r) => r.data?.players?.some((p) => p.name?.toLowerCase() === playerName?.toLowerCase())).map((r) => r.data);
+}
+
 async function dbGetBlockedPlayers() {
   const { data } = await supabase.from("blocked_players").select("*");
   return data || [];
@@ -493,12 +512,15 @@ function getSavedRounds(playerName = null) {
     const saved = localStorage.getItem("ff_saved_rounds");
     const all = saved ? JSON.parse(saved) : [];
     if (!playerName) return all;
-    // Only return rounds the player was in
     return all.filter((r) => r.players?.some((p) => p.name?.toLowerCase() === playerName.toLowerCase()));
   } catch { return []; }
 }
 
-function saveRoundToHistory(round, players, scores, holes) {
+async function getSavedRoundsFromSupabase(playerName) {
+  try { return await dbGetRoundHistory(playerName); } catch { return []; }
+}
+
+async function saveRoundToHistory(round, players, scores, holes) {
   const existing = getSavedRounds();
   const creator = players[0]?.name || 'Unknown';
   const entry = {
@@ -516,6 +538,7 @@ function saveRoundToHistory(round, players, scores, holes) {
   const filtered = existing.filter((r) => r.id !== round.id);
   const updated = [entry, ...filtered].slice(0, 20); // keep last 20
   localStorage.setItem("ff_saved_rounds", JSON.stringify(updated));
+  try { await dbSaveRoundHistory(entry); } catch(e) { console.log("Remote save failed", e); }
 }
 
 function deleteSavedRound(roundId) {
@@ -778,6 +801,11 @@ function HomeScreen({ onCreateRound, onJoinRound, onAdminLogin, onRejoin, lastRo
           </button>
         </div>
         <button onClick={() => setShowShare(true)} style={{ backgroundColor: "transparent", color: "#64748b", border: "1px solid #1e293b", borderRadius: 12, padding: "13px", fontSize: 13, fontWeight: 600, cursor: "pointer", width: "100%", fontFamily: "inherit" }}>Share App</button>
+        {/* Add to home screen prompt */}
+        <div style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "12px 16px", textAlign: "center" }}>
+          <div style={{ fontSize: 12, color: "#64748b", marginBottom: 4 }}>📱 Add to your home screen</div>
+          <div style={{ fontSize: 11, color: "#475569" }}>iPhone: tap Share → Add to Home Screen · Android: tap ⋮ → Add to Home Screen</div>
+        </div>
         <button style={{ background: "none", border: "none", color: "#334155", fontSize: 12, cursor: "pointer", padding: "8px 0 0", fontFamily: "inherit", textAlign: "center" }} onClick={onAdminLogin}>Admin</button>
       </div>
 
@@ -950,7 +978,7 @@ function AdminDashboardScreen({ onLogout }) {
   }, []);
 
   const startNew = () => {
-    const c = { id: genId(), name: newName, par: 72, holes: Array.from({ length: 18 }, (_, i) => ({ hole_number: i + 1, par: 4, stroke_index: i + 1 })) };
+    const c = { id: genId(), name: newName, par: 72, holes: Array.from({ length: 18 }, (_, i) => ({ hole_number: i + 1, par: "", stroke_index: "" })) };
     setEditing(c); setHoles(c.holes); setNewName("");
   };
 
@@ -1078,6 +1106,8 @@ function SuperAdminScreen({ onLogout }) {
   const handleDeleteRound = async (r) => {
     if (!window.confirm("Delete round " + r.code + " at " + r.course_name + "? Cannot be undone.")) return;
     await dbDeleteRound(r.id);
+    // Blacklist so it doesn't reappear
+    try { const ids = JSON.parse(localStorage.getItem("ff_deleted_rounds") || "[]"); localStorage.setItem("ff_deleted_rounds", JSON.stringify([...ids, r.id])); } catch {}
     setRounds((prev) => prev.filter((x) => x.id !== r.id));
     setMsg("Round deleted."); setTimeout(() => setMsg(""), 2000);
   };
@@ -1116,12 +1146,17 @@ function SuperAdminScreen({ onLogout }) {
           <div>
             <div style={{ fontSize: 13, color: "#64748b", marginBottom: 16 }}>{rounds.length} total rounds</div>
             {rounds.map((r) => (
-              <div key={r.id} style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 10, padding: "12px 14px", marginBottom: 8, display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "#f8fafc" }}>{r.course_name}</div>
-                  <div style={{ fontSize: 11, color: "#64748b" }}>{r.code} · {GAME_TYPES[r.game_type]?.label} · {new Date(r.created_at).toLocaleDateString("en-NZ")}</div>
+              <div key={r.id} style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 10, padding: "12px 14px", marginBottom: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "#f8fafc" }}>{r.course_name}</div>
+                    <div style={{ fontSize: 11, color: "#64748b" }}>{r.code} · {GAME_TYPES[r.game_type]?.label} · {new Date(r.created_at).toLocaleDateString("en-NZ")}</div>
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                    <button style={{ ...S.smallBtn, color: "#22c55e", borderColor: "#22c55e" }} onClick={() => { navigator.clipboard.writeText(window.location.origin + "?join=" + r.code); setMsg("Join link copied for " + r.code); setTimeout(() => setMsg(""), 2000); }}>Share</button>
+                    <button style={{ ...S.smallBtn, color: "#ef4444", borderColor: "#ef4444" }} onClick={() => handleDeleteRound(r)}>Delete</button>
+                  </div>
                 </div>
-                <button style={{ ...S.smallBtn, color: "#ef4444", borderColor: "#ef4444", flexShrink: 0 }} onClick={() => handleDeleteRound(r)}>Delete</button>
               </div>
             ))}
           </div>
@@ -1443,7 +1478,7 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
     setLoading(true); setErr("");
     try {
       const code = Math.random().toString(36).substr(2, 6).toUpperCase();
-      const round = await dbCreateRound({ code, course_name: course.name, course_id: course.id, game_type: gameType, holes: course.holes, use_handicap: useHandicap, created_at: new Date().toISOString(), created_by: "player" });
+      const round = await dbCreateRound({ code, course_name: course.name, course_id: course.id, game_type: gameType, holes: course.holes, use_handicap: useHandicap, created_at: new Date().toISOString(), created_by: name });
       const me = await dbCreatePlayer({ name, handicap: parseFloat(hcp) || 0, round_id: round.id, team: gameType === "matchplay_teams" ? team : null, is_placeholder: false });
       savePlayerProfile(name, parseFloat(hcp) || 0);
       const fullRound = { ...round, holes: course.holes };
@@ -1713,10 +1748,45 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
         {/* Banker hole breakdown */}
         {round.game_type === "banker" && lb.length > 0 && (
           <div style={{ marginTop: 24 }}>
-            <h3 style={S.stepTitle}>Hole Breakdown</h3>
+            <h3 style={S.stepTitle}>Banker Story</h3>
+            {/* Per hole banker result - who was banker and what they won */}
+            <div style={{ overflowX: "auto", marginBottom: 20 }}>
+              <div style={{ display: "flex", gap: 6 }}>
+                {holes.map((hole) => {
+                  const holeScores = scores.filter((s) => s.hole_number === hole.hole_number);
+                  const bankerId = holeScores[0]?.banker_id;
+                  const bankerPlayer = players.find((p) => p.id === bankerId);
+                  const allScored = players.every((p) => holeScores.some((s) => s.player_id === p.id));
+                  if (!allScored || !bankerPlayer) return (
+                    <div key={hole.hole_number} style={{ minWidth: 44, backgroundColor: "#1e293b", borderRadius: 8, padding: "8px 4px", textAlign: "center", flexShrink: 0 }}>
+                      <div style={{ fontSize: 9, color: "#475569", marginBottom: 4 }}>H{hole.hole_number}</div>
+                      <div style={{ fontSize: 10, color: "#334155" }}>—</div>
+                    </div>
+                  );
+                  // Find winner
+                  let lowest = Infinity, winner = null, tied = false;
+                  holeScores.forEach((s) => { const pl = players.find((p) => p.id === s.player_id); if (!pl) return; const net = s.score - getHcpStrokes(pl.handicap, hole.stroke_index); if (net < lowest) { lowest = net; winner = s.player_id; tied = false; } else if (net === lowest) tied = true; });
+                  const bankerWon = winner === bankerId && !tied;
+                  const bankerBets = holeScores.filter((s) => s.player_id !== bankerId).reduce((sum, s) => sum + (s.bet || 0), 0);
+                  return (
+                    <div key={hole.hole_number} style={{ minWidth: 52, backgroundColor: "#1e293b", borderRadius: 8, padding: "8px 4px", textAlign: "center", flexShrink: 0, border: "1px solid #334155" }}>
+                      <div style={{ fontSize: 9, color: "#475569", marginBottom: 2 }}>H{hole.hole_number}</div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", marginBottom: 2 }}>{bankerPlayer.name.split(" ")[0]}</div>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: bankerWon ? "#22c55e" : tied ? "#94a3b8" : "#ef4444" }}>{tied ? "TIE" : bankerWon ? "WIN" : "LOSS"}</div>
+                      <div style={{ fontSize: 10, color: bankerWon ? "#22c55e" : tied ? "#94a3b8" : "#ef4444" }}>{tied ? "" : (bankerWon ? "+" : "-") + "$" + bankerBets}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            {/* Individual player breakdown */}
+            <h3 style={S.stepTitle}>Player Balances</h3>
             {lb.map((player) => (
               <div key={player.id} style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#94a3b8", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>{player.name}</div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 0.5 }}>{player.name}</div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: player.total > 0 ? "#22c55e" : player.total < 0 ? "#ef4444" : "#94a3b8" }}>{player.total >= 0 ? "+$" : "-$"}{Math.abs(player.total)}</div>
+                </div>
                 <div style={{ display: "flex", gap: 4, overflowX: "auto", paddingBottom: 4 }}>
                   {holes.map((hole) => {
                     const hd = player.holeScores?.bankerHoleData?.[hole.hole_number];
@@ -1726,13 +1796,12 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
                         <div style={{ fontSize: 11, color: "#334155" }}>—</div>
                       </div>
                     );
-                    const label = hd.isBanker && hd.isWinner ? "B/W" : hd.isBanker ? "B/L" : hd.isWinner ? "W" : "L";
-                    const color = hd.isWinner ? "#22c55e" : "#ef4444";
+                    const color = hd.holeChange > 0 ? "#22c55e" : hd.holeChange < 0 ? "#ef4444" : "#94a3b8";
                     return (
-                      <div key={hole.hole_number} style={{ minWidth: 36, backgroundColor: "#1e293b", borderRadius: 6, padding: "6px 4px", textAlign: "center", flexShrink: 0 }}>
+                      <div key={hole.hole_number} style={{ minWidth: 40, backgroundColor: "#1e293b", borderRadius: 6, padding: "6px 4px", textAlign: "center", flexShrink: 0 }}>
                         <div style={{ fontSize: 9, color: "#475569", marginBottom: 2 }}>H{hole.hole_number}</div>
-                        <div style={{ fontSize: 11, fontWeight: 700, color }}>{label}</div>
-                        <div style={{ fontSize: 10, color: hd.runningPot > 0 ? "#22c55e" : hd.runningPot < 0 ? "#ef4444" : "#94a3b8" }}>${hd.runningPot}</div>
+                        <div style={{ fontSize: 11, fontWeight: 700, color }}>{hd.iAmBanker ? "🏦" : hd.isWinner ? "W" : hd.tied ? "T" : "L"}</div>
+                        <div style={{ fontSize: 10, color, fontWeight: 700 }}>{hd.holeChange !== 0 ? (hd.holeChange > 0 ? "+" : "") + "$" + hd.holeChange : ""}</div>
                       </div>
                     );
                   })}
@@ -1776,11 +1845,25 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
 
   useEffect(() => {
     (async () => {
-      const [s, p] = await Promise.all([dbGetScores(round.id), dbGetPlayers(round.id)]);
+      const [s, p, bankerData] = await Promise.all([dbGetScores(round.id), dbGetPlayers(round.id), round.game_type === "banker" ? dbGetBanker(round.id) : Promise.resolve({})]);
       setAllScores(s); setOthers(p.filter((pl) => pl.id !== me.id));
       const sc = {}, bt = {};
       s.filter((x) => x.player_id === me.id).forEach((x) => { sc[x.hole_number] = x.score; if (x.bet) bt[x.hole_number] = x.bet; });
       setMyScores(sc); setMyBets(bt);
+      // Load banker from Supabase
+      if (bankerData?.initial_banker_id) {
+        setInitialBankerId(bankerData.initial_banker_id);
+        // Determine current banker from scores
+        const lastScoredHole = Math.max(0, ...s.map((x) => x.hole_number));
+        if (lastScoredHole > 0) {
+          const lastHoleScores = s.filter((x) => x.hole_number === lastScoredHole);
+          const allP = [...p, me]; let lowest = Infinity, winner = null;
+          lastHoleScores.forEach((x) => { const pl = allP.find((pp) => pp.id === x.player_id); if (!pl) return; const net = x.score - getHcpStrokes(pl.handicap, round.holes?.find((h) => h.hole_number === lastScoredHole)?.stroke_index || 1); if (net < lowest) { lowest = net; winner = x.player_id; } });
+          setCurrentBankerId(winner || bankerData.initial_banker_id);
+        } else {
+          setCurrentBankerId(bankerData.initial_banker_id);
+        }
+      }
     })();
   }, [round.id, me.id]);
 
@@ -1837,6 +1920,14 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
     
     if (holeNum < 18) {
       const next = holeNum + 1;
+      // For banker, only advance if all players have scored this hole
+      if (round.game_type === "banker") {
+        const updatedScores = [...allScores.filter((s) => !(s.player_id === me.id && s.hole_number === holeNum)), obj];
+        const holeScores = updatedScores.filter((s) => s.hole_number === holeNum);
+        const allPlayersList = [...others, me];
+        const allScored = allPlayersList.every((p) => holeScores.some((s) => s.player_id === p.id));
+        if (!allScored) return; // Don't advance until all scored
+      }
       setActiveHole(next);
       setTimeout(() => {
         const pos = Math.max(0, (next - 1) * 54 - 120);
@@ -1986,18 +2077,28 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
             
             return (
               <>
-                {/* Hole 1 banker selector - show if no banker set yet */}
-                {activeHole === 1 && !initialBankerId && (
+                {/* Hole 1 banker selector - only round creator can select */}
+                {activeHole === 1 && !initialBankerId && round.created_by === me.name && (
                   <div style={{ backgroundColor: "#1e293b", border: "1.5px solid #f59e0b", borderRadius: 12, padding: "14px 16px", marginBottom: 12 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "#f59e0b", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>⚠ Select Initial Banker</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#f59e0b", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>⚠ Select Initial Banker (Creator only)</div>
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                       {[...others, me].map((p) => (
-                        <button key={p.id} onClick={() => { setInitialBankerId(p.id); setCurrentBankerId(p.id); }}
+                        <button key={p.id} onClick={async () => {
+                          setInitialBankerId(p.id);
+                          setCurrentBankerId(p.id);
+                          await dbSaveBanker(round.id, p.id);
+                        }}
                           style={{ backgroundColor: "#0f172a", color: "#f8fafc", border: "1px solid #334155", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                           {p.name} {p.id === me.id ? "(You)" : ""}
                         </button>
                       ))}
                     </div>
+                  </div>
+                )}
+                {/* Show waiting message for non-creators when no banker set */}
+                {activeHole === 1 && !initialBankerId && round.created_by !== me.name && (
+                  <div style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "12px 16px", marginBottom: 12, textAlign: "center" }}>
+                    <div style={{ fontSize: 13, color: "#64748b" }}>⏳ Waiting for round creator to select the initial banker...</div>
                   </div>
                 )}
 
@@ -2111,7 +2212,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
               <div style={{ display: "flex", alignItems: "center" }}>
                 <div className="ff-slave-scroll" style={{ ...S.scoreInfoRow, flex: 1 }} onScroll={(e) => { document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { if (el !== e.target) el.scrollLeft = e.target.scrollLeft; }); }}>
                   {holes.map((h) => { const g = myScores[h.hole_number]; const { number, shape } = getScoreShape(g, h.par); return (
-                    <div key={"gs"+h.hole_number} style={S.scoreInfoCell}><div style={S.scoreInfoCellNumber}>{h.hole_number}</div>
+                    <div key={"gs"+h.hole_number} style={S.scoreInfoCell}>
                       {g ? <div style={{ ...S.scoreInfoCellValue, ...shapeStyle(shape) }}>{number}</div> : <div style={S.scoreInfoCellValue}>—</div>}
                     </div>); })}
                 </div>
@@ -2124,7 +2225,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
               <div style={{ display: "flex", alignItems: "center" }}>
                 <div className="ff-slave-scroll" style={{ ...S.scoreInfoRow, flex: 1 }} onScroll={(e) => { document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { if (el !== e.target) el.scrollLeft = e.target.scrollLeft; }); }}>
                   {holes.map((h) => { const hs = getHcpStrokes(me.handicap, h.stroke_index); const g = myScores[h.hole_number]; const { number, shape } = getNetShape(g, h.par, hs); return (
-                    <div key={"ns"+h.hole_number} style={S.scoreInfoCell}><div style={S.scoreInfoCellNumber}>{h.hole_number}</div>
+                    <div key={"ns"+h.hole_number} style={S.scoreInfoCell}>
                       {g ? <div style={{ ...S.scoreInfoCellValue, ...shapeStyle(shape) }}>{number}</div> : <div style={S.scoreInfoCellValue}>—</div>}
                     </div>); })}
                 </div>
@@ -2157,12 +2258,13 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                       const myG = myScores[h.hole_number];
                       if (myG) {
                         const holeScores = allScores.filter((s) => s.hole_number === h.hole_number);
+                        const allPlayers2 = [...others, me];
                         // Only show W/L/T when ALL players have scored this hole
-                        const allScored2 = allPlayers.every((p) => holeScores.some((s) => s.player_id === p.id));
+                        const allScored2 = allPlayers2.every((p) => holeScores.some((s) => s.player_id === p.id));
                         if (allScored2) {
                           let lowest = Infinity, tied = [], winner = null;
                           holeScores.forEach((s) => {
-                            const pl = allPlayers.find((p) => p.id === s.player_id); if (!pl) return;
+                            const pl = allPlayers2.find((p) => p.id === s.player_id); if (!pl) return;
                             const net = s.score - getHcpStrokes(pl.handicap, h.stroke_index);
                             if (net < lowest) { lowest = net; tied = [s.player_id]; winner = s.player_id; } else if (net === lowest) tied.push(s.player_id);
                           });
@@ -2325,6 +2427,17 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
 // =============================================================================
 function PastRoundsScreen({ onBack, onViewRound }) {
   const [rounds, setRounds] = useState(getSavedRounds());
+  const profile = getPlayerProfile();
+  useEffect(() => {
+    (async () => {
+      if (profile.name) {
+        const remote = await getSavedRoundsFromSupabase(profile.name);
+        const local = getSavedRounds();
+        const merged = [...remote, ...local.filter((l) => !remote.some((r) => r.id === l.id))];
+        setRounds(merged);
+      }
+    })();
+  }, []);
 
   const handleDelete = (roundId, courseName) => {
     if (window.confirm("Remove " + courseName + " from your history?")) {
@@ -2424,10 +2537,44 @@ export default function GolfApp() {
           <div style={S.header}>
             <button style={S.backBtn} onClick={() => setScreen("history")}>← Back</button>
             <h2 style={S.headerTitle}>{viewingRound.course_name}</h2>
-            <div />
+            <button style={{ ...S.smallIconBtn, fontSize: 11, padding: "5px 8px" }} onClick={() => exportScorecardPDF(viewingRound, viewingRound.players, viewingRound.scores, viewingRound.holes)}>PDF</button>
           </div>
           <div style={S.content}>
-            <div style={{ fontSize: 13, color: "#64748b", marginBottom: 16 }}>{GAME_TYPES[viewingRound.game_type]?.label} · {viewingRound.date} · Round {viewingRound.code}</div>
+            <div style={{ fontSize: 13, color: "#64748b", marginBottom: 16 }}>{GAME_TYPES[viewingRound.game_type]?.label} · {viewingRound.date} · Created by {viewingRound.createdBy || "Unknown"}</div>
+            <div style={{ overflowX: "auto", marginBottom: 20 }}>
+              <table style={{ borderCollapse: "collapse", fontSize: 11, minWidth: "100%" }}>
+                <thead>
+                  <tr>
+                    <td style={{ padding: "6px 8px", backgroundColor: "#1e293b", color: "#64748b", fontWeight: 700, whiteSpace: "nowrap", minWidth: 100 }}>Player</td>
+                    {viewingRound.holes?.map((h) => <td key={h.hole_number} style={{ padding: "5px 3px", backgroundColor: "#1e293b", color: "#64748b", textAlign: "center", minWidth: 24 }}>{h.hole_number}</td>)}
+                    <td style={{ padding: "5px 6px", backgroundColor: "#1e293b", color: "#94a3b8", fontWeight: 700, textAlign: "center" }}>Tot</td>
+                  </tr>
+                  <tr>
+                    <td style={{ padding: "4px 8px", backgroundColor: "#0f172a", color: "#475569" }}>Par</td>
+                    {viewingRound.holes?.map((h) => <td key={h.hole_number} style={{ padding: "4px 3px", backgroundColor: "#0f172a", color: "#475569", textAlign: "center" }}>{h.par}</td>)}
+                    <td style={{ padding: "4px 6px", backgroundColor: "#0f172a", color: "#475569", textAlign: "center" }}>{viewingRound.holes?.reduce((s, h) => s + h.par, 0)}</td>
+                  </tr>
+                </thead>
+                <tbody>
+                  {calcLeaderboard(viewingRound.players, viewingRound.scores, viewingRound.holes, viewingRound.game_type).map((p, i) => (
+                    <tr key={p.id} style={{ backgroundColor: i % 2 === 0 ? "#0f172a" : "#111827" }}>
+                      <td style={{ padding: "5px 8px", color: "#f8fafc", fontWeight: 600, whiteSpace: "nowrap" }}>{i+1}. {p.name}</td>
+                      {viewingRound.holes?.map((h) => {
+                        const s = viewingRound.scores?.find((sc) => sc.player_id === p.id && sc.hole_number === h.hole_number);
+                        const score = s?.score; const diff = score ? score - h.par : null;
+                        let bg = "transparent";
+                        if (diff !== null) { if (diff <= -1) bg = "#991b1b"; else if (diff === 1) bg = "#7f1d1d"; else if (diff >= 2) bg = "#4c0519"; }
+                        return <td key={h.hole_number} style={{ padding: "4px 3px", textAlign: "center", backgroundColor: bg, color: "#fff", fontWeight: score ? 700 : 400, fontSize: 11 }}>{score || "—"}</td>;
+                      })}
+                      <td style={{ padding: "5px 6px", textAlign: "center", color: "#22c55e", fontWeight: 800 }}>
+                        {viewingRound.game_type === "stableford" ? p.total + "pt" : viewingRound.game_type === "banker" ? "$" + p.total : formatToPar(p.toPar)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <h3 style={S.stepTitle}>Final Standings</h3>
             {calcLeaderboard(viewingRound.players, viewingRound.scores, viewingRound.holes, viewingRound.game_type).map((p, i) => (
               <div key={p.id} style={{ ...S.lbRow }}>
                 <div style={S.lbPos}>{i + 1}</div>
@@ -2443,9 +2590,6 @@ export default function GolfApp() {
                 </div>
               </div>
             ))}
-            <button style={{ ...S.btnSecondary, marginTop: 24 }} onClick={() => exportScorecardImage(viewingRound, viewingRound.players, viewingRound.scores, viewingRound.holes)}>
-              Save Scorecard Image
-            </button>
           </div>
         </div>
       )}
