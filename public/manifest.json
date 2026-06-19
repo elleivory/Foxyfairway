@@ -1,0 +1,14 @@
+{
+  "short_name": "Foxy Fairways",
+  "name": "Foxy Fairways Golf Scoring",
+  "description": "Live golf scoring for your round",
+  "icons": [
+    { "src": "logo.png", "type": "image/png", "sizes": "512x512", "purpose": "any maskable" }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#0f172a",
+  "background_color": "#0f172a",
+  "categories": ["sports", "games"]
+}
