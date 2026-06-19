@@ -1370,7 +1370,7 @@ function RoundCompleteScreen({ round, players, scores, onSave, onDismiss }) {
             <div key={p.id} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #1e293b" }}>
               <div style={{ fontSize: 14, color: "#94a3b8" }}>{i + 2}. {p.name}</div>
               <div style={{ fontSize: 14, fontWeight: 600, color: "#64748b" }}>
-                {round.game_type === "stableford" ? p.total + " pts" : round.game_type === "banker" ? "$" + p.total : formatToPar(p.toPar)}
+                {round.game_type === "stableford" ? p.total + " pts" : round.game_type === "banker" ? (p.total >= 0 ? "+$" : "-$") + Math.abs(p.total) : formatToPar(p.toPar)}
               </div>
             </div>
           ))}
@@ -1424,7 +1424,7 @@ function TournamentScreen({ onBack }) {
           <h3 style={S.stepTitle}>Season Leaderboard</h3>
           {sorted.length === 0 ? <div style={S.empty}>No rounds saved to this tournament yet.</div> : sorted.map((p, i) => (
             <div key={p.name} style={{ ...S.lbRow, ...(i === 0 ? { backgroundColor: "#022c22", borderRadius: 10, padding: "14px 12px", margin: "0 -12px" } : {}) }}>
-              <div style={S.lbPos}>{i + 1}</div>
+              <div style={{ ...S.lbPos, color: i === 0 ? "#f59e0b" : i === 1 ? "#94a3b8" : i === 2 ? "#cd7c2f" : "#475569" }}>{i + 1}</div>
               <div style={S.lbName}>{p.name}<span style={S.lbHcp}>HCP {p.handicap}</span></div>
               <div style={S.lbRight}>
                 <div style={{ fontSize: 14, fontWeight: 700, color: "#f8fafc" }}>{formatToPar(p.totalToPar)}</div>
@@ -1560,7 +1560,10 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
               {courses.map((c) => (
                 <button key={c.id} style={{ ...S.courseCard, ...(course?.id === c.id ? S.courseCardSelected : {}) }} onClick={() => setCourse(c)}>
                   <span style={S.courseIcon}>⛳</span>
-                  <div style={{ flex: 1 }}><div style={S.courseName}>{c.name}</div><div style={S.courseAddr}>18 holes</div></div>
+                  <div style={{ flex: 1 }}>
+                    <div style={S.courseName}>{c.name}</div>
+                    <div style={S.courseAddr}>18 holes · Par {c.par || (c.holes ? c.holes.reduce((s, h) => s + (h.par || 0), 0) : "—")}</div>
+                  </div>
                 </button>
               ))}
             </div>
@@ -1759,11 +1762,17 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
       <div style={S.content}>
         <div style={{ textAlign: "center", marginBottom: 20, padding: 16, backgroundColor: "#1e293b", borderRadius: 12, border: "1px solid #334155" }}>
           <div style={{ display: "inline-block", backgroundColor: "#fff", borderRadius: 10, padding: 12, marginBottom: 8 }}>
-            <QRCodeSVG value={window.location.origin + window.location.pathname + "?join=" + round.code} size={130} bgColor="#ffffff" fgColor="#0f172a" />
+            <QRCodeSVG value={window.location.origin + window.location.pathname + "?join=" + round.code} size={100} bgColor="#ffffff" fgColor="#0f172a" />
           </div>
           <div style={{ fontSize: 13, color: "#94a3b8" }}>Scan to join · Code: <span style={{ color: "#22c55e", fontWeight: 700, letterSpacing: 2 }}>{round.code}</span></div>
         </div>
-        <h3 style={S.stepTitle}>Leaderboard</h3>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+          <h3 style={{ ...S.stepTitle, margin: 0 }}>Leaderboard</h3>
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#22c55e", animation: "pulse 1.5s infinite" }} />
+            <span style={{ fontSize: 11, color: "#475569" }}>Live</span>
+          </div>
+        </div>
         {lb.length === 0 ? <div style={S.empty}>Waiting for players...</div>
         : round.game_type === "matchplay_teams" ? (
           ["A", "B"].map((tl) => {
@@ -1784,13 +1793,13 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
         ) : (
           lb.map((p, i) => (
             <div key={p.id} style={{ ...S.lbRow, ...(p.id === me?.id ? S.lbRowMe : {}) }}>
-              <div style={S.lbPos}>{i + 1}</div>
+              <div style={{ ...S.lbPos, color: i === 0 ? "#f59e0b" : i === 1 ? "#94a3b8" : i === 2 ? "#cd7c2f" : "#475569" }}>{i + 1}</div>
               <div style={S.lbName}>{p.name}<span style={S.lbHcp}>HCP {p.handicap}</span></div>
               <div style={S.lbRight}>
                 <div style={S.lbScore}>
                   {round.game_type === "stableford" ? (p.total + " pts")
                     : round.game_type === "matchplay" ? (p.total === 0 ? "All Sq" : p.total > 0 ? Math.floor(p.total) + " Up" : Math.abs(Math.floor(p.total)) + " Dn")
-                    : round.game_type === "banker" ? <span style={{ color: p.total > 0 ? "#22c55e" : p.total < 0 ? "#ef4444" : "#94a3b8" }}>${p.total}</span>
+                    : round.game_type === "banker" ? <span style={{ color: p.total > 0 ? "#22c55e" : p.total < 0 ? "#ef4444" : "#94a3b8", fontSize: 18, fontWeight: 800 }}>{p.total >= 0 ? "+$" : "-$"}{Math.abs(p.total)}</span>
                     : <><div style={{ fontSize: 14, color: "#94a3b8" }}>Gross: {p.grossTotal || 0}</div>
                        <div style={{ fontSize: 14, fontWeight: 700 }}>{formatToPar(p.toPar)}</div></>}
                 </div>
@@ -2009,7 +2018,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
       }
       setActiveHole(next);
       setTimeout(() => {
-        const pos = Math.max(0, (next - 1) * 54 - 120);
+        const pos = Math.max(0, (next - 1) * 44 - 120);
         document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { el.scrollLeft = pos; });
       }, 50);
     } else {
@@ -2116,12 +2125,12 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
               return (
                 <button key={h.hole_number} onClick={() => {
                   setActiveHole(h.hole_number);
-                  const pos = Math.max(0, (h.hole_number - 1) * 54 - 140);
+                  const pos = Math.max(0, (h.hole_number - 1) * 44 - 140);
                   document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { el.scrollLeft = pos; });
                 }}
                   style={{
                     ...S.holeNavBtn,
-                    ...(isActive ? { ...S.holeNavActive, minWidth: 44, width: 44, height: 44, fontSize: 16, fontWeight: 900, boxShadow: "0 0 0 3px #022c22, 0 0 0 5px #22c55e" } : {}),
+                    ...(isActive ? { ...S.holeNavActive, minWidth: 40, width: 40, height: 40, fontSize: 15, fontWeight: 900, boxShadow: "0 0 0 3px #022c22, 0 0 0 5px #22c55e" } : {}),
                     ...(isDone ? S.holeNavDone : {}),
                     position: "relative",
                   }}>
@@ -2155,6 +2164,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                   const lead = Math.floor(myMatchTotal);
                   label = "Match"; color = lead > 0 ? "#22c55e" : lead < 0 ? "#ef4444" : "#94a3b8";
                   value = lead === 0 ? "All Sq" : lead > 0 ? lead + " Up" : Math.abs(lead) + " Dn";
+                  // Add holes played context
                 } else if (round.game_type === "banker") {
                   // Show MY running balance, not the pot
                   label = "Balance"; 
@@ -2330,19 +2340,21 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                         const pos = Math.max(0, (h.hole_number - 1) * 54 - 20);
                         document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { el.scrollLeft = pos; });
                       }}
-                        style={{ minWidth: 48, width: 48, flex: "0 0 auto", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: "pointer",
+                        style={{ minWidth: 40, width: 40, flex: "0 0 auto", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: "pointer",
                           backgroundColor: isActive ? "#022c22" : "transparent", borderRadius: 8, padding: "6px 0", gap: 1,
                           outline: isActive ? "1px solid #22c55e" : "none", outlineOffset: -1 }}>
                         <div style={{ fontSize: 16, fontWeight: 900, color: isActive ? "#22c55e" : "#f8fafc", lineHeight: 1 }}>{h.hole_number}</div>
                         <div style={{ width: 20, height: 1, backgroundColor: isActive ? "#22c55e" : "#334155", margin: "3px 0" }} />
                         <div style={{ fontSize: 11, fontWeight: 700, color: isActive ? "#22c55e" : "#94a3b8", lineHeight: 1 }}>P{h.par}</div>
                         <div style={{ fontSize: 9, fontWeight: 400, color: "#475569", lineHeight: 1.4 }}>{h.stroke_index}</div>
+                        {getHcpStrokes(me.handicap, h.stroke_index) > 0 && <div style={{ width: 4, height: 4, borderRadius: "50%", backgroundColor: "#f59e0b", marginTop: 1 }} />}
+                        {round.game_type === "stableford" && <div style={{ fontSize: 8, color: "#22c55e", lineHeight: 1, fontWeight: 600 }}>{2 + getHcpStrokes(me.handicap, h.stroke_index)}pt</div>}
                       </div>
                     );
                   })}
                 </div>
                 {/* Invisible spacer matching TotalPin width so scroll endpoint aligns */}
-                <div style={{ minWidth: 48, width: 48, flexShrink: 0 }} />
+                <div style={{ minWidth: 40, width: 40, flexShrink: 0 }} />
               </div>
             </div>
 
@@ -2421,42 +2433,60 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
             )}
 
             {round.game_type === "banker" && (
-              <div style={S.scoreInfoSection}>
-                <div style={S.scoreInfoSectionTitle}>Banker Result</div>
+              <div style={{ ...S.scoreInfoSection, padding: "8px 10px" }}>
+                <div style={S.scoreInfoSectionTitle}>Your Balance</div>
                 <div style={{ display: "flex", alignItems: "center" }}>
                   <div className="ff-slave-scroll" style={{ ...S.scoreInfoRow, flex: 1 }} onScroll={(e) => { document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { if (el !== e.target) el.scrollLeft = e.target.scrollLeft; }); }}>
                     {holes.map((h) => {
-                      const myG = myScores[h.hole_number], myBet = myBets[h.hole_number];
-                      if (!myG || !myBet) return (<div key={"bk"+h.hole_number} style={S.scoreInfoCell}><div style={S.scoreInfoCellNumber}>{h.hole_number}</div><div style={S.scoreInfoCellValue}>—</div></div>);
                       const holeScores = allScores.filter((s) => s.hole_number === h.hole_number);
-                      // Only show result when ALL players have scored
-                      const allScoredBk = allPlayers.every((p) => holeScores.some((s) => s.player_id === p.id));
-                      if (!allScoredBk) return (<div key={"bk"+h.hole_number} style={S.scoreInfoCell}><div style={S.scoreInfoCellNumber}>{h.hole_number}</div><div style={S.scoreInfoCellValue}>—</div></div>);
-                      let lowest = Infinity, winner = null;
-                      holeScores.forEach((s) => {
-                        const pl = allPlayers.find((p) => p.id === s.player_id); if (!pl) return;
-                        const net = s.score - getHcpStrokes(pl.handicap, h.stroke_index);
-                        if (net < lowest) { lowest = net; winner = s.player_id; }
-                      });
-                      const isWin = winner === me.id;
-                      const color = isWin ? "#22c55e" : "#ef4444";
+                      const myScore = holeScores.find((s) => s.player_id === me.id);
+                      const allScoredBk = myScore && allPlayers.every((p) => holeScores.some((s) => s.player_id === p.id));
+                      if (!allScoredBk) return (<div key={"bk"+h.hole_number} style={S.scoreInfoCell}><div style={{ fontSize: 14, color: "#334155" }}>—</div></div>);
+                      const bankerId = myScore?.banker_id || holeScores[0]?.banker_id;
+                      const doubled = holeScores.some((s) => s.doubled);
+                      const iAmBankerHole = bankerId === me.id;
+                      let lowest = Infinity, winner = null, tied = false;
+                      holeScores.forEach((s) => { const pl = allPlayers.find((p) => p.id === s.player_id); if (!pl) return; const net = s.score - getHcpStrokes(pl.handicap, h.stroke_index); if (net < lowest) { lowest = net; winner = s.player_id; tied = false; } else if (net === lowest) { tied = true; } });
+                      let holeChange = 0;
+                      if (!tied) {
+                        if (iAmBankerHole) { holeScores.forEach((s) => { if (s.player_id === me.id) return; const bet = (s.bet||0)*(doubled?2:1); if (winner===me.id) holeChange+=bet; else holeChange-=bet; }); }
+                        else { const myBet=(myScore?.bet||0)*(doubled?2:1); if(myBet>0){if(winner===me.id)holeChange+=myBet;else if(winner===bankerId)holeChange-=myBet;} }
+                      }
+                      const color = holeChange > 0 ? "#22c55e" : holeChange < 0 ? "#ef4444" : "#94a3b8";
                       return (
-                        <div key={"bk"+h.hole_number} style={{ ...S.scoreInfoCell, minWidth: 44 }}>
-                          <div style={S.scoreInfoCellNumber}>{h.hole_number}</div>
-                          <div style={{ ...S.scoreInfoCellValue, color, fontSize: 12 }}>{isWin ? "W" : "L"}</div>
-                          <div style={{ fontSize: 10, color, fontWeight: 700 }}>${myBet}</div>
-                          <div style={{ fontSize: 10, color, fontWeight: 700 }}>{isWin ? "+" + myBet * (holeScores.length - 1) : "-" + myBet}</div>
+                        <div key={"bk"+h.hole_number} style={{ ...S.scoreInfoCell, minWidth: 40 }}>
+                          <div style={{ fontSize: 11, fontWeight: 800, color }}>{iAmBankerHole ? "🏦" : tied ? "T" : winner === me.id ? "W" : "L"}</div>
+                          <div style={{ fontSize: 9, color, fontWeight: 700 }}>{holeChange !== 0 ? (holeChange > 0 ? "+$" : "-$") + Math.abs(holeChange) : ""}{doubled ? "×2" : ""}</div>
                         </div>
                       );
                     })}
                   </div>
-                  <RunningTotal value={myBankerTotal} label={"$" + myBankerTotal} color={myBankerTotal > 0 ? "#22c55e" : myBankerTotal < 0 ? "#ef4444" : "#94a3b8"} />
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minWidth: 48, paddingLeft: 8, borderLeft: "1px solid #334155", flexShrink: 0 }}>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: myBankerTotal > 0 ? "#22c55e" : myBankerTotal < 0 ? "#ef4444" : "#94a3b8" }}>{myBankerTotal >= 0 ? "+$" : "-$"}{Math.abs(myBankerTotal)}</span>
+                  </div>
                 </div>
               </div>
             )}
           </div>
         </div>
       )}
+
+      {/* Match play status banner */}
+      {(round.game_type === "matchplay" || round.game_type === "matchplay_teams") && (() => {
+        const holesPlayed = Object.keys(myScores).length;
+        if (holesPlayed === 0) return null;
+        const lead = Math.floor(myMatchTotal);
+        const color = lead > 0 ? "#22c55e" : lead < 0 ? "#ef4444" : "#94a3b8";
+        const bg = lead > 0 ? "#022c22" : lead < 0 ? "#1a0a0a" : "#1e293b";
+        const border = lead > 0 ? "#22c55e" : lead < 0 ? "#ef4444" : "#334155";
+        const status = lead === 0 ? "All Square" : lead > 0 ? lead + " Up" : Math.abs(lead) + " Down";
+        return (
+          <div style={{ margin: "0 16px 12px", backgroundColor: bg, border: "1px solid " + border, borderRadius: 10, padding: "10px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 13, color: "#94a3b8" }}>After {holesPlayed} hole{holesPlayed !== 1 ? "s" : ""}</span>
+            <span style={{ fontSize: 16, fontWeight: 800, color }}>{status}</span>
+          </div>
+        );
+      })()}
 
       {others.length > 0 && (
         <div style={S.otherPlayersSection}>
@@ -2746,7 +2776,7 @@ export default function GolfApp() {
                         return <td key={h.hole_number} style={{ padding: "4px 3px", textAlign: "center", backgroundColor: bg, color: "#fff", fontWeight: score ? 700 : 400, fontSize: 11 }}>{score || "—"}</td>;
                       })}
                       <td style={{ padding: "5px 6px", textAlign: "center", color: "#22c55e", fontWeight: 800 }}>
-                        {viewingRound.game_type === "stableford" ? p.total + "pt" : viewingRound.game_type === "banker" ? "$" + p.total : formatToPar(p.toPar)}
+                        {viewingRound.game_type === "stableford" ? p.total + "pt" : viewingRound.game_type === "banker" ? (p.total >= 0 ? "+$" : "-$") + Math.abs(p.total) : formatToPar(p.toPar)}
                       </td>
                     </tr>
                   ))}
@@ -2756,12 +2786,12 @@ export default function GolfApp() {
             <h3 style={S.stepTitle}>Final Standings</h3>
             {calcLeaderboard(viewingRound.players, viewingRound.scores, viewingRound.holes, viewingRound.game_type).map((p, i) => (
               <div key={p.id} style={{ ...S.lbRow }}>
-                <div style={S.lbPos}>{i + 1}</div>
+                <div style={{ ...S.lbPos, color: i === 0 ? "#f59e0b" : i === 1 ? "#94a3b8" : i === 2 ? "#cd7c2f" : "#475569" }}>{i + 1}</div>
                 <div style={S.lbName}>{p.name}<span style={S.lbHcp}>HCP {p.handicap}</span></div>
                 <div style={S.lbRight}>
                   <div style={S.lbScore}>
                     {viewingRound.game_type === "stableford" ? p.total + " pts"
-                      : viewingRound.game_type === "banker" ? "$" + p.total
+                      : viewingRound.game_type === "banker" ? (p.total >= 0 ? "+$" : "-$") + Math.abs(p.total)
                       : viewingRound.game_type === "matchplay" ? (p.total === 0 ? "All Sq" : p.total > 0 ? Math.floor(p.total) + " Up" : Math.abs(Math.floor(p.total)) + " Dn")
                       : <><div style={{ fontSize: 13, color: "#94a3b8" }}>Gross: {p.grossTotal}</div><div style={{ fontSize: 14, fontWeight: 700 }}>{formatToPar(p.toPar)}</div></>}
                   </div>
@@ -2802,7 +2832,7 @@ const S = {
   headerGame: { fontSize: 12, color: "#64748b" },
   headerTitle: { fontSize: 18, fontWeight: 700, margin: 0, color: "#f8fafc" },
   adminBadge: { backgroundColor: "#f59e0b", color: "#0f172a", fontSize: 11, fontWeight: 800, padding: "4px 10px", borderRadius: 6, letterSpacing: 1 },
-  backBtn: { background: "none", border: "none", color: "#22c55e", fontSize: 14, cursor: "pointer", padding: 0, fontFamily: "inherit" },
+  backBtn: { background: "none", border: "1px solid #334155", borderRadius: 8, color: "#22c55e", fontSize: 14, cursor: "pointer", padding: "8px 12px", fontFamily: "inherit" },
   lbBtn: { backgroundColor: "#22c55e", color: "#0f172a", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },
   smallIconBtn: { backgroundColor: "#1e293b", color: "#e2e8f0", border: "1px solid #334155", borderRadius: 8, padding: "8px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" },
   content: { flex: 1, padding: "20px 20px 40px", overflowY: "auto" },
@@ -2838,8 +2868,8 @@ const S = {
   gameName: { fontSize: 15, fontWeight: 700, color: "#f8fafc" },
   gameDesc: { fontSize: 12, color: "#64748b", marginTop: 2 },
   roundInfo: { display: "flex", alignItems: "center", gap: 12, backgroundColor: "#022c22", border: "1px solid #22c55e", borderRadius: 12, padding: "14px 16px", marginBottom: 20 },
-  holeNav: { display: "flex", gap: 6, overflowX: "auto", scrollbarWidth: "none", msOverflowStyle: "none" },
-  holeNavBtn: { minWidth: 48, width: 48, height: 36, borderRadius: 8, border: "none", outline: "1px solid #334155", outlineOffset: -1, backgroundColor: "#0f172a", color: "#94a3b8", fontSize: 13, fontWeight: 600, cursor: "pointer", flexShrink: 0, fontFamily: "inherit", WebkitAppearance: "none" },
+  holeNav: { display: "flex", gap: 4, overflowX: "auto", scrollbarWidth: "none", msOverflowStyle: "none" },
+  holeNavBtn: { minWidth: 40, width: 40, height: 36, borderRadius: 8, border: "none", outline: "1px solid #334155", outlineOffset: -1, backgroundColor: "#0f172a", color: "#94a3b8", fontSize: 13, fontWeight: 600, cursor: "pointer", flexShrink: 0, fontFamily: "inherit", WebkitAppearance: "none" },
   holeNavActive: { outline: "2px solid #22c55e", outlineOffset: -1, color: "#22c55e", backgroundColor: "#022c22", fontSize: 15, fontWeight: 900, zIndex: 1 },
   holeNavDone: { backgroundColor: "#1e3a1e", color: "#22c55e", border: "1px solid #22c55e" },
   holeCard: { margin: "16px", backgroundColor: "#1e293b", borderRadius: 16, padding: "20px", border: "1px solid #334155" },
@@ -2853,9 +2883,9 @@ const S = {
   scoreBtn: { flex: 1, borderRadius: 12, padding: "12px 4px", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, fontFamily: "inherit", WebkitAppearance: "none" },
   scoreBtnNum: { fontSize: 22, fontWeight: 800 },
   scoreBtnLabel: { fontSize: 9, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 },
-  customScore: { display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1px solid #334155", paddingTop: 16, marginTop: 4, gap: 12 },
+  customScore: { display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1px solid #334155", paddingTop: 12, marginTop: 4, gap: 12 },
   customLabel: { fontSize: 13, color: "#64748b" },
-  customInput: { backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, padding: "8px 12px", color: "#f8fafc", fontSize: 18, fontWeight: 700, width: 60, textAlign: "center", outline: "none", fontFamily: "inherit" },
+  customInput: { backgroundColor: "#1e293b", border: "1px solid #475569", borderRadius: 8, padding: "8px 12px", color: "#f8fafc", fontSize: 18, fontWeight: 700, width: 60, textAlign: "center", outline: "none", fontFamily: "inherit" },
   scoreInfoBoxes: { display: "flex", flexDirection: "column", gap: 6, marginTop: 10 },
   scoreInfoSection: { backgroundColor: "#0f172a", border: "1px solid #1e293b", borderRadius: 6, padding: "6px 10px" },
   scoreInfoSectionTitle: { fontSize: 9, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 },
@@ -2865,7 +2895,7 @@ const S = {
   scoreInfoCellValue: { fontSize: 14, fontWeight: 800, color: "#22c55e" },
   lbRow: { display: "flex", alignItems: "center", gap: 12, padding: "14px 0", borderBottom: "1px solid #1e293b" },
   lbRowMe: { backgroundColor: "#022c22", borderRadius: 10, padding: "14px 12px", margin: "0 -12px" },
-  lbPos: { fontSize: 18, fontWeight: 800, color: "#475569", width: 28 },
+  lbPos: { fontSize: 18, fontWeight: 800, color: "#475569", width: 28, flexShrink: 0 },
   lbName: { flex: 1, fontSize: 16, fontWeight: 600, color: "#f8fafc" },
   lbHcp: { fontSize: 11, color: "#475569", fontWeight: 400, marginLeft: 8 },
   lbRight: { textAlign: "right" },
