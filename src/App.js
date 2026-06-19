@@ -2109,8 +2109,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
         <div id="ff-master-scroll" style={S.holeNav} onScroll={(e) => {
           document.querySelectorAll(".ff-slave-scroll").forEach((el) => { if (el !== e.target) el.scrollLeft = e.target.scrollLeft; });
         }}>
-          {holes.map((h) => (
-            {(() => {
+          {holes.map((h) => {
               const holeAllScored = allPlayers.length > 1 && allScores.filter((s) => s.hole_number === h.hole_number).length >= allPlayers.length;
               const isActive = h.hole_number === activeHole;
               const isDone = !!myScores[h.hole_number] && !isActive;
@@ -2130,8 +2129,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                   {holeAllScored && isDone && <span style={{ position: "absolute", top: -3, right: -3, backgroundColor: "#22c55e", borderRadius: "50%", width: 10, height: 10, fontSize: 7, display: "flex", alignItems: "center", justifyContent: "center", color: "#0f172a", fontWeight: 900 }}>✓</span>}
                 </button>
               );
-            })()}
-          ))}
+            })}
         </div>
       </div>
 
