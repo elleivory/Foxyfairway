@@ -322,19 +322,20 @@ function getNetShape(gross, par, hcpS) {
 }
 
 function shapeStyle(shape) {
-  // Use padding instead of box-shadow so shapes never clip cell boundaries
-  const base = { display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#e2e8f0", width: 26, height: 26, flexShrink: 0, position: "relative" };
+  // Use wrapper approach - inner element gets the shape, outer provides spacing
+  const base = { display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: "#e2e8f0", width: 32, height: 32, flexShrink: 0, position: "relative" };
   switch (shape) {
     case "circle":
-      return { ...base, borderRadius: "50%", border: "1.5px solid #e2e8f0" };
+      return { ...base, borderRadius: "50%", border: "1.5px solid #e2e8f0", width: 24, height: 24 };
     case "doubleCircle":
-      return { ...base, borderRadius: "50%", border: "1.5px solid #e2e8f0", outline: "1.5px solid #e2e8f0", outlineOffset: "2px" };
+      // Use box-shadow instead of outline - stays inside the element bounds
+      return { ...base, borderRadius: "50%", border: "1.5px solid #e2e8f0", boxShadow: "0 0 0 3px #1e293b, 0 0 0 5px #e2e8f0", width: 20, height: 20, margin: "4px" };
     case "tripleCircle":
-      return { ...base, borderRadius: "50%", border: "1.5px solid #e2e8f0", outline: "1.5px solid #e2e8f0", outlineOffset: "3px", width: 20, height: 20 };
+      return { ...base, borderRadius: "50%", border: "1.5px solid #e2e8f0", boxShadow: "0 0 0 2px #1e293b, 0 0 0 4px #e2e8f0, 0 0 0 6px #1e293b, 0 0 0 8px #e2e8f0", width: 14, height: 14, margin: "7px" };
     case "square":
-      return { ...base, border: "1.5px solid #e2e8f0" };
+      return { ...base, border: "1.5px solid #e2e8f0", width: 24, height: 24 };
     case "doubleSquare":
-      return { ...base, border: "1.5px solid #e2e8f0", outline: "1.5px solid #e2e8f0", outlineOffset: "2px" };
+      return { ...base, border: "1.5px solid #e2e8f0", boxShadow: "0 0 0 3px #1e293b, 0 0 0 5px #e2e8f0", width: 20, height: 20, margin: "4px" };
     case "triangle":
       return { ...base, clipPath: "polygon(50% 0%, 100% 100%, 0% 100%)", border: "1.5px solid #e2e8f0", width: 22, height: 22 };
     default:
@@ -859,11 +860,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onAdminLogin, onRejoin, lastRo
           </button>
         </div>
         <button onClick={() => setShowShare(true)} style={{ backgroundColor: "transparent", color: "#64748b", border: "1px solid #1e293b", borderRadius: 12, padding: "13px", fontSize: 13, fontWeight: 600, cursor: "pointer", width: "100%", fontFamily: "inherit" }}>Share App</button>
-        {/* Add to home screen prompt */}
-        <div style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "12px 16px", textAlign: "center" }}>
-          <div style={{ fontSize: 12, color: "#64748b", marginBottom: 4 }}>📱 Add to your home screen</div>
-          <div style={{ fontSize: 11, color: "#475569" }}>iPhone: tap Share → Add to Home Screen · Android: tap ⋮ → Add to Home Screen</div>
-        </div>
+
         <button style={{ background: "none", border: "none", color: "#334155", fontSize: 12, cursor: "pointer", padding: "8px 0 0", fontFamily: "inherit", textAlign: "center" }} onClick={onAdminLogin}>Admin</button>
       </div>
 
@@ -1983,36 +1980,41 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
     });
     await dbSaveScore(obj);
     
-    // After scoring, check if all players have scored - if so, winner becomes next banker
+    // After scoring - if all players scored, determine next banker
     if (round.game_type === "banker") {
       const updatedHoleScores = [...allScores.filter((s) => !(s.player_id === me.id && s.hole_number === holeNum)), obj].filter((s) => s.hole_number === holeNum);
-      if (updatedHoleScores.length === allPlayers.length) {
-        let lowest = Infinity, winner = null;
+      const allPlayersList2 = [...others, me];
+      if (updatedHoleScores.length >= allPlayersList2.length) {
+        let lowest = Infinity, winner = null, tied = false;
         updatedHoleScores.forEach((s) => {
-          const pl = allPlayers.find((p) => p.id === s.player_id); if (!pl) return;
+          const pl = allPlayersList2.find((p) => p.id === s.player_id); if (!pl) return;
           const hole = holes.find((h) => h.hole_number === holeNum);
           const net = s.score - getHcpStrokes(pl.handicap, hole?.stroke_index || 1);
-          if (net < lowest) { lowest = net; winner = s.player_id; }
+          if (net < lowest) { lowest = net; winner = s.player_id; tied = false; }
+          else if (net === lowest) { tied = true; }
         });
-        if (winner) setCurrentBankerId(winner);
+        // Only rotate if clear winner - tied hole keeps current banker
+        if (winner && !tied) setCurrentBankerId(winner);
       }
     }
     
     if (holeNum < 18) {
       const next = holeNum + 1;
-      // For banker, only advance if all players have scored this hole
       if (round.game_type === "banker") {
         const updatedScores = [...allScores.filter((s) => !(s.player_id === me.id && s.hole_number === holeNum)), obj];
         const holeScores = updatedScores.filter((s) => s.hole_number === holeNum);
         const allPlayersList = [...others, me];
         const allScored = allPlayersList.every((p) => holeScores.some((s) => s.player_id === p.id));
-        if (!allScored) return; // Don't advance until all scored
+        if (!allScored) return;
       }
       setActiveHole(next);
       setTimeout(() => {
         const pos = Math.max(0, (next - 1) * 54 - 120);
         document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { el.scrollLeft = pos; });
       }, 50);
+    } else {
+      // Hole 18 complete - go back to dashboard which will show round complete
+      setTimeout(() => onViewDashboard(), 800);
     }
   };
 
@@ -2108,23 +2110,27 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
           document.querySelectorAll(".ff-slave-scroll").forEach((el) => { if (el !== e.target) el.scrollLeft = e.target.scrollLeft; });
         }}>
           {holes.map((h) => (
-            <button key={h.hole_number} onClick={() => {
-              setActiveHole(h.hole_number);
-              const pos = Math.max(0, (h.hole_number - 1) * 54 - 140);
-              document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { el.scrollLeft = pos; });
-            }}
-              style={{
-                ...S.holeNavBtn,
-                ...(h.hole_number === activeHole ? {
-                  ...S.holeNavActive,
-                  minWidth: 44, width: 44, height: 44,
-                  fontSize: 16, fontWeight: 900,
-                  boxShadow: "0 0 0 3px #022c22, 0 0 0 5px #22c55e",
-                } : {}),
-                ...(myScores[h.hole_number] && h.hole_number !== activeHole ? S.holeNavDone : {}),
-              }}>
-              {h.hole_number}
-            </button>
+            {(() => {
+              const holeAllScored = allPlayers.length > 1 && allScores.filter((s) => s.hole_number === h.hole_number).length >= allPlayers.length;
+              const isActive = h.hole_number === activeHole;
+              const isDone = !!myScores[h.hole_number] && !isActive;
+              return (
+                <button key={h.hole_number} onClick={() => {
+                  setActiveHole(h.hole_number);
+                  const pos = Math.max(0, (h.hole_number - 1) * 54 - 140);
+                  document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { el.scrollLeft = pos; });
+                }}
+                  style={{
+                    ...S.holeNavBtn,
+                    ...(isActive ? { ...S.holeNavActive, minWidth: 44, width: 44, height: 44, fontSize: 16, fontWeight: 900, boxShadow: "0 0 0 3px #022c22, 0 0 0 5px #22c55e" } : {}),
+                    ...(isDone ? S.holeNavDone : {}),
+                    position: "relative",
+                  }}>
+                  {h.hole_number}
+                  {holeAllScored && isDone && <span style={{ position: "absolute", top: -3, right: -3, backgroundColor: "#22c55e", borderRadius: "50%", width: 10, height: 10, fontSize: 7, display: "flex", alignItems: "center", justifyContent: "center", color: "#0f172a", fontWeight: 900 }}>✓</span>}
+                </button>
+              );
+            })()}
           ))}
         </div>
       </div>
@@ -2132,7 +2138,16 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
       {curHole && (
         <div style={S.holeCard}>
           <div style={S.holeTop}>
-            <div><div style={S.holeNum}>Hole {curHole.hole_number}</div><div style={S.holeMeta}>SI {curHole.stroke_index}</div></div>
+            <div>
+              <div style={S.holeNum}>Hole {curHole.hole_number}</div>
+              <div style={S.holeMeta}>SI {curHole.stroke_index}</div>
+              {round.game_type === "banker" && (() => {
+                const thisBankerId2 = activeHole === 1 ? initialBankerId : currentBankerId;
+                const bankerName = [...others, me].find((p) => p.id === thisBankerId2)?.name;
+                if (!bankerName) return null;
+                return <div style={{ fontSize: 11, color: "#f59e0b", fontWeight: 700, marginTop: 2 }}>🏦 {thisBankerId2 === me.id ? "YOU ARE BANKER" : bankerName + " is Banker"}</div>;
+              })()}
+            </div>
             <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
               {(() => {
                 let label, value, color;
@@ -2827,7 +2842,7 @@ const S = {
   roundInfo: { display: "flex", alignItems: "center", gap: 12, backgroundColor: "#022c22", border: "1px solid #22c55e", borderRadius: 12, padding: "14px 16px", marginBottom: 20 },
   holeNav: { display: "flex", gap: 6, overflowX: "auto", scrollbarWidth: "none", msOverflowStyle: "none" },
   holeNavBtn: { minWidth: 48, width: 48, height: 36, borderRadius: 8, border: "none", outline: "1px solid #334155", outlineOffset: -1, backgroundColor: "#0f172a", color: "#94a3b8", fontSize: 13, fontWeight: 600, cursor: "pointer", flexShrink: 0, fontFamily: "inherit", WebkitAppearance: "none" },
-  holeNavActive: { outline: "2px solid #22c55e", outlineOffset: -1, color: "#22c55e", backgroundColor: "#022c22", fontSize: 15, fontWeight: 900, transform: "scale(1.15)", zIndex: 1 },
+  holeNavActive: { outline: "2px solid #22c55e", outlineOffset: -1, color: "#22c55e", backgroundColor: "#022c22", fontSize: 15, fontWeight: 900, zIndex: 1 },
   holeNavDone: { backgroundColor: "#1e3a1e", color: "#22c55e", border: "1px solid #22c55e" },
   holeCard: { margin: "16px", backgroundColor: "#1e293b", borderRadius: 16, padding: "20px", border: "1px solid #334155" },
   holeTop: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 },
@@ -2847,7 +2862,7 @@ const S = {
   scoreInfoSection: { backgroundColor: "#0f172a", border: "1px solid #1e293b", borderRadius: 6, padding: "6px 10px" },
   scoreInfoSectionTitle: { fontSize: 9, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 },
   scoreInfoRow: { display: "flex", gap: 4, overflowX: "auto", paddingBottom: 4, scrollbarWidth: "none" },
-  scoreInfoCell: { display: "flex", flexDirection: "column", alignItems: "center", minWidth: 48, width: 48, flex: "0 0 auto" },
+  scoreInfoCell: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minWidth: 40, width: 40, flex: "0 0 auto", padding: "2px 0" },
   scoreInfoCellNumber: { fontSize: 9, color: "#64748b", fontWeight: 700, marginBottom: 2 },
   scoreInfoCellValue: { fontSize: 14, fontWeight: 800, color: "#22c55e" },
   lbRow: { display: "flex", alignItems: "center", gap: 12, padding: "14px 0", borderBottom: "1px solid #1e293b" },
