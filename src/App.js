@@ -253,17 +253,11 @@ function calcLeaderboard(players, scores, holes, gameType) {
         const myS = scores.find((s) => s.player_id === p.id && s.hole_number === hole.hole_number);
         if (!myS) return;
         const allH = scores.filter((s) => s.hole_number === hole.hole_number);
-        // Only calculate when all players have scored
-        const allScored = players.every((pl) => allH.some((s) => s.player_id === pl.id));
-        if (!allScored) return;
-        
+        if (!players.every((pl) => allH.some((s) => s.player_id === pl.id))) return;
         const bankerId = myS.banker_id || allH[0]?.banker_id;
-        const myBet = myS.bet || 0;
-        const doubled = myS.doubled || false;
-        const effectiveBet = doubled ? myBet * 2 : myBet;
+        const doubled = allH.some((s) => s.doubled);
         const iAmBanker = bankerId === p.id;
-        
-        // Find winner (lowest net)
+        // Find winner
         let lowest = Infinity, winner = null, tied = false;
         allH.forEach((s) => {
           const pl = players.find((pl) => pl.id === s.player_id); if (!pl) return;
@@ -271,32 +265,25 @@ function calcLeaderboard(players, scores, holes, gameType) {
           if (net < lowest) { lowest = net; winner = s.player_id; tied = false; }
           else if (net === lowest) { tied = true; }
         });
-        
         let holeChange = 0;
         if (!tied) {
           if (iAmBanker) {
-            // Banker wins from each non-banker player who lost, loses to each who won
             allH.forEach((s) => {
               if (s.player_id === p.id) return;
-              const oppBet = doubled ? (s.bet || 0) * 2 : (s.bet || 0);
-              if (winner === p.id) holeChange += oppBet; // banker beat them
-              else if (winner === s.player_id) holeChange -= oppBet; // they beat banker
-              // tie = $0
+              const bet = (s.bet || 0) * (doubled ? 2 : 1);
+              if (winner === p.id) holeChange += bet;
+              else holeChange -= bet;
             });
           } else {
-            // Non-banker: win from banker or lose to banker
-            if (winner === p.id) holeChange += effectiveBet;
-            else if (winner === bankerId) holeChange -= effectiveBet;
-            // tie = $0 (simple variant)
+            const myBet = (myS.bet || 0) * (doubled ? 2 : 1);
+            if (myBet > 0) {
+              if (winner === p.id) holeChange += myBet;
+              else if (winner === bankerId) holeChange -= myBet;
+            }
           }
         }
-        
         bankerTotal += holeChange;
-        bankerHoleData[hole.hole_number] = { 
-          bet: effectiveBet, iAmBanker, isWinner: winner === p.id, 
-          winnerId: winner, tied, holeChange, runningPot: bankerTotal,
-          bankerId, doubled
-        };
+        bankerHoleData[hole.hole_number] = { bet: myS.bet || 0, effectiveBet: (myS.bet||0)*(doubled?2:1), iAmBanker, isWinner: winner === p.id, winnerId: winner, tied, holeChange, runningPot: bankerTotal, bankerId, doubled };
       });
       total = bankerTotal;
       holeScores.bankerHoleData = bankerHoleData;
@@ -449,7 +436,8 @@ async function dbSendChat(msg) {
 
 async function dbGetAllRounds() {
   const { data } = await supabase.from("rounds").select("*, players(count)").order("created_at", { ascending: false }).limit(100);
-  return data || [];
+  const deletedIds = JSON.parse(localStorage.getItem("ff_deleted_rounds") || "[]");
+  return (data || []).filter((r) => !deletedIds.includes(r.id));
 }
 
 async function dbDeleteRound(roundId) {
@@ -561,6 +549,76 @@ function loadLastRound() {
 // SCORECARD IMAGE EXPORT
 // =============================================================================
 async function exportScorecardPDF(round, players, scores, holes) {
+  const front9 = holes.slice(0, 9);
+  const back9 = holes.slice(9, 18);
+
+  const shapeCell = (score, par, hcpS, gameType, extraMetric) => {
+    if (!score) return `<td style="border:1px solid #ccc;padding:6px;text-align:center;color:#999;font-size:13px">—</td>`;
+    const diff = score - par;
+    const netDiff = score - hcpS - par;
+    let shape = "";
+    if (diff <= -2) shape = `border-radius:50%;border:2px solid #333;outline:2px solid #333;outline-offset:2px;`;
+    else if (diff === -1) shape = `border-radius:50%;border:2px solid #333;`;
+    else if (diff === 1) shape = `border:2px solid #333;`;
+    else if (diff >= 2) shape = `border:2px solid #333;outline:2px solid #333;outline-offset:2px;`;
+    let metric = "";
+    if (gameType === "stableford") { const pts = Math.max(0, par - (score - hcpS) + 2); metric = `<div style="font-size:9px;color:#555">${pts}pt</div>`; }
+    else if (gameType === "matchplay") metric = "";
+    else if (gameType === "banker" && extraMetric !== undefined) { const c = extraMetric > 0 ? "green" : extraMetric < 0 ? "red" : "#555"; metric = `<div style="font-size:9px;color:${c}">${extraMetric >= 0 ? "+" : ""}$${extraMetric}</div>`; }
+    return `<td style="border:1px solid #ccc;padding:4px;text-align:center"><div style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;font-size:13px;font-weight:bold;${shape}">${score}</div>${metric}</td>`;
+  };
+
+  const buildPlayerTable = (player, holeSet, setLabel) => {
+    const lbData = calcLeaderboard([player], scores, holes, round.game_type)[0];
+    const parRow = holeSet.map((h) => `<td style="border:1px solid #ccc;padding:5px;text-align:center;background:#f5f5f5;font-size:12px">${h.par}</td>`).join("");
+    const holeRow = holeSet.map((h) => `<td style="border:1px solid #ccc;padding:5px;text-align:center;background:#e8e8e8;font-weight:bold;font-size:12px">${h.hole_number}</td>`).join("");
+    const parTotal = holeSet.reduce((s, h) => s + h.par, 0);
+    const playerScores = holeSet.map((h) => {
+      const sc = scores.find((s) => s.player_id === player.id && s.hole_number === h.hole_number);
+      const hcpS = getHcpStrokes(player.handicap, h.stroke_index);
+      let extra;
+      if (round.game_type === "banker" && lbData?.holeScores?.bankerHoleData?.[h.hole_number]) {
+        extra = lbData.holeScores.bankerHoleData[h.hole_number].holeChange;
+      }
+      return shapeCell(sc?.score, h.par, hcpS, round.game_type, extra);
+    }).join("");
+    const grossSet = holeSet.reduce((s, h) => { const sc = scores.find((x) => x.player_id === player.id && x.hole_number === h.hole_number); return s + (sc?.score || 0); }, 0);
+    const totalLabel = round.game_type === "stableford" ? (lbData?.total || 0) + "pts" : round.game_type === "banker" ? (lbData?.total >= 0 ? "+$" : "-$") + Math.abs(lbData?.total || 0) : formatToPar(lbData?.toPar || 0);
+    return `
+      <div style="margin-bottom:20px;page-break-inside:avoid">
+        <div style="background:#1a2a3a;color:white;padding:8px 12px;font-weight:bold;font-size:14px;border-radius:4px 4px 0 0">
+          ${player.name} (HCP ${player.handicap}) · ${setLabel} · ${GAME_TYPES[round.game_type]?.label}
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-family:sans-serif">
+          <tr><td style="border:1px solid #ccc;padding:5px;background:#e8e8e8;font-weight:bold;font-size:11px">Hole</td>${holeRow}<td style="border:1px solid #ccc;padding:5px;background:#e8e8e8;font-weight:bold;text-align:center;font-size:11px">Total</td></tr>
+          <tr><td style="border:1px solid #ccc;padding:5px;background:#f5f5f5;font-size:12px">Par</td>${parRow}<td style="border:1px solid #ccc;padding:5px;text-align:center;background:#f5f5f5;font-weight:bold;font-size:12px">${parTotal}</td></tr>
+          <tr><td style="border:1px solid #ccc;padding:5px;font-size:12px">Score</td>${playerScores}<td style="border:1px solid #ccc;padding:5px;text-align:center;font-weight:bold;font-size:13px;color:#1a2a3a">${grossSet || "—"} (${totalLabel})</td></tr>
+        </table>
+      </div>`;
+  };
+
+  const html = `<!DOCTYPE html><html><head><title>Foxy Fairways Scorecard</title>
+    <style>
+      body{font-family:sans-serif;padding:20px;background:#fff;color:#111}
+      h1{color:#1a2a3a;margin:0 0 4px}
+      .subtitle{color:#666;margin:0 0 20px;font-size:13px}
+      @media print{body{padding:10px}}
+    </style></head><body>
+    <h1>⛳ Foxy Fairways</h1>
+    <p class="subtitle">${round.course_name} · ${GAME_TYPES[round.game_type]?.label} · ${new Date().toLocaleDateString("en-NZ", { day:"numeric",month:"long",year:"numeric" })} · Code ${round.code} · Created by ${round.created_by || "Unknown"}${round.use_handicap === false ? " · Scratch Play" : ""}</p>
+    ${players.map((p) => buildPlayerTable(p, front9, "Front 9") + buildPlayerTable(p, back9, "Back 9")).join("")}
+    <p style="font-size:10px;color:#999;margin-top:20px">foxyfairways.netlify.app</p>
+    </body></html>`;
+
+  const win = window.open("", "_blank");
+  if (!win) return;
+  win.document.write(html);
+  win.document.close();
+  setTimeout(() => win.print(), 600);
+}
+
+// OLD image export kept for reference but replaced by PDF
+async function exportScorecardPDF_OLD(round, players, scores, holes) {
   // Build HTML scorecard then print as PDF
   const front9 = holes.slice(0, 9);
   const back9 = holes.slice(9, 18);
@@ -1479,7 +1537,7 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
     try {
       const code = Math.random().toString(36).substr(2, 6).toUpperCase();
       const round = await dbCreateRound({ code, course_name: course.name, course_id: course.id, game_type: gameType, holes: course.holes, use_handicap: useHandicap, created_at: new Date().toISOString(), created_by: name });
-      const me = await dbCreatePlayer({ name, handicap: parseFloat(hcp) || 0, round_id: round.id, team: gameType === "matchplay_teams" ? team : null, is_placeholder: false });
+      const me = await dbCreatePlayer({ name, handicap: useHandicap ? (parseFloat(hcp) || 0) : 0, round_id: round.id, team: gameType === "matchplay_teams" ? team : null, is_placeholder: false });
       savePlayerProfile(name, parseFloat(hcp) || 0);
       const fullRound = { ...round, holes: course.holes };
       saveLastRound(fullRound, me);
@@ -1530,9 +1588,9 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
             <h3 style={S.stepTitle}>Your details</h3>
             <label style={S.label}>Your name</label>
             <input style={S.input} placeholder="e.g. Jamie" value={name} onChange={(e) => setName(e.target.value)} />
-            <label style={S.label}>Your handicap</label>
-            <input style={S.input} type="number" step="0.1" placeholder="0" value={hcp} onChange={(e) => setHcp(e.target.value)} />
-            <p style={S.hint}>Enter 0 if playing off scratch. Decimals OK e.g. 9.2</p>
+            {useHandicap && <label style={S.label}>Your handicap</label>}
+            {useHandicap && <input style={S.input} type="number" step="0.1" placeholder="0" value={hcp} onChange={(e) => setHcp(e.target.value)} />}
+            {useHandicap && <p style={S.hint}>Decimals OK e.g. 9.2</p>}
             <label style={S.label}>Handicap scoring</label>
             <div style={{ display: "flex", backgroundColor: "#1e293b", borderRadius: 10, padding: 4, gap: 4 }}>
               <button onClick={() => setUseHandicap(true)} style={{ flex: 1, padding: "10px", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 700, fontSize: 13, backgroundColor: useHandicap ? "#22c55e" : "transparent", color: useHandicap ? "#0f172a" : "#64748b" }}>Apply Handicaps</button>
@@ -1692,7 +1750,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
         <button style={S.backBtn} onClick={() => { if (window.confirm("Exit round? It stays saved.")) onBack(); }}>← Back</button>
         <div style={S.headerLeft}>
           <div style={S.headerCourse}>{round.course_name}</div>
-          <div style={S.headerGame}>{GAME_TYPES[round.game_type]?.label}</div>
+          <div style={S.headerGame}>{GAME_TYPES[round.game_type]?.label}{round.use_handicap === false ? " · Scratch" : ""} · {round.created_by || "Unknown"}</div>
         </div>
         <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
           <button style={{ ...S.smallIconBtn, fontSize: 11, padding: "5px 8px" }} onClick={() => { saveRoundToHistory(round, players, scores, holes); alert("Round saved!"); }}>Save Round</button>
@@ -1853,15 +1911,29 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
       // Load banker from Supabase
       if (bankerData?.initial_banker_id) {
         setInitialBankerId(bankerData.initial_banker_id);
-        // Determine current banker from scores
-        const lastScoredHole = Math.max(0, ...s.map((x) => x.hole_number));
-        if (lastScoredHole > 0) {
-          const lastHoleScores = s.filter((x) => x.hole_number === lastScoredHole);
-          const allP = [...p, me]; let lowest = Infinity, winner = null;
-          lastHoleScores.forEach((x) => { const pl = allP.find((pp) => pp.id === x.player_id); if (!pl) return; const net = x.score - getHcpStrokes(pl.handicap, round.holes?.find((h) => h.hole_number === lastScoredHole)?.stroke_index || 1); if (net < lowest) { lowest = net; winner = x.player_id; } });
-          setCurrentBankerId(winner || bankerData.initial_banker_id);
-        } else {
-          setCurrentBankerId(bankerData.initial_banker_id);
+        // Determine current banker hole by hole (winner becomes banker next hole)
+        let runningBanker = bankerData.initial_banker_id;
+        const allP = [...p, me];
+        // Go through each completed hole in order to track banker rotation
+        const maxHole = Math.max(0, ...s.map((x) => x.hole_number));
+        for (let hn = 1; hn <= maxHole; hn++) {
+          const hScores = s.filter((x) => x.hole_number === hn);
+          if (!allP.every((pl) => hScores.some((x) => x.player_id === pl.id))) break;
+          let lowest = Infinity, winner = null, tied = false;
+          hScores.forEach((x) => { const pl = allP.find((pp) => pp.id === x.player_id); if (!pl) return; const hole = round.holes?.find((h) => h.hole_number === hn); const net = x.score - getHcpStrokes(pl.handicap, hole?.stroke_index || 1); if (net < lowest) { lowest = net; winner = x.player_id; tied = false; } else if (net === lowest) { tied = true; } });
+          if (!tied && winner) runningBanker = winner; // winner becomes banker next hole
+        }
+        setCurrentBankerId(runningBanker);
+        // Restore active hole to next unscored hole
+        const myScoreHoles = s.filter((x) => x.player_id === me.id).map((x) => x.hole_number);
+        const nextHole = Math.max(1, myScoreHoles.length > 0 ? Math.max(...myScoreHoles) + 1 : 1);
+        if (nextHole <= 18) setActiveHole(Math.min(nextHole, 18));
+      } else {
+        // No banker game - still restore active hole
+        const myScoreHoles = s.filter((x) => x.player_id === me.id).map((x) => x.hole_number);
+        if (myScoreHoles.length > 0) {
+          const nextHole = Math.min(Math.max(...myScoreHoles) + 1, 18);
+          setActiveHole(nextHole);
         }
       }
     })();
@@ -1969,22 +2041,42 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
     });
     return myHolesWon - oppHolesWon;
   })();
+  // Correct banker total: track who is banker per hole, money flows correctly
   const myBankerTotal = (() => {
     let total = 0;
     holes.forEach((hole) => {
       const myG = myScores[hole.hole_number]; if (!myG) return;
-      const myBet = myBets[hole.hole_number] || 0; if (!myBet) return;
       const holeScores = allScores.filter((s) => s.hole_number === hole.hole_number);
-      // Only calculate once ALL players have scored this hole
-      const allScored = allPlayers.every((p) => holeScores.some((s) => s.player_id === p.id));
-      if (!allScored) return;
-      let lowest = Infinity, winner = null;
+      if (!allPlayers.every((p) => holeScores.some((s) => s.player_id === p.id))) return;
+      const myScore = holeScores.find((s) => s.player_id === me.id);
+      const bankerId = myScore?.banker_id || holeScores[0]?.banker_id;
+      const doubled = holeScores.some((s) => s.doubled);
+      const iAmBanker = bankerId === me.id;
+      // Find winner
+      let lowest = Infinity, winner = null, tied = false;
       holeScores.forEach((s) => {
         const pl = allPlayers.find((p) => p.id === s.player_id); if (!pl) return;
         const net = s.score - getHcpStrokes(pl.handicap, hole.stroke_index);
-        if (net < lowest) { lowest = net; winner = s.player_id; }
+        if (net < lowest) { lowest = net; winner = s.player_id; tied = false; }
+        else if (net === lowest) { tied = true; }
       });
-      if (winner === me.id) total += myBet * (holeScores.length - 1); else total -= myBet;
+      if (tied) return; // tie = no money changes hands
+      if (iAmBanker) {
+        // Banker: +bet for each player they beat, -bet for each player who beats them
+        holeScores.forEach((s) => {
+          if (s.player_id === me.id) return;
+          const bet = (s.bet || 0) * (doubled ? 2 : 1);
+          if (winner === me.id) total += bet;
+          else total -= bet;
+        });
+      } else {
+        // Non-banker: win or lose your own bet vs banker
+        const myBet = (myScore?.bet || 0) * (doubled ? 2 : 1);
+        if (!myBet) return;
+        if (winner === me.id) total += myBet;
+        else if (winner === bankerId) total -= myBet;
+        // If another non-banker wins: no money changes (vs banker only)
+      }
     });
     return total;
   })();
@@ -2003,9 +2095,9 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
         <button style={S.backBtn} onClick={onViewDashboard}>← Back</button>
         <h2 style={S.headerTitle}>Enter Score</h2>
         <button onClick={() => { setShowChat(true); setUnreadChat(0); }}
-          style={{ position: "relative", backgroundColor: "#1e293b", color: "#e2e8f0", border: "1px solid #334155", borderRadius: 8, padding: "8px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+          style={{ position: "relative", backgroundColor: "#1e293b", color: "#e2e8f0", border: "1px solid #334155", borderRadius: 10, padding: "10px 16px", fontSize: 16, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
           💬
-          {unreadChat > 0 && <span style={{ position: "absolute", top: -6, right: -6, backgroundColor: "#ef4444", color: "#fff", borderRadius: "50%", width: 16, height: 16, fontSize: 9, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", animation: "pulse 1s infinite", boxShadow: "0 0 0 3px rgba(239,68,68,0.3)" }}>{unreadChat}</span>}
+          {unreadChat > 0 && <span style={{ position: "absolute", top: -6, right: -6, backgroundColor: "#ef4444", color: "#fff", borderRadius: "50%", width: 20, height: 20, fontSize: 10, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", animation: "pulse 1s infinite", boxShadow: "0 0 0 3px rgba(239,68,68,0.3)" }}>{unreadChat}</span>}
         </button>
       </div>
       {showChat && <ChatPanel round={round} me={me} onClose={() => { setShowChat(false); setUnreadChat(0); }} />}
@@ -2051,7 +2143,9 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                   label = "Match"; color = lead > 0 ? "#22c55e" : lead < 0 ? "#ef4444" : "#94a3b8";
                   value = lead === 0 ? "All Sq" : lead > 0 ? lead + " Up" : Math.abs(lead) + " Dn";
                 } else if (round.game_type === "banker") {
-                  label = "Pot"; color = myBankerTotal > 0 ? "#22c55e" : myBankerTotal < 0 ? "#ef4444" : "#94a3b8";
+                  // Show MY running balance, not the pot
+                  label = "Balance"; 
+                  color = myBankerTotal > 0 ? "#22c55e" : myBankerTotal < 0 ? "#ef4444" : "#94a3b8";
                   value = (myBankerTotal >= 0 ? "+$" : "-$") + Math.abs(myBankerTotal);
                 } else {
                   label = "Gross"; value = formatToPar(myGrossTotal); color = "#e2e8f0";
@@ -2079,9 +2173,13 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
             const iAmBanker = thisBanker === me.id;
             const bankerPlayer = [...others, me].find((p) => p.id === thisBanker);
             
-            // Total pot = sum of all other players bets this hole
+            // Total pot = sum of all non-banker bets this hole (doubled if applicable)
             const otherBets = allScores.filter((s) => s.hole_number === activeHole && s.player_id !== thisBanker && s.bet);
-            const totalPot = otherBets.reduce((sum, s) => sum + (s.bet || 0), 0);
+            const isDoubled = allScores.some((s) => s.hole_number === activeHole && s.doubled);
+            const totalPot = otherBets.reduce((sum, s) => sum + ((s.bet || 0) * (isDoubled ? 2 : 1)), 0);
+            const nonBankerPlayers = [...others, me].filter((p) => p.id !== thisBanker);
+            const betsSubmitted = otherBets.length;
+            const betsNeeded = nonBankerPlayers.length;
             
             return (
               <>
@@ -2116,13 +2214,18 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                     {iAmBanker ? (
                       <>
                         <div style={{ fontSize: 12, fontWeight: 700, color: "#22c55e", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>🏦 You are the Banker</div>
-                        <div style={{ fontSize: 13, color: "#64748b" }}>Competing for: <span style={{ color: "#f59e0b", fontWeight: 800, fontSize: 18 }}>${totalPot}</span></div>
-                        <div style={{ fontSize: 11, color: "#475569", marginTop: 4 }}>No bet needed - you face all players</div>
+                        <div style={{ fontSize: 13, color: "#64748b" }}>Competing for: <span style={{ color: "#f59e0b", fontWeight: 800, fontSize: 18 }}>${totalPot}</span>{isDoubled ? <span style={{ color: "#f59e0b", fontSize: 10, marginLeft: 4 }}>DOUBLED</span> : null}</div>
+                        <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>Bets in: {betsSubmitted}/{betsNeeded} · No bet needed for you</div>
                         {/* Double button - only show after all others have bet */}
                         {otherBets.length >= others.length && otherBets.length > 0 && (
                           <button onClick={async () => {
                             if (window.confirm("Double all bets for hole " + activeHole + "? This cannot be undone.")) {
-                              await dbSendChat({ id: genId(), round_id: round.id, player_id: me.id, player_name: me.name, text: "🔥 " + me.name + " DOUBLED the bets on hole " + activeHole + "! All bets are now doubled.", created_at: new Date().toISOString() });
+                              // Save doubled=true on ALL scores for this hole
+                              const hScores = allScores.filter((s) => s.hole_number === activeHole);
+                              await Promise.all(hScores.map((s) => dbSaveScore({ ...s, doubled: true })));
+                              // Update local state
+                              setAllScores((prev) => prev.map((s) => s.hole_number === activeHole ? { ...s, doubled: true } : s));
+                              await dbSendChat({ id: genId(), round_id: round.id, player_id: me.id, player_name: me.name, text: "🔥 " + me.name + " DOUBLED the bets on hole " + activeHole + "! All bets now doubled.", created_at: new Date().toISOString() });
                             }
                           }}
                             style={{ backgroundColor: "#f59e0b", color: "#0f172a", border: "none", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", marginTop: 10, width: "100%" }}>
@@ -2137,26 +2240,27 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                         </div>
                         <div style={{ fontSize: 11, color: "#64748b" }}>Your Balance: <span style={{ color: myBankerTotal > 0 ? "#22c55e" : myBankerTotal < 0 ? "#ef4444" : "#94a3b8", fontWeight: 700 }}>{myBankerTotal >= 0 ? "+$" : "-$"}{Math.abs(myBankerTotal)}</span></div>
                         {/* Bet input for non-banker players */}
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
-                          <span style={{ fontSize: 14, color: "#64748b" }}>Your bet:</span>
-                          <span style={{ fontSize: 16, fontWeight: 800, color: myBets[activeHole] ? "#22c55e" : "#f59e0b" }}>$</span>
-                          <input style={{ ...S.customInput, width: 68, fontSize: 20, borderColor: myBets[activeHole] ? "#22c55e" : "#f59e0b" }}
-                            type="number" min="1" placeholder="0" value={myBets[activeHole] || ""}
-                            onChange={(e) => { if (e.target.value) setMyBets((prev) => ({ ...prev, [activeHole]: parseInt(e.target.value) })); }}
-                            onBlur={async (e) => {
-                              if (e.target.value) {
-                                const betVal = parseInt(e.target.value);
-                                setMyBets((prev) => ({ ...prev, [activeHole]: betVal }));
-                                // Save bet to Supabase so other players see it
-                                const obj = { player_id: me.id, hole_number: activeHole, round_id: round.id, score: myScores[activeHole] || 0, bet: betVal };
-                                const thisBankerId = activeHole === 1 ? initialBankerId : currentBankerId;
-                                if (thisBankerId) obj.banker_id = thisBankerId;
-                                await dbSaveScore(obj);
-                                // Refresh scores so banker sees updated pot
-                                const updated = await dbGetScores(round.id);
-                                setAllScores(updated);
-                              }
-                            }} />
+                        <div style={{ marginTop: 10 }}>
+                          <div style={{ fontSize: 11, color: "#64748b", marginBottom: 6 }}>Your Balance: <span style={{ color: myBankerTotal > 0 ? "#22c55e" : myBankerTotal < 0 ? "#ef4444" : "#94a3b8", fontWeight: 700 }}>{myBankerTotal >= 0 ? "+$" : "-$"}{Math.abs(myBankerTotal)}</span></div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span style={{ fontSize: 14, color: "#64748b" }}>Bet $</span>
+                            <input style={{ ...S.customInput, width: 68, fontSize: 20, borderColor: myBets[activeHole] ? "#22c55e" : "#f59e0b" }}
+                              type="number" min="1" placeholder="0" value={myBets[activeHole] || ""}
+                              onChange={(e) => { if (e.target.value) setMyBets((prev) => ({ ...prev, [activeHole]: parseInt(e.target.value) })); }} />
+                            <button onClick={async () => {
+                              const betVal = myBets[activeHole];
+                              if (!betVal || betVal < 1) return;
+                              const thisBankerId2 = activeHole === 1 ? initialBankerId : currentBankerId;
+                              const obj = { player_id: me.id, hole_number: activeHole, round_id: round.id, score: myScores[activeHole] || 0, bet: betVal };
+                              if (thisBankerId2) obj.banker_id = thisBankerId2;
+                              await dbSaveScore(obj);
+                              const updated = await dbGetScores(round.id);
+                              setAllScores(updated);
+                            }} style={{ backgroundColor: myBets[activeHole] ? "#22c55e" : "#334155", color: myBets[activeHole] ? "#0f172a" : "#64748b", border: "none", borderRadius: 8, padding: "10px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>
+                              Submit
+                            </button>
+                          </div>
+                          {!myBets[activeHole] && <div style={{ fontSize: 10, color: "#f59e0b", marginTop: 4 }}>Enter bet to unlock scoring</div>}
                         </div>
                       </>
                     )}
@@ -2380,15 +2484,20 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                         if (round.game_type === "stableford") { thirdValue = stablefordPoints(g, h.par, hs); thirdColor = "#22c55e"; }
                         else if (round.game_type === "matchplay") {
                           const holeScores = allScores.filter((s) => s.hole_number === h.hole_number);
-                          let lowest = Infinity, tied = [], winner = null;
-                          holeScores.forEach((s) => {
-                            const pl = [...others, me].find((p) => p.id === s.player_id); if (!pl) return;
-                            const net = s.score - getHcpStrokes(pl.handicap, h.stroke_index);
-                            if (net < lowest) { lowest = net; tied = [s.player_id]; winner = s.player_id; } else if (net === lowest) tied.push(s.player_id);
-                          });
-                          if (tied.length > 1) { thirdValue = "T"; thirdColor = "#94a3b8"; }
-                          else if (winner === player.id) { thirdValue = "W"; thirdColor = "#22c55e"; }
-                          else { thirdValue = "L"; thirdColor = "#ef4444"; }
+                          const allPlayers3 = [...others, me];
+                          // Only show when all players have scored
+                          if (!allPlayers3.every((p) => holeScores.some((s) => s.player_id === p.id))) { thirdValue = "—"; thirdColor = "#475569"; }
+                          else {
+                            let lowest = Infinity, tied = [], winner = null;
+                            holeScores.forEach((s) => {
+                              const pl = allPlayers3.find((p) => p.id === s.player_id); if (!pl) return;
+                              const net = s.score - getHcpStrokes(pl.handicap, h.stroke_index);
+                              if (net < lowest) { lowest = net; tied = [s.player_id]; winner = s.player_id; } else if (net === lowest) tied.push(s.player_id);
+                            });
+                            if (tied.length > 1) { thirdValue = "T"; thirdColor = "#94a3b8"; }
+                            else if (winner === player.id) { thirdValue = "W"; thirdColor = "#22c55e"; }
+                            else { thirdValue = "L"; thirdColor = "#ef4444"; }
+                          }
                         } else if (round.game_type === "banker") {
                           const bet = sc?.bet || 0;
                           const holeScores = allScores.filter((s) => s.hole_number === h.hole_number);
@@ -2424,13 +2533,48 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                       </div>
                     )}
                     {round.game_type === "matchplay" && (
-                      <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800, color: "#22c55e" }}>
-                        {(() => { let pts = 0; holes.forEach((hole) => { const myS = ps.find((s) => s.hole_number === hole.hole_number); if (!myS) return; const holeScores = allScores.filter((s) => s.hole_number === hole.hole_number); let lowest = Infinity, tied = []; holeScores.forEach((s) => { const pl = [...others, me].find((p) => p.id === s.player_id); if (!pl) return; const net = s.score - getHcpStrokes(pl.handicap, hole.stroke_index); if (net < lowest) { lowest = net; tied = [s.player_id]; } else if (net === lowest) tied.push(s.player_id); }); if (tied.includes(player.id)) pts += 1 / tied.length; }); return pts.toFixed(1) + "pts"; })()}
+                      <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800 }}>
+                        {(() => {
+                          let won = 0, lost = 0;
+                          holes.forEach((hole) => {
+                            const myS = ps.find((s) => s.hole_number === hole.hole_number); if (!myS) return;
+                            const holeScores = allScores.filter((s) => s.hole_number === hole.hole_number);
+                            const allP3 = [...others, me];
+                            if (!allP3.every((p) => holeScores.some((s) => s.player_id === p.id))) return;
+                            let lowest = Infinity, winner = null, tied = false;
+                            holeScores.forEach((s) => { const pl = allP3.find((p) => p.id === s.player_id); if (!pl) return; const net = s.score - getHcpStrokes(pl.handicap, hole.stroke_index); if (net < lowest) { lowest = net; winner = s.player_id; tied = false; } else if (net === lowest) { tied = true; } });
+                            if (!tied) { if (winner === player.id) won++; else lost++; }
+                          });
+                          const lead = won - lost;
+                          const col = lead > 0 ? "#22c55e" : lead < 0 ? "#ef4444" : "#94a3b8";
+                          return <span style={{ color: col }}>{lead === 0 ? "Sq" : lead > 0 ? lead + " Up" : Math.abs(lead) + " Dn"}</span>;
+                        })()}
                       </div>
                     )}
                     {round.game_type === "banker" && (
                       <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800 }}>
-                        {(() => { let total = 0; holes.forEach((hole) => { const myS = ps.find((s) => s.hole_number === hole.hole_number); if (!myS) return; const myBet = myS.bet || 0; const holeScores = allScores.filter((s) => s.hole_number === hole.hole_number); let lowest = Infinity, winner = null; holeScores.forEach((s) => { const pl = [...others, me].find((p) => p.id === s.player_id); if (!pl) return; const net = s.score - getHcpStrokes(pl.handicap, hole.stroke_index); if (net < lowest) { lowest = net; winner = s.player_id; } }); if (winner === player.id) total += myBet * (holeScores.length - 1); else total -= myBet; }); return <span style={{ color: total > 0 ? "#22c55e" : total < 0 ? "#ef4444" : "#94a3b8" }}>${total}</span>; })()}
+                        {(() => {
+                          let total = 0;
+                          const allP4 = [...others, me];
+                          holes.forEach((hole) => {
+                            const myS = ps.find((s) => s.hole_number === hole.hole_number); if (!myS) return;
+                            const holeScores = allScores.filter((s) => s.hole_number === hole.hole_number);
+                            if (!allP4.every((p) => holeScores.some((s) => s.player_id === p.id))) return;
+                            const bankerId = myS.banker_id || holeScores[0]?.banker_id;
+                            const doubled = holeScores.some((s) => s.doubled);
+                            const isBanker = bankerId === player.id;
+                            let lowest = Infinity, winner = null, tied = false;
+                            holeScores.forEach((s) => { const pl = allP4.find((p) => p.id === s.player_id); if (!pl) return; const net = s.score - getHcpStrokes(pl.handicap, hole.stroke_index); if (net < lowest) { lowest = net; winner = s.player_id; tied = false; } else if (net === lowest) { tied = true; } });
+                            if (tied) return;
+                            if (isBanker) {
+                              holeScores.forEach((s) => { if (s.player_id === player.id) return; const bet = (s.bet || 0) * (doubled ? 2 : 1); if (winner === player.id) total += bet; else total -= bet; });
+                            } else {
+                              const myBet = (myS.bet || 0) * (doubled ? 2 : 1);
+                              if (myBet > 0) { if (winner === player.id) total += myBet; else if (winner === bankerId) total -= myBet; }
+                            }
+                          });
+                          return <span style={{ color: total > 0 ? "#22c55e" : total < 0 ? "#ef4444" : "#94a3b8" }}>{total >= 0 ? "+$" : "-$"}{Math.abs(total)}</span>;
+                        })()}
                       </div>
                     )}
                   </div>
@@ -2699,9 +2843,9 @@ const S = {
   customScore: { display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1px solid #334155", paddingTop: 16, marginTop: 4, gap: 12 },
   customLabel: { fontSize: 13, color: "#64748b" },
   customInput: { backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, padding: "8px 12px", color: "#f8fafc", fontSize: 18, fontWeight: 700, width: 60, textAlign: "center", outline: "none", fontFamily: "inherit" },
-  scoreInfoBoxes: { display: "flex", flexDirection: "column", gap: 12, marginTop: 16 },
-  scoreInfoSection: { backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, padding: "12px" },
-  scoreInfoSectionTitle: { fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 },
+  scoreInfoBoxes: { display: "flex", flexDirection: "column", gap: 6, marginTop: 10 },
+  scoreInfoSection: { backgroundColor: "#0f172a", border: "1px solid #1e293b", borderRadius: 6, padding: "6px 10px" },
+  scoreInfoSectionTitle: { fontSize: 9, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 },
   scoreInfoRow: { display: "flex", gap: 4, overflowX: "auto", paddingBottom: 4, scrollbarWidth: "none" },
   scoreInfoCell: { display: "flex", flexDirection: "column", alignItems: "center", minWidth: 48, width: 48, flex: "0 0 auto" },
   scoreInfoCellNumber: { fontSize: 9, color: "#64748b", fontWeight: 700, marginBottom: 2 },
