@@ -2851,10 +2851,31 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                     {round.game_type === "banker" && (
                       <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800 }}>
                         {(() => {
-                          // Use same calcLeaderboard for consistency
-                          let lbPlayer = null;
-                          try { lbPlayer = holes?.length ? calcLeaderboard([...others, me].filter(Boolean), allScores, holes, "banker").find((p) => p.id === player.id) : null; } catch(e) {}
-                          const total = lbPlayer?.total || 0;
+                          // Same direct calc as myBankerTotal but for this player
+                          let total = 0;
+                          holes.forEach((hole) => {
+                            const pScore = ps.find((s) => s.hole_number === hole.hole_number); if (!pScore || !pScore.score) return;
+                            const holeScores = allScores.filter((s) => s.hole_number === hole.hole_number);
+                            const allP = [...others, me];
+                            if (!allP.every((p) => holeScores.some((s) => s.player_id === p.id && s.score > 0))) return;
+                            const bankerId = pScore.banker_id || holeScores[0]?.banker_id;
+                            const isBanker = bankerId === player.id;
+                            let lowest = Infinity;
+                            holeScores.forEach((s) => { const pl = allP.find((p) => p.id === s.player_id); if (!pl || !s.score) return; const net = s.score - getHcpStrokes(pl.handicap, hole.stroke_index); if (net < lowest) lowest = net; });
+                            const winners = holeScores.filter((s) => { const pl = allP.find((p) => p.id === s.player_id); if (!pl || !s.score) return false; return (s.score - getHcpStrokes(pl.handicap, hole.stroke_index)) === lowest; }).map((s) => s.player_id);
+                            const allTied = winners.length === allP.length;
+                            if (allTied) return;
+                            const bankerWon = winners.includes(bankerId);
+                            if (isBanker) {
+                              if (bankerWon) { holeScores.forEach((s) => { if (s.player_id === player.id || !s.score) return; if (!winners.includes(s.player_id)) total += (s.bet || 0); }); }
+                              else { holeScores.forEach((s) => { if (s.player_id === player.id || !s.score) return; if (winners.includes(s.player_id)) total -= (s.bet || 0); }); }
+                            } else {
+                              const bet = pScore.bet || 0;
+                              if (!bet) return;
+                              if (winners.includes(player.id) && !bankerWon) total += bet;
+                              else if (bankerWon && !winners.includes(player.id)) total -= bet;
+                            }
+                          });
                           return <span style={{ color: total > 0 ? "#22c55e" : total < 0 ? "#ef4444" : "#94a3b8" }}>{total >= 0 ? "+$" : "-$"}{Math.abs(total)}</span>;
                         })()}
                       </div>
