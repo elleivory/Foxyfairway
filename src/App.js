@@ -2187,8 +2187,8 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
   // Direct calculation - most reliable
   const myBankerTotal = (() => {
     if (!holes || !holes.length || !me) return 0;
-    try {
     let total = 0;
+    try {
     holes.forEach((hole) => {
       const myG = myScores[hole.hole_number]; if (!myG) return;
       const holeScores = allScores.filter((s) => s.hole_number === hole.hole_number);
