@@ -2659,21 +2659,20 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                     {holes.map((h) => {
                       const holeScores = allScores.filter((s) => s.hole_number === h.hole_number);
                       const myScore = holeScores.find((s) => s.player_id === me.id && s.score > 0);
-                      const myBetRecord = allScores.find((s) => s.player_id === me.id && s.hole_number === h.hole_number && s.bet > 0);
-                      if (myBetRecord && myScore) myScore.bet = myBetRecord.bet;
+                      // myBets state is the most reliable source
                       const allScoredBk = myScore && allPlayers.every((p) => holeScores.some((s) => s.player_id === p.id && s.score > 0));
                       if (!allScoredBk) return (<div key={"bk"+h.hole_number} style={S.scoreInfoCell}><div style={{ fontSize: 14, color: "#334155" }}>—</div></div>);
                       const bankerId = holeScores.find((s) => s.banker_id)?.banker_id;
                       const doubled = holeScores.some((s) => s.doubled);
                       const iAmBankerHole = bankerId === me.id;
                       let lowest = Infinity, winner = null, tied = false;
-                      holeScores.forEach((s) => { const pl = allPlayers.find((p) => p.id === s.player_id); if (!pl) return; const net = s.score - getHcpStrokes(pl.handicap, h.stroke_index); if (net < lowest) { lowest = net; winner = s.player_id; tied = false; } else if (net === lowest) { tied = true; } });
+                      holeScores.forEach((s) => { const pl = allPlayers.find((p) => p.id === s.player_id); if (!pl || !s.score) return; const net = s.score - getHcpStrokes(pl.handicap, h.stroke_index); if (net < lowest) { lowest = net; winner = s.player_id; tied = false; } else if (net === lowest) { tied = true; } });
                       let holeChange = 0;
                       if (!tied) {
                         if (iAmBankerHole) { 
                         allScores.filter((s) => s.hole_number === h.hole_number && s.player_id !== me.id && s.bet > 0).forEach((s) => { if (winner===me.id) holeChange+=s.bet; else holeChange-=s.bet; }); 
                       } else { 
-                        const myBet = allScores.find((s) => s.player_id === me.id && s.hole_number === h.hole_number && s.bet > 0)?.bet || 0;
+                        const myBet = myBets[h.hole_number] || 0;
                         if(myBet>0){if(winner===me.id)holeChange+=myBet;else if(winner===bankerId)holeChange-=myBet;}
                       }
                       }
