@@ -2674,7 +2674,9 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                       const color = holeChange > 0 ? "#22c55e" : holeChange < 0 ? "#ef4444" : "#94a3b8";
                       return (
                         <div key={"bk"+h.hole_number} style={{ ...S.scoreInfoCell, minWidth: 40 }}>
-                          <div style={{ fontSize: 11, fontWeight: 800, color }}>{iAmBankerHole ? "🏦" : tied ? "T" : winner === me.id ? "W" : "L"}</div>
+                          <div style={{ fontSize: 11, fontWeight: 800, color }}>{tied ? "T" : winner === me.id ? "W" : "L"}</div>
+                          {iAmBankerHole && <div style={{ fontSize: 9 }}>🏦</div>}
+                          {doubled && <div style={{ fontSize: 9 }}>🔥</div>}
                           <div style={{ fontSize: 9, color, fontWeight: 700 }}>{holeChange !== 0 ? (holeChange > 0 ? "+$" : "-$") + Math.abs(holeChange) : ""}{doubled ? "×2" : ""}</div>
                         </div>
                       );
