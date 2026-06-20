@@ -2188,7 +2188,6 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
   const myBankerTotal = (() => {
     if (!holes || !holes.length || !me) return 0;
     let total = 0;
-    try {
     holes.forEach((hole) => {
       const myG = myScores[hole.hole_number]; if (!myG) return;
       const holeScores = allScores.filter((s) => s.hole_number === hole.hole_number);
@@ -2230,6 +2229,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
       }
     });
     return total;
+  } catch(e) { return 0; }
   })();
 
   const RunningTotal = ({ value, label, color }) => (
