@@ -2353,16 +2353,13 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                         {allBetsIn && !isDoubled && (
                           <button onClick={async () => {
                             if (!window.confirm("Double all bets on hole " + activeHole + "? Cannot be undone.")) return;
-                            const hScores = allScores.filter((s) => s.hole_number === activeHole);
+                            // Only update records that already have a real bet - don't create placeholders
+                            const hScores = allScores.filter((s) => s.hole_number === activeHole && s.bet > 0);
                             for (const s of hScores) { await dbSaveScore({ ...s, doubled: true }); }
-                            // Save doubled for players without a score record yet
-                            for (const p of nonBankerPlayers) {
-                              if (!hScores.find((s) => s.player_id === p.id)) {
-                                await dbSaveScore({ player_id: p.id, hole_number: activeHole, round_id: round.id, score: 0, bet: 0, doubled: true, banker_id: thisBanker });
-                              }
-                            }
-                            setAllScores((prev) => prev.map((s) => s.hole_number === activeHole ? { ...s, doubled: true } : s));
-                            const refreshedD = await dbGetScores(round.id); setAllScores(refreshedD);
+                            // Update local state immediately - don't re-fetch as it may return stale data
+                            setAllScores((prev) => prev.map((s) => 
+                              s.hole_number === activeHole && s.bet > 0 ? { ...s, doubled: true } : s
+                            ));
                             await dbSendChat({ id: genId(), round_id: round.id, player_id: me.id, player_name: me.name, text: "🔥 " + me.name + " DOUBLED the bets on hole " + activeHole + "!", created_at: new Date().toISOString() });
                           }} style={{ width: "100%", backgroundColor: "#f59e0b", color: "#0f172a", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", marginBottom: 8 }}>
                             💥 DOUBLE — ${totalPot} → ${totalPot * 2}
