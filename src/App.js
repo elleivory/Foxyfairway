@@ -1369,7 +1369,8 @@ function ChatPanel({ round, me, onClose }) {
 // =============================================================================
 function RoundCompleteScreen({ round, players, scores, onSave, onDismiss }) {
   const holes = round.holes || [];
-  const lb = calcLeaderboard(players, scores, holes, round.game_type);
+  let lb = [];
+  try { lb = calcLeaderboard(players, scores, holes, round.game_type); } catch(e) { lb = []; }
   const winner = lb[0];
 
   return (
@@ -1770,7 +1771,8 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
 
   useEffect(() => { refresh(); const t = setInterval(refresh, 2000); return () => clearInterval(t); }, [refresh]);
 
-  const lb = calcLeaderboard(players, scores, holes, round.game_type);
+  let lb = [];
+  try { lb = calcLeaderboard(players, scores, holes, round.game_type); } catch(e) { lb = []; }
 
   return (
     <div style={S.screen}>
@@ -2184,9 +2186,11 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
   })();
   // Use calcLeaderboard result to avoid duplicate calculation
   const myBankerTotal = (() => {
-    if (!holes || !holes.length) return 0;
-    const lbMe = calcLeaderboard([...others, me], allScores, holes, "banker").find((p) => p.id === me.id);
-    if (lbMe) return lbMe.total;
+    if (!holes || !holes.length || !me) return 0;
+    try {
+      const lbMe = calcLeaderboard([...others, me].filter(Boolean), allScores, holes, "banker").find((p) => p.id === me.id);
+      if (lbMe) return lbMe.total;
+    } catch(e) { return 0; }
     // Fallback calculation
     let total = 0;
     holes.forEach((hole) => {
@@ -2783,9 +2787,40 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                           <div style={{ height: 28, display: "flex", alignItems: "center", justifyContent: "center" }}>
                             {g ? <div style={{ ...shapeStyle(ns), fontSize: 11 }}>{nn}</div> : <div style={{ fontSize: 12, color: "#334155" }}>—</div>}
                           </div>
-                          {(round.game_type === "stableford" || round.game_type === "matchplay" || round.game_type === "banker") && (
+                          {(round.game_type === "stableford" || round.game_type === "matchplay") && (
                             <div style={{ height: 20, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: thirdColor }}>{thirdValue}</div>
                           )}
+                          {round.game_type === "banker" && (() => {
+                            const hScores = allScores.filter((s) => s.hole_number === h.hole_number);
+                            const allP5 = [...others, me];
+                            const allScored5 = allP5.every((p) => hScores.some((s) => s.player_id === p.id && s.score > 0));
+                            if (!allScored5) return <div style={{ height: 20 }} />;
+                            const bankerId5 = hScores[0]?.banker_id;
+                            const doubled5 = hScores.some((s) => s.doubled);
+                            let low5 = Infinity, win5 = null, tie5 = false;
+                            hScores.forEach((s) => { const pl = allP5.find((p) => p.id === s.player_id); if (!pl || !s.score) return; const net = s.score - getHcpStrokes(pl.handicap, h.stroke_index); if (net < low5) { low5 = net; win5 = s.player_id; tie5 = false; } else if (net === low5) tie5 = true; });
+                            const pScore = hScores.find((s) => s.player_id === player.id);
+                            const pBet = pScore?.bet || 0;
+                            let pChange = 0;
+                            if (!tie5 && pBet > 0) {
+                              if (player.id === bankerId5) {
+                                hScores.forEach((s) => { if (s.player_id === bankerId5 || !s.score) return; if (win5 === bankerId5) pChange += (s.bet||0); else pChange -= (s.bet||0); });
+                              } else {
+                                if (win5 === player.id && win5 !== bankerId5) pChange = pBet;
+                                else if (win5 === bankerId5) pChange = -pBet;
+                              }
+                            }
+                            const pCol = pChange > 0 ? "#22c55e" : pChange < 0 ? "#ef4444" : "#94a3b8";
+                            const isBanker5 = player.id === bankerId5;
+                            return (
+                              <div style={{ height: 20, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+                                <div style={{ fontSize: 9, fontWeight: 700, color: pCol }}>{tie5 ? "T" : pChange > 0 ? "W" : "L"}</div>
+                                <div style={{ fontSize: 8, color: pCol }}>{pChange !== 0 ? (pChange > 0 ? "+$" : "-$") + Math.abs(pChange) : ""}</div>
+                                {isBanker5 && <div style={{ fontSize: 7 }}>🏦</div>}
+                                {doubled5 && <div style={{ fontSize: 7 }}>🔥</div>}
+                              </div>
+                            );
+                          })()}
                         </div>
                       );
                     })}
@@ -2822,7 +2857,8 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                       <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800 }}>
                         {(() => {
                           // Use same calcLeaderboard for consistency
-                          const lbPlayer = holes?.length ? calcLeaderboard([...others, me], allScores, holes, "banker").find((p) => p.id === player.id) : null;
+                          let lbPlayer = null;
+                          try { lbPlayer = holes?.length ? calcLeaderboard([...others, me].filter(Boolean), allScores, holes, "banker").find((p) => p.id === player.id) : null; } catch(e) {}
                           const total = lbPlayer?.total || 0;
                           return <span style={{ color: total > 0 ? "#22c55e" : total < 0 ? "#ef4444" : "#94a3b8" }}>{total >= 0 ? "+$" : "-$"}{Math.abs(total)}</span>;
                         })()}
