@@ -2311,7 +2311,9 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
             const submittedBets = allScores.filter((s) => s.hole_number === activeHole && s.player_id !== thisBanker && s.bet > 0);
             const uniqueBettors = [...new Set(submittedBets.map((s) => s.player_id))];
             const isDoubled = doubledHolesRef.current[activeHole] || allScores.some((s) => s.hole_number === activeHole && s.doubled);
-            const totalPot = submittedBets.reduce((sum, s) => sum + ((s.bet || 0) * (isDoubled ? 2 : 1)), 0);
+            const originalPot = submittedBets.reduce((sum, s) => sum + (s.bet || 0), 0);
+            const doubledPot = originalPot * 2;
+            const totalPot = isDoubled ? doubledPot : originalPot;
             const allBetsIn = uniqueBettors.length >= nonBankerPlayers.length && nonBankerPlayers.length > 0;
             const myBetConfirmed = !!myBets[activeHole];
 
@@ -2378,7 +2380,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                             }));
                             await dbSendChat({ id: genId(), round_id: round.id, player_id: me.id, player_name: me.name, text: "🔥 " + me.name + " DOUBLED the bets on hole " + activeHole + "! All bets are now x2.", created_at: new Date().toISOString() });
                           }} style={{ width: "100%", backgroundColor: "#f59e0b", color: "#0f172a", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", marginBottom: 8 }}>
-                            💥 DOUBLE — ${totalPot} → ${totalPot * 2}
+                            💥 DOUBLE — ${originalPot} → ${doubledPot}
                           </button>
                         )}
                         {isDoubled && (
