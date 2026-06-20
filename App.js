@@ -277,7 +277,7 @@ function calcLeaderboard(players, scores, holes, gameType) {
             allH.forEach((s) => {
               if (s.player_id === p.id || s.score === 0) return;
               if (!winners.includes(s.player_id)) {
-                holeChange += (s.bet || 0) * (doubled ? 2 : 1);
+                holeChange += (s.bet || 0);
               }
             });
           } else {
@@ -285,12 +285,12 @@ function calcLeaderboard(players, scores, holes, gameType) {
             allH.forEach((s) => {
               if (s.player_id === p.id || s.score === 0) return;
               if (winners.includes(s.player_id)) {
-                holeChange -= (s.bet || 0) * (doubled ? 2 : 1);
+                holeChange -= (s.bet || 0);
               }
             });
           }
         } else {
-          const myBet = (myS.bet || 0) * (doubled ? 2 : 1);
+          const myBet = (myS.bet || 0);
           if (myBet > 0) {
             if (winners.includes(p.id) && !bankerIsWinner) {
               // I beat the banker - collect my bet from banker
@@ -303,7 +303,7 @@ function calcLeaderboard(players, scores, holes, gameType) {
           }
         }
         bankerTotal += holeChange;
-        bankerHoleData[hole.hole_number] = { bet: myS.bet || 0, effectiveBet: (myS.bet||0)*(doubled?2:1), iAmBanker, isWinner: winner === p.id, winnerId: winner, tied, holeChange, runningPot: bankerTotal, bankerId, doubled };
+        bankerHoleData[hole.hole_number] = { bet: myS.bet || 0, effectiveBet: (myS.bet||0), iAmBanker, isWinner: winner === p.id, winnerId: winner, tied, holeChange, runningPot: bankerTotal, bankerId, doubled };
       });
       total = bankerTotal;
       holeScores.bankerHoleData = bankerHoleData;
@@ -2219,7 +2219,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
           });
         }
       } else {
-        const myBet = (myScore?.bet || 0) * (doubled ? 2 : 1);
+        const myBet = (myScore?.bet || 0);
         if (!myBet) return;
         if (winners2.includes(me.id) && !bankerIsWinner2) total += myBet;
         else if (bankerIsWinner2 && !winners2.includes(me.id)) total -= myBet;
@@ -2665,8 +2665,8 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                       holeScores.forEach((s) => { const pl = allPlayers.find((p) => p.id === s.player_id); if (!pl) return; const net = s.score - getHcpStrokes(pl.handicap, h.stroke_index); if (net < lowest) { lowest = net; winner = s.player_id; tied = false; } else if (net === lowest) { tied = true; } });
                       let holeChange = 0;
                       if (!tied) {
-                        if (iAmBankerHole) { holeScores.forEach((s) => { if (s.player_id === me.id) return; const bet = (s.bet||0)*(doubled?2:1); if (winner===me.id) holeChange+=bet; else holeChange-=bet; }); }
-                        else { const myBet=(myScore?.bet||0)*(doubled?2:1); if(myBet>0){if(winner===me.id)holeChange+=myBet;else if(winner===bankerId)holeChange-=myBet;} }
+                        if (iAmBankerHole) { holeScores.forEach((s) => { if (s.player_id === me.id) return; const bet = (s.bet||0); if (winner===me.id) holeChange+=bet; else holeChange-=bet; }); }
+                        else { const myBet=(myScore?.bet||0); if(myBet>0){if(winner===me.id)holeChange+=myBet;else if(winner===bankerId)holeChange-=myBet;} }
                       }
                       const color = holeChange > 0 ? "#22c55e" : holeChange < 0 ? "#ef4444" : "#94a3b8";
                       return (
@@ -2833,10 +2833,10 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                             const winnersOth = holeScores.filter((s) => { const pl = allP4.find((p) => p.id === s.player_id); if (!pl || s.score === 0) return false; return (s.score - getHcpStrokes(pl.handicap, hole.stroke_index)) === lowestOth; }).map((s) => s.player_id);
                             const bankerWonOth = winnersOth.includes(bankerId);
                             if (isBanker) {
-                              if (bankerWonOth) { holeScores.forEach((s) => { if (s.player_id === player.id || s.score === 0) return; if (!winnersOth.includes(s.player_id)) total += (s.bet || 0) * (doubled ? 2 : 1); }); }
-                              else { holeScores.forEach((s) => { if (s.player_id === player.id || s.score === 0) return; if (winnersOth.includes(s.player_id)) total -= (s.bet || 0) * (doubled ? 2 : 1); }); }
+                              if (bankerWonOth) { holeScores.forEach((s) => { if (s.player_id === player.id || s.score === 0) return; if (!winnersOth.includes(s.player_id)) total += (s.bet || 0); }); }
+                              else { holeScores.forEach((s) => { if (s.player_id === player.id || s.score === 0) return; if (winnersOth.includes(s.player_id)) total -= (s.bet || 0); }); }
                             } else {
-                              const myBet = (myS.bet || 0) * (doubled ? 2 : 1);
+                              const myBet = (myS.bet || 0);
                               if (myBet > 0) { if (winnersOth.includes(player.id) && !bankerWonOth) total += myBet; else if (bankerWonOth && !winnersOth.includes(player.id)) total -= myBet; }
                             }
                           });
