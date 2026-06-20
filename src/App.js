@@ -1939,6 +1939,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
   const [currentBankerId, setCurrentBankerId] = useState(null);
   const [pendingBets, setPendingBets] = useState({}); // unsubmitted bet amounts
   const doubledHolesRef = useRef({}); // tracks which holes have been doubled - immune to refresh
+  const originalPotRef = useRef({}); // stores original pot per hole - immune to refresh
   const holes = round.holes || [];
   const curHole = holes.find((h) => h.hole_number === activeHole);
 
@@ -2313,7 +2314,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
               : allScores.filter((s) => s.hole_number === activeHole && s.bet > 0);
             const uniqueBettors = [...new Set(submittedBets.map((s) => s.player_id))];
             const isDoubled = doubledHolesRef.current[activeHole] === true || allScores.some((s) => s.hole_number === activeHole && s.doubled === true);
-            const originalPot = submittedBets.reduce((sum, s) => sum + (s.bet || 0), 0);
+            const originalPot = originalPotRef.current[activeHole] || submittedBets.reduce((sum, s) => sum + (s.bet || 0), 0);
             const doubledPot = originalPot * 2;
             const totalPot = isDoubled ? doubledPot : originalPot;
             const allBetsIn = uniqueBettors.length >= nonBankerPlayers.length && nonBankerPlayers.length > 0;
@@ -2364,7 +2365,8 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                             // Prevent double-firing
                             if (doubledHolesRef.current[activeHole]) return;
                             if (!window.confirm("Double all bets on hole " + activeHole + "? Cannot be undone.")) return;
-                            // Mark IMMEDIATELY before any async work
+                            // Store original pot and mark doubled IMMEDIATELY
+                            originalPotRef.current = { ...originalPotRef.current, [activeHole]: originalPot };
                             doubledHolesRef.current = { ...doubledHolesRef.current, [activeHole]: true };
                             // Get the ORIGINAL bets (before any doubling)
                             const hScores = allScores.filter((s) => s.hole_number === activeHole && s.bet > 0 && !s.doubled);
