@@ -2281,165 +2281,140 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
 
           {/* Banker game - full banker UI */}
           {round.game_type === "banker" && (() => {
-            // Determine who is banker this hole
-            // Hole 1: use initialBankerId, subsequent: winner of previous hole
-            const prevHoleScores = allScores.filter((s) => s.hole_number === activeHole - 1);
-            let thisBanker = activeHole === 1 ? initialBankerId : currentBankerId;
+            const thisBanker = activeHole === 1 ? initialBankerId : currentBankerId;
             const iAmBanker = thisBanker === me.id;
             const bankerPlayer = [...others, me].find((p) => p.id === thisBanker);
-            
-            // Total pot = sum of all non-banker bets this hole (doubled if applicable)
-            const otherBets = allScores.filter((s) => s.hole_number === activeHole && s.player_id !== thisBanker && s.bet);
-            const isDoubled = allScores.some((s) => s.hole_number === activeHole && s.doubled);
-            const totalPot = otherBets.reduce((sum, s) => sum + ((s.bet || 0) * (isDoubled ? 2 : 1)), 0);
             const nonBankerPlayers = [...others, me].filter((p) => p.id !== thisBanker);
-            const betsSubmitted = otherBets.length;
-            const betsNeeded = nonBankerPlayers.length;
-            
+            const submittedBets = allScores.filter((s) => s.hole_number === activeHole && s.player_id !== thisBanker && s.bet > 0);
+            const isDoubled = allScores.some((s) => s.hole_number === activeHole && s.doubled);
+            const totalPot = submittedBets.reduce((sum, s) => sum + ((s.bet || 0) * (isDoubled ? 2 : 1)), 0);
+            const allBetsIn = submittedBets.length >= nonBankerPlayers.length && nonBankerPlayers.length > 0;
+            const myBetConfirmed = !!myBets[activeHole];
+
             return (
               <>
-                {/* Hole 1 banker selector - only round creator can select */}
-                {!initialBankerId && round.created_by === me.name && (
+                {/* STEP 1: Select banker - only if no banker set */}
+                {!thisBanker && round.created_by === me.name && (
                   <div style={{ backgroundColor: "#1e293b", border: "1.5px solid #f59e0b", borderRadius: 12, padding: "14px 16px", marginBottom: 12 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "#f59e0b", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>⚠ Select Initial Banker (Creator only)</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#f59e0b", marginBottom: 10 }}>⚠ SELECT INITIAL BANKER</div>
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                       {[...others, me].map((p) => (
                         <button key={p.id} onClick={async () => {
                           setInitialBankerId(p.id);
                           setCurrentBankerId(p.id);
                           await dbSaveBanker(round.id, p.id);
-                        }}
-                          style={{ backgroundColor: "#0f172a", color: "#f8fafc", border: "1px solid #334155", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                          {p.name} {p.id === me.id ? "(You)" : ""}
+                        }} style={{ backgroundColor: "#0f172a", color: "#f8fafc", border: "1px solid #334155", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                          {p.name}{p.id === me.id ? " (You)" : ""}
                         </button>
                       ))}
                     </div>
                   </div>
                 )}
-                {/* Show waiting message for non-creators when no banker set */}
-                {!initialBankerId && round.created_by !== me.name && (
+                {!thisBanker && round.created_by !== me.name && (
                   <div style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "12px 16px", marginBottom: 12, textAlign: "center" }}>
-                    <div style={{ fontSize: 13, color: "#64748b" }}>⏳ Waiting for round creator to select the initial banker...</div>
+                    <div style={{ fontSize: 13, color: "#64748b" }}>⏳ Waiting for creator to select the banker...</div>
                   </div>
                 )}
 
-                {/* Banker role display */}
+                {/* STEP 2+: Banker is set - show role */}
                 {thisBanker && (
                   <div style={{ backgroundColor: iAmBanker ? "#022c22" : "#0f172a", border: iAmBanker ? "1.5px solid #22c55e" : "1px solid #334155", borderRadius: 12, padding: "12px 16px", marginBottom: 12 }}>
                     {iAmBanker ? (
+                      /* BANKER VIEW */
                       <>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: "#22c55e", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>🏦 You are the Banker</div>
-                        <div style={{ fontSize: 13, color: "#64748b" }}>Competing for: <span style={{ color: "#f59e0b", fontWeight: 800, fontSize: 18 }}>${totalPot}</span>{isDoubled ? <span style={{ color: "#f59e0b", fontSize: 10, marginLeft: 4 }}>DOUBLED</span> : null}</div>
-                        <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>Bets in: {betsSubmitted}/{betsNeeded} · No bet needed for you</div>
-                        {/* Double button - only show after all others have bet */}
-                        {!isDoubled && betsSubmitted >= betsNeeded && betsNeeded > 0 && (
-                          <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
-                            <button onClick={async () => {
-                              if (window.confirm("Double all bets for hole " + activeHole + "? This cannot be undone.")) {
-                                const hScores = allScores.filter((s) => s.hole_number === activeHole);
-                                await Promise.all(hScores.map((s) => dbSaveScore({ ...s, doubled: true })));
-                                const allPlayersList3 = [...others, me];
-                                const scoredIds = hScores.map((s) => s.player_id);
-                                const unscored = allPlayersList3.filter((p) => !scoredIds.includes(p.id) && p.id !== thisBanker);
-                                await Promise.all(unscored.map((p) => dbSaveScore({ player_id: p.id, hole_number: activeHole, round_id: round.id, score: 0, bet: 0, doubled: true, banker_id: thisBanker })));
-                                setAllScores((prev) => prev.map((s) => s.hole_number === activeHole ? { ...s, doubled: true } : s));
-                                await dbSendChat({ id: genId(), round_id: round.id, player_id: me.id, player_name: me.name, text: "🔥 " + me.name + " DOUBLED the bets on hole " + activeHole + "! All bets are now x2.", created_at: new Date().toISOString() });
+                        <div style={{ fontSize: 13, fontWeight: 800, color: "#22c55e", marginBottom: 6 }}>🏦 YOU ARE THE BANKER</div>
+                        <div style={{ fontSize: 13, color: "#64748b", marginBottom: 4 }}>
+                          Pot: <span style={{ color: "#f59e0b", fontWeight: 800, fontSize: 20 }}>${totalPot}</span>
+                          {isDoubled && <span style={{ color: "#f59e0b", fontSize: 11, marginLeft: 6 }}>🔥 DOUBLED</span>}
+                        </div>
+                        <div style={{ fontSize: 11, color: "#475569", marginBottom: 8 }}>
+                          {allBetsIn ? "✓ All bets in - ready to play or double" : `Bets in: ${submittedBets.length}/${nonBankerPlayers.length}`}
+                        </div>
+                        {/* Double button - only when all bets in and not yet doubled */}
+                        {allBetsIn && !isDoubled && (
+                          <button onClick={async () => {
+                            if (!window.confirm("Double all bets on hole " + activeHole + "? Cannot be undone.")) return;
+                            const hScores = allScores.filter((s) => s.hole_number === activeHole);
+                            for (const s of hScores) { await dbSaveScore({ ...s, doubled: true }); }
+                            // Save doubled for players without a score record yet
+                            for (const p of nonBankerPlayers) {
+                              if (!hScores.find((s) => s.player_id === p.id)) {
+                                await dbSaveScore({ player_id: p.id, hole_number: activeHole, round_id: round.id, score: 0, bet: 0, doubled: true, banker_id: thisBanker });
                               }
-                            }}
-                              style={{ flex: 1, backgroundColor: "#f59e0b", color: "#0f172a", border: "none", borderRadius: 8, padding: "12px 8px", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
-                              💥 DOUBLE ${totalPot}→${totalPot * 2}
-                            </button>
-                            <button onClick={async () => {
-                              // Save a "proceed" flag so all devices know scoring is open
-                              await supabase.from("rounds").update({ scoring_open: true }).eq("id", round.id);
-                            }}
-                              style={{ flex: 1, backgroundColor: "#22c55e", color: "#0f172a", border: "none", borderRadius: 8, padding: "12px 8px", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
-                              ✓ Proceed to Score
-                            </button>
-                          </div>
-                        )}
-                        {betsSubmitted < betsNeeded && (
-                          <div style={{ marginTop: 8, fontSize: 11, color: "#64748b", textAlign: "center" }}>
-                            ⏳ Waiting for bets: {betsSubmitted}/{betsNeeded} submitted
-                          </div>
+                            }
+                            setAllScores((prev) => prev.map((s) => s.hole_number === activeHole ? { ...s, doubled: true } : s));
+                            await dbSendChat({ id: genId(), round_id: round.id, player_id: me.id, player_name: me.name, text: "🔥 " + me.name + " DOUBLED the bets on hole " + activeHole + "!", created_at: new Date().toISOString() });
+                          }} style={{ width: "100%", backgroundColor: "#f59e0b", color: "#0f172a", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", marginBottom: 8 }}>
+                            💥 DOUBLE — ${totalPot} → ${totalPot * 2}
+                          </button>
                         )}
                         {isDoubled && (
-                          <div style={{ marginTop: 8, backgroundColor: "#f59e0b22", border: "1px solid #f59e0b", borderRadius: 8, padding: "6px 12px", textAlign: "center", fontSize: 12, color: "#f59e0b", fontWeight: 700 }}>
+                          <div style={{ backgroundColor: "#f59e0b22", border: "1px solid #f59e0b", borderRadius: 8, padding: "6px 12px", textAlign: "center", fontSize: 12, color: "#f59e0b", fontWeight: 700, marginBottom: 8 }}>
                             🔥 DOUBLED — All bets x2
+                          </div>
+                        )}
+                        {/* Scoring active indicator */}
+                        {allBetsIn && (
+                          <div style={{ backgroundColor: "#022c22", border: "1px solid #22c55e", borderRadius: 8, padding: "8px 12px", textAlign: "center", fontSize: 13, color: "#22c55e", fontWeight: 700 }}>
+                            ⛳ Scoring is LIVE — Enter your score below
                           </div>
                         )}
                       </>
                     ) : (
+                      /* NON-BANKER VIEW */
                       <>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 0.5 }}>
-                            🏦 {bankerPlayer?.name || "?"} is Banker
-                          </div>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8" }}>🏦 {bankerPlayer?.name || "?"} is Banker</div>
                           <div style={{ fontSize: 13, fontWeight: 800, color: myBankerTotal > 0 ? "#22c55e" : myBankerTotal < 0 ? "#ef4444" : "#94a3b8" }}>
                             {myBankerTotal >= 0 ? "+$" : "-$"}{Math.abs(myBankerTotal)}
                           </div>
                         </div>
-                        {/* Bet input for non-banker players - proper sequence */}
-                        <div style={{ marginTop: 8 }}>
-                          {myBets[activeHole] ? (
-                            /* STEP 3: Bet confirmed and locked */
-                            <div>
-                              <div style={{ display: "flex", alignItems: "center", gap: 10, backgroundColor: "#022c22", border: "1.5px solid #22c55e", borderRadius: 10, padding: "12px 16px" }}>
-                                <div style={{ fontSize: 13, color: "#22c55e", fontWeight: 700 }}>✓ Bet Locked</div>
-                                <div style={{ fontSize: 24, fontWeight: 900, color: "#22c55e", flex: 1, textAlign: "center" }}>
-                                  ${isDoubled ? myBets[activeHole] * 2 : myBets[activeHole]}
-                                </div>
-                                {isDoubled && <div style={{ fontSize: 11, color: "#f59e0b", fontWeight: 700 }}>🔥 DOUBLED</div>}
-                              </div>
-                              {isDoubled && (
-                                <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 6 }}>
-                                  <span style={{ textDecoration: "line-through", color: "#64748b", fontSize: 12 }}>${myBets[activeHole]}</span>
-                                  <span style={{ fontSize: 12, color: "#475569" }}>→ doubled to</span>
-                                  <span style={{ color: "#f59e0b", fontWeight: 800, fontSize: 14 }}>${myBets[activeHole] * 2}</span>
-                                  <span style={{ fontSize: 10, color: "#f59e0b" }}>by banker</span>
-                                </div>
-                              )}
+
+                        {myBetConfirmed ? (
+                          /* Bet locked */
+                          <div style={{ backgroundColor: "#022c22", border: "1.5px solid #22c55e", borderRadius: 8, padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <div style={{ fontSize: 12, color: "#22c55e", fontWeight: 700 }}>✓ Bet Locked</div>
+                            <div style={{ fontSize: 22, fontWeight: 900, color: "#22c55e" }}>
+                              ${isDoubled ? myBets[activeHole] * 2 : myBets[activeHole]}
+                              {isDoubled && <span style={{ fontSize: 10, color: "#f59e0b", marginLeft: 6 }}>🔥x2</span>}
                             </div>
-                          ) : (
-                            /* STEP 2: Enter and submit bet */
-                            <div>
-                              <div style={{ fontSize: 11, color: "#f59e0b", fontWeight: 700, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>⚠ Enter your bet to unlock scoring</div>
-                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                <span style={{ fontSize: 16, color: "#64748b", fontWeight: 700 }}>$</span>
-                                <input
-                                  style={{ ...S.customInput, width: 80, fontSize: 22, fontWeight: 900, borderColor: pendingBets[activeHole] ? "#22c55e" : "#f59e0b", flex: 1 }}
-                                  type="number" min="1" placeholder="0"
-                                  value={pendingBets[activeHole] || ""}
-                                  onChange={(e) => setPendingBets((prev) => ({ ...prev, [activeHole]: e.target.value ? parseInt(e.target.value) : "" }))}
-                                />
-                                <button
-                                  disabled={!pendingBets[activeHole] || pendingBets[activeHole] < 1}
-                                  onClick={async () => {
-                                    const betVal = pendingBets[activeHole];
-                                    if (!betVal || betVal < 1) return;
-                                    const thisBankerId2 = activeHole === 1 ? initialBankerId : currentBankerId;
-                                    const existingScore = allScores.find((s) => s.player_id === me.id && s.hole_number === activeHole);
-                                    const obj = { player_id: me.id, hole_number: activeHole, round_id: round.id, score: existingScore?.score || 0, bet: betVal, bet_locked: true };
-                                    if (thisBankerId2) obj.banker_id = thisBankerId2;
-                                    await dbSaveScore(obj);
-                                    // Only NOW lock the bet by moving to myBets
-                                    setMyBets((prev) => ({ ...prev, [activeHole]: betVal }));
-                                    const updated = await dbGetScores(round.id);
-                                    setAllScores(updated);
-                                  }}
-                                  style={{
-                                    backgroundColor: pendingBets[activeHole] ? "#22c55e" : "#334155",
-                                    color: pendingBets[activeHole] ? "#0f172a" : "#64748b",
-                                    border: "none", borderRadius: 8, padding: "12px 18px",
-                                    fontSize: 14, fontWeight: 800, cursor: pendingBets[activeHole] ? "pointer" : "not-allowed",
-                                    fontFamily: "inherit", flexShrink: 0
-                                  }}>
-                                  Submit Bet
-                                </button>
-                              </div>
+                          </div>
+                        ) : (
+                          /* Enter bet */
+                          <div>
+                            <div style={{ fontSize: 11, color: "#f59e0b", fontWeight: 700, marginBottom: 8 }}>⚠ Enter your bet to unlock scoring</div>
+                            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                              <span style={{ fontSize: 16, color: "#64748b", fontWeight: 700 }}>$</span>
+                              <input
+                                style={{ ...S.customInput, flex: 1, fontSize: 22, fontWeight: 900, borderColor: pendingBets[activeHole] ? "#22c55e" : "#f59e0b" }}
+                                type="number" min="1" placeholder="0"
+                                value={pendingBets[activeHole] || ""}
+                                onChange={(e) => setPendingBets((prev) => ({ ...prev, [activeHole]: e.target.value ? parseInt(e.target.value) : "" }))}
+                              />
+                              <button
+                                onClick={async () => {
+                                  const betVal = pendingBets[activeHole];
+                                  if (!betVal || betVal < 1) return;
+                                  const obj = { player_id: me.id, hole_number: activeHole, round_id: round.id, score: 0, bet: betVal, banker_id: thisBanker };
+                                  await dbSaveScore(obj);
+                                  setMyBets((prev) => ({ ...prev, [activeHole]: betVal }));
+                                  const updated = await dbGetScores(round.id);
+                                  setAllScores(updated);
+                                }}
+                                disabled={!pendingBets[activeHole]}
+                                style={{ backgroundColor: pendingBets[activeHole] ? "#22c55e" : "#334155", color: pendingBets[activeHole] ? "#0f172a" : "#64748b", border: "none", borderRadius: 8, padding: "12px 16px", fontSize: 14, fontWeight: 800, cursor: pendingBets[activeHole] ? "pointer" : "not-allowed", fontFamily: "inherit", flexShrink: 0 }}>
+                                Submit
+                              </button>
                             </div>
-                          )}
-                        </div>
+                          </div>
+                        )}
+
+                        {/* Show scoring active once bet confirmed */}
+                        {myBetConfirmed && (
+                          <div style={{ marginTop: 8, backgroundColor: "#022c22", border: "1px solid #22c55e", borderRadius: 8, padding: "6px 12px", textAlign: "center", fontSize: 12, color: "#22c55e", fontWeight: 700 }}>
+                            ⛳ Scoring LIVE — Enter your score below
+                          </div>
+                        )}
                       </>
                     )}
                   </div>
@@ -2448,7 +2423,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
             );
           })()}
 
-          <div style={{ position: "relative" }}>
+                    <div style={{ position: "relative" }}>
           {round.game_type === "banker" && (() => {
             const thisBankerNow = activeHole === 1 ? initialBankerId : currentBankerId;
             const iAmBankerNow2 = thisBankerNow === me.id;
