@@ -2307,10 +2307,12 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
             const iAmBanker = thisBanker === me.id;
             const bankerPlayer = [...others, me].find((p) => p.id === thisBanker);
             const nonBankerPlayers = [...others, me].filter((p) => p.id !== thisBanker);
+            // Count unique players who have submitted a bet (regardless of doubled status)
             const submittedBets = allScores.filter((s) => s.hole_number === activeHole && s.player_id !== thisBanker && s.bet > 0);
+            const uniqueBettors = [...new Set(submittedBets.map((s) => s.player_id))];
             const isDoubled = doubledHolesRef.current[activeHole] || allScores.some((s) => s.hole_number === activeHole && s.doubled);
             const totalPot = submittedBets.reduce((sum, s) => sum + ((s.bet || 0) * (isDoubled ? 2 : 1)), 0);
-            const allBetsIn = submittedBets.length >= nonBankerPlayers.length && nonBankerPlayers.length > 0;
+            const allBetsIn = uniqueBettors.length >= nonBankerPlayers.length && nonBankerPlayers.length > 0;
             const myBetConfirmed = !!myBets[activeHole];
 
             return (
@@ -2355,18 +2357,22 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                         {/* Double button - only when all bets in and not yet doubled */}
                         {allBetsIn && !isDoubled && (
                           <button onClick={async () => {
+                            // Prevent double-firing
+                            if (doubledHolesRef.current[activeHole]) return;
                             if (!window.confirm("Double all bets on hole " + activeHole + "? Cannot be undone.")) return;
-                            // Mark as doubled immediately in ref - immune to 2s refresh
+                            // Mark IMMEDIATELY before any async work
                             doubledHolesRef.current = { ...doubledHolesRef.current, [activeHole]: true };
-                            // Save doubled bets to Supabase
-                            const hScores = allScores.filter((s) => s.hole_number === activeHole && s.bet > 0);
+                            // Get the ORIGINAL bets (before any doubling)
+                            const hScores = allScores.filter((s) => s.hole_number === activeHole && s.bet > 0 && !s.doubled);
+                            // Save each bet as doubled=true but keep ORIGINAL bet amount
+                            // The doubled flag tells the calc to multiply by 2
                             for (const s of hScores) {
-                              await dbSaveScore({ ...s, bet: s.bet * 2, doubled: true });
+                              await dbSaveScore({ ...s, doubled: true });
                             }
-                            // Update local state
+                            // Update local state - mark doubled but keep original bet amount
                             setAllScores((prev) => prev.map((s) => {
-                              if (s.hole_number === activeHole && s.bet > 0) {
-                                return { ...s, bet: s.bet * 2, doubled: true };
+                              if (s.hole_number === activeHole && s.bet > 0 && !s.doubled) {
+                                return { ...s, doubled: true };
                               }
                               return s;
                             }));
