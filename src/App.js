@@ -1984,7 +1984,25 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
   useEffect(() => {
     const t = setInterval(async () => {
       const [s, p, msgs] = await Promise.all([dbGetScores(round.id), dbGetPlayers(round.id), dbGetChat(round.id)]);
-      setAllScores(s); setOthers(p.filter((pl) => pl.id !== me.id));
+      // MERGE: never overwrite a field that exists locally with null from Supabase
+      setAllScores((prev) => {
+        const merged = [...s];
+        prev.forEach((localScore) => {
+          const idx = merged.findIndex((r) => r.player_id === localScore.player_id && r.hole_number === localScore.hole_number && r.round_id === localScore.round_id);
+          if (idx >= 0) {
+            // Keep local values if Supabase returned null for that field
+            merged[idx] = {
+              ...merged[idx],
+              bet: merged[idx].bet ?? localScore.bet,
+              banker_id: merged[idx].banker_id ?? localScore.banker_id,
+              doubled: merged[idx].doubled ?? localScore.doubled,
+              bet_locked: merged[idx].bet_locked ?? localScore.bet_locked,
+            };
+          }
+        });
+        return merged;
+      });
+      setOthers(p.filter((pl) => pl.id !== me.id));
       if (!showChat) {
         setLastMsgCount((prev) => { if (msgs.length > prev && prev > 0) setUnreadChat((u) => u + (msgs.length - prev)); return msgs.length; });
       }
@@ -2377,16 +2395,19 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                             originalPotRef.current = { ...originalPotRef.current, [activeHole]: originalPot };
                             doubledHolesRef.current = { ...doubledHolesRef.current, [activeHole]: true };
                             // Get the ORIGINAL bets (before any doubling)
-                            const hScores = allScores.filter((s) => s.hole_number === activeHole && s.bet > 0 && !s.doubled);
-                            // Save each bet as doubled=true but keep ORIGINAL bet amount
-                            // The doubled flag tells the calc to multiply by 2
+                            const hScores = allScores.filter((s) => s.hole_number === activeHole && s.bet > 0);
+                            // Save DOUBLED amount directly to Supabase so all devices see it
                             for (const s of hScores) {
-                              await dbSaveScore({ ...s, doubled: true });
+                              await supabase.from("scores")
+                                .update({ bet: s.bet * 2, doubled: true })
+                                .eq("player_id", s.player_id)
+                                .eq("hole_number", s.hole_number)
+                                .eq("round_id", s.round_id);
                             }
-                            // Update local state - mark doubled but keep original bet amount
+                            // Update local state immediately
                             setAllScores((prev) => prev.map((s) => {
-                              if (s.hole_number === activeHole && s.bet > 0 && !s.doubled) {
-                                return { ...s, doubled: true };
+                              if (s.hole_number === activeHole && s.bet > 0) {
+                                return { ...s, bet: s.bet * 2, doubled: true };
                               }
                               return s;
                             }));
