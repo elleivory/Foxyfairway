@@ -2663,15 +2663,19 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                       if (myBetRecord && myScore) myScore.bet = myBetRecord.bet;
                       const allScoredBk = myScore && allPlayers.every((p) => holeScores.some((s) => s.player_id === p.id && s.score > 0));
                       if (!allScoredBk) return (<div key={"bk"+h.hole_number} style={S.scoreInfoCell}><div style={{ fontSize: 14, color: "#334155" }}>—</div></div>);
-                      const bankerId = myScore?.banker_id || holeScores[0]?.banker_id;
+                      const bankerId = holeScores.find((s) => s.banker_id)?.banker_id;
                       const doubled = holeScores.some((s) => s.doubled);
                       const iAmBankerHole = bankerId === me.id;
                       let lowest = Infinity, winner = null, tied = false;
                       holeScores.forEach((s) => { const pl = allPlayers.find((p) => p.id === s.player_id); if (!pl) return; const net = s.score - getHcpStrokes(pl.handicap, h.stroke_index); if (net < lowest) { lowest = net; winner = s.player_id; tied = false; } else if (net === lowest) { tied = true; } });
                       let holeChange = 0;
                       if (!tied) {
-                        if (iAmBankerHole) { holeScores.forEach((s) => { if (s.player_id === me.id) return; const bet = (s.bet||0); if (winner===me.id) holeChange+=bet; else holeChange-=bet; }); }
-                        else { const myBet=(myScore?.bet||0); if(myBet>0){if(winner===me.id)holeChange+=myBet;else if(winner===bankerId)holeChange-=myBet;} }
+                        if (iAmBankerHole) { 
+                        allScores.filter((s) => s.hole_number === h.hole_number && s.player_id !== me.id && s.bet > 0).forEach((s) => { if (winner===me.id) holeChange+=s.bet; else holeChange-=s.bet; }); 
+                      } else { 
+                        const myBet = allScores.find((s) => s.player_id === me.id && s.hole_number === h.hole_number && s.bet > 0)?.bet || 0;
+                        if(myBet>0){if(winner===me.id)holeChange+=myBet;else if(winner===bankerId)holeChange-=myBet;}
+                      }
                       }
                       const color = holeChange > 0 ? "#22c55e" : holeChange < 0 ? "#ef4444" : "#94a3b8";
                       return (
@@ -2792,18 +2796,18 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                             const allP5 = [...others, me];
                             const allScored5 = allP5.every((p) => hScores.some((s) => s.player_id === p.id && s.score > 0));
                             if (!allScored5) return <div style={{ height: 20 }} />;
-                            const bankerId5 = hScores[0]?.banker_id;
+                            // Get bankerId from ANY score record that has it set
+                            const bankerId5 = hScores.find((s) => s.banker_id)?.banker_id;
                             const doubled5 = hScores.some((s) => s.doubled);
                             let low5 = Infinity, win5 = null, tie5 = false;
                             hScores.forEach((s) => { const pl = allP5.find((p) => p.id === s.player_id); if (!pl || !s.score) return; const net = s.score - getHcpStrokes(pl.handicap, h.stroke_index); if (net < low5) { low5 = net; win5 = s.player_id; tie5 = false; } else if (net === low5) tie5 = true; });
-                            const pScore = hScores.find((s) => s.player_id === player.id);
-                            // Get bet from ANY record for this player this hole (bet may be in separate record)
-                            const pBetRecord = allScores.find((s) => s.player_id === player.id && s.hole_number === h.hole_number && s.bet > 0);
-                            const pBet = pBetRecord?.bet || pScore?.bet || 0;
+                            // Get bet from ANY record for this player this hole
+                            const pBet = allScores.find((s) => s.player_id === player.id && s.hole_number === h.hole_number && s.bet > 0)?.bet || 0;
                             let pChange = 0;
-                            if (!tie5) {
+                            if (!tie5 && bankerId5) {
                               if (player.id === bankerId5) {
-                                hScores.forEach((s) => { if (s.player_id === bankerId5 || !s.score) return; if (win5 === bankerId5) pChange += (s.bet||0); else pChange -= (s.bet||0); });
+                                // Banker: sum all non-banker bets
+                                allScores.filter((s) => s.hole_number === h.hole_number && s.player_id !== bankerId5 && s.bet > 0).forEach((s) => { if (win5 === bankerId5) pChange += s.bet; else pChange -= s.bet; });
                               } else {
                                 if (win5 === player.id && win5 !== bankerId5) pChange = pBet;
                                 else if (win5 === bankerId5) pChange = -pBet;
