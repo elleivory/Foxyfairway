@@ -1773,11 +1773,12 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
 
   let lb = [];
   try { lb = calcLeaderboard(players, scores, holes, round.game_type); } catch(e) { lb = []; }
+  if (lb.length === 0 && players.length > 0) { lb = players.map((p) => ({ ...p, total: 0, toPar: 0, grossTotal: 0, holesPlayed: 0 })); }
 
   return (
     <div style={S.screen}>
       <div style={{ backgroundColor: "#1e293b", borderBottom: "1px solid #334155", position: "sticky", top: 0, zIndex: 10 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px 8px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 8px" }}>
           <button style={S.backBtn} onClick={() => { if (window.confirm("Exit round? It stays saved.")) onBack(); }}>← Back</button>
           <div style={{ flex: 1, textAlign: "center" }}>
             <div style={{ fontSize: 15, fontWeight: 700, color: "#f8fafc" }}>{round.course_name}</div>
@@ -1787,7 +1788,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
         </div>
         <div style={{ display: "flex", gap: 8, padding: "0 16px 10px" }}>
           <button style={{ flex: 1, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 11, fontWeight: 600, cursor: "pointer", padding: "8px 4px", fontFamily: "inherit" }} onClick={() => { saveRoundToHistory(round, players, scores, holes); alert("Round saved!"); }}>💾 Save Round</button>
-          <button style={{ flex: 1, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 11, fontWeight: 600, cursor: "pointer", padding: "8px 4px", fontFamily: "inherit" }} onClick={() => exportScorecardPDF(round, players, scores, holes)}>📄 Scorecard</button>
+          <button style={{ flex: 1, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 11, fontWeight: 600, cursor: "pointer", padding: "8px 4px", fontFamily: "inherit" }} onClick={async () => { try { await exportScorecardPDF(round, players, scores, holes); } catch(e) { alert("Please allow popups to export scorecard"); } }}>📄 Scorecard</button>
         </div>
       </div>
 
@@ -3147,7 +3148,7 @@ const S = {
   tagline: { fontSize: 16, color: "#64748b", margin: "8px 0 0" },
   homeButtons: { width: "100%", maxWidth: 320, display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 },
   adminLink: { background: "none", border: "none", color: "#64748b", fontSize: 12, cursor: "pointer", padding: 0, textDecoration: "underline", fontFamily: "inherit" },
-  header: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "52px 20px 16px", backgroundColor: "#1e293b", borderBottom: "1px solid #334155", position: "sticky", top: 0, zIndex: 10 },
+  header: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 20px 16px", backgroundColor: "#1e293b", borderBottom: "1px solid #334155", position: "sticky", top: 0, zIndex: 10 },
   headerLeft: { display: "flex", flexDirection: "column" },
   headerCourse: { fontSize: 14, fontWeight: 600, color: "#f8fafc" },
   headerGame: { fontSize: 12, color: "#64748b" },
