@@ -2303,14 +2303,16 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
 
           {/* Banker game - full banker UI */}
           {round.game_type === "banker" && (() => {
-            const thisBanker = activeHole === 1 ? initialBankerId : currentBankerId;
+            const thisBanker = currentBankerId || initialBankerId;
             const iAmBanker = thisBanker === me.id;
             const bankerPlayer = [...others, me].find((p) => p.id === thisBanker);
             const nonBankerPlayers = [...others, me].filter((p) => p.id !== thisBanker);
-            // Count unique players who have submitted a bet (regardless of doubled status)
-            const submittedBets = allScores.filter((s) => s.hole_number === activeHole && s.player_id !== thisBanker && s.bet > 0);
+            // Get bets - if thisBanker is null show all bets
+            const submittedBets = thisBanker
+              ? allScores.filter((s) => s.hole_number === activeHole && s.player_id !== thisBanker && s.bet > 0)
+              : allScores.filter((s) => s.hole_number === activeHole && s.bet > 0);
             const uniqueBettors = [...new Set(submittedBets.map((s) => s.player_id))];
-            const isDoubled = doubledHolesRef.current[activeHole] || allScores.some((s) => s.hole_number === activeHole && s.doubled);
+            const isDoubled = doubledHolesRef.current[activeHole] === true || allScores.some((s) => s.hole_number === activeHole && s.doubled === true);
             const originalPot = submittedBets.reduce((sum, s) => sum + (s.bet || 0), 0);
             const doubledPot = originalPot * 2;
             const totalPot = isDoubled ? doubledPot : originalPot;
