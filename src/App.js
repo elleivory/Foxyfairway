@@ -2229,7 +2229,6 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
       }
     });
     return total;
-  } catch(e) { return 0; }
   })();
 
   const RunningTotal = ({ value, label, color }) => (
