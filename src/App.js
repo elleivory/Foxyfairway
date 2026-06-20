@@ -2210,12 +2210,12 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
         if (bankerIsWinner2) {
           holeScores.forEach((s) => {
             if (s.player_id === me.id || s.score === 0) return;
-            if (!winners2.includes(s.player_id)) total += (s.bet || 0) * (doubled ? 2 : 1);
+            if (!winners2.includes(s.player_id)) total += (s.bet || 0);
           });
         } else {
           holeScores.forEach((s) => {
             if (s.player_id === me.id || s.score === 0) return;
-            if (winners2.includes(s.player_id)) total -= (s.bet || 0) * (doubled ? 2 : 1);
+            if (winners2.includes(s.player_id)) total -= (s.bet || 0);
           });
         }
       } else {
@@ -2443,7 +2443,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                           <div style={{ backgroundColor: "#022c22", border: "1.5px solid #22c55e", borderRadius: 8, padding: "10px 14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                             <div style={{ fontSize: 12, color: "#22c55e", fontWeight: 700 }}>✓ Bet Locked</div>
                             <div style={{ fontSize: 22, fontWeight: 900, color: "#22c55e" }}>
-                              ${isDoubled ? myBets[activeHole] * 2 : myBets[activeHole]}
+                              ${myBets[activeHole]}
                               {isDoubled && <span style={{ fontSize: 10, color: "#f59e0b", marginLeft: 6 }}>🔥x2</span>}
                             </div>
                           </div>
