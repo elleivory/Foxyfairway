@@ -2349,7 +2349,10 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                               style={{ flex: 1, backgroundColor: "#f59e0b", color: "#0f172a", border: "none", borderRadius: 8, padding: "12px 8px", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
                               💥 DOUBLE ${totalPot}→${totalPot * 2}
                             </button>
-                            <button onClick={() => {/* Proceed - just close the banker box, scoring already unlocked */}}
+                            <button onClick={async () => {
+                              // Save a "proceed" flag so all devices know scoring is open
+                              await supabase.from("rounds").update({ scoring_open: true }).eq("id", round.id);
+                            }}
                               style={{ flex: 1, backgroundColor: "#22c55e", color: "#0f172a", border: "none", borderRadius: 8, padding: "12px 8px", fontSize: 13, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
                               ✓ Proceed to Score
                             </button>
