@@ -2184,14 +2184,10 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
     });
     return myHolesWon - oppHolesWon;
   })();
-  // Use calcLeaderboard result to avoid duplicate calculation
+  // Direct calculation - most reliable
   const myBankerTotal = (() => {
     if (!holes || !holes.length || !me) return 0;
     try {
-      const lbMe = calcLeaderboard([...others, me].filter(Boolean), allScores, holes, "banker").find((p) => p.id === me.id);
-      if (lbMe) return lbMe.total;
-    } catch(e) { return 0; }
-    // Fallback calculation
     let total = 0;
     holes.forEach((hole) => {
       const myG = myScores[hole.hole_number]; if (!myG) return;
