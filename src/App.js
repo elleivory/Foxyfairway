@@ -2304,7 +2304,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
             const iAmBanker = thisBanker === me.id;
             const bankerPlayer = [...others, me].find((p) => p.id === thisBanker);
             const nonBankerPlayers = [...others, me].filter((p) => p.id !== thisBanker);
-            const submittedBets = allScores.filter((s) => s.hole_number === activeHole && s.player_id !== thisBanker && s.bet > 0 && s.bet_locked);
+            const submittedBets = allScores.filter((s) => s.hole_number === activeHole && s.player_id !== thisBanker && s.bet > 0);
             const isDoubled = allScores.some((s) => s.hole_number === activeHole && s.doubled);
             const totalPot = submittedBets.reduce((sum, s) => sum + ((s.bet || 0) * (isDoubled ? 2 : 1)), 0);
             const allBetsIn = submittedBets.length >= nonBankerPlayers.length && nonBankerPlayers.length > 0;
