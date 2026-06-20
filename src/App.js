@@ -2658,7 +2658,9 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                   <div className="ff-slave-scroll" style={{ ...S.scoreInfoRow, flex: 1 }} onScroll={(e) => { document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { if (el !== e.target) el.scrollLeft = e.target.scrollLeft; }); }}>
                     {holes.map((h) => {
                       const holeScores = allScores.filter((s) => s.hole_number === h.hole_number);
-                      const myScore = holeScores.find((s) => s.player_id === me.id);
+                      const myScore = holeScores.find((s) => s.player_id === me.id && s.score > 0);
+                      const myBetRecord = allScores.find((s) => s.player_id === me.id && s.hole_number === h.hole_number && s.bet > 0);
+                      if (myBetRecord && myScore) myScore.bet = myBetRecord.bet;
                       const allScoredBk = myScore && allPlayers.every((p) => holeScores.some((s) => s.player_id === p.id && s.score > 0));
                       if (!allScoredBk) return (<div key={"bk"+h.hole_number} style={S.scoreInfoCell}><div style={{ fontSize: 14, color: "#334155" }}>—</div></div>);
                       const bankerId = myScore?.banker_id || holeScores[0]?.banker_id;
@@ -2795,9 +2797,11 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                             let low5 = Infinity, win5 = null, tie5 = false;
                             hScores.forEach((s) => { const pl = allP5.find((p) => p.id === s.player_id); if (!pl || !s.score) return; const net = s.score - getHcpStrokes(pl.handicap, h.stroke_index); if (net < low5) { low5 = net; win5 = s.player_id; tie5 = false; } else if (net === low5) tie5 = true; });
                             const pScore = hScores.find((s) => s.player_id === player.id);
-                            const pBet = pScore?.bet || 0;
+                            // Get bet from ANY record for this player this hole (bet may be in separate record)
+                            const pBetRecord = allScores.find((s) => s.player_id === player.id && s.hole_number === h.hole_number && s.bet > 0);
+                            const pBet = pBetRecord?.bet || pScore?.bet || 0;
                             let pChange = 0;
-                            if (!tie5 && pBet > 0) {
+                            if (!tie5) {
                               if (player.id === bankerId5) {
                                 hScores.forEach((s) => { if (s.player_id === bankerId5 || !s.score) return; if (win5 === bankerId5) pChange += (s.bet||0); else pChange -= (s.bet||0); });
                               } else {
@@ -2805,11 +2809,13 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                                 else if (win5 === bankerId5) pChange = -pBet;
                               }
                             }
-                            const pCol = pChange > 0 ? "#22c55e" : pChange < 0 ? "#ef4444" : "#94a3b8";
+                            const isWinner5 = win5 === player.id && !tie5;
+                            const isLoser5 = !tie5 && win5 !== player.id && (player.id === bankerId5 ? true : win5 === bankerId5);
+                            const pCol = isWinner5 ? "#22c55e" : isLoser5 ? "#ef4444" : "#94a3b8";
                             const isBanker5 = player.id === bankerId5;
                             return (
                               <div style={{ height: 20, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-                                <div style={{ fontSize: 9, fontWeight: 700, color: pCol }}>{tie5 ? "T" : pChange > 0 ? "W" : "L"}</div>
+                                <div style={{ fontSize: 9, fontWeight: 700, color: pCol }}>{tie5 ? "T" : isWinner5 ? "W" : "L"}</div>
                                 <div style={{ fontSize: 8, color: pCol }}>{pChange !== 0 ? (pChange > 0 ? "+$" : "-$") + Math.abs(pChange) : ""}</div>
                                 {isBanker5 && <div style={{ fontSize: 7 }}>🏦</div>}
                                 {doubled5 && <div style={{ fontSize: 7 }}>🔥</div>}
