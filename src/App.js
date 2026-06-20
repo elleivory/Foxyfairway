@@ -2038,63 +2038,76 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
 
   const saveScore = async (holeNum, score, bet = null) => {
     if (score < 1 || score > 15) return;
-    // Banker: non-banker players must enter a bet first
     const thisBankerId = holeNum === 1 ? initialBankerId : currentBankerId;
     const iAmBankerNow = thisBankerId === me.id;
-    if (round.game_type === "banker" && !iAmBankerNow && !myBets[holeNum] && bet === null) return;
+    // Non-banker must have submitted a bet first
+    if (round.game_type === "banker" && !iAmBankerNow && !myBets[holeNum]) return;
     
     setMyScores((prev) => ({ ...prev, [holeNum]: score }));
     if (bet !== null) setMyBets((prev) => ({ ...prev, [holeNum]: bet }));
     
-    const obj = { player_id: me.id, hole_number: holeNum, score, round_id: round.id };
-    if (bet !== null) obj.bet = bet;
-    if (round.game_type === "banker") obj.banker_id = thisBankerId;
+    // Build score object - preserve existing bet if already submitted
+    const existingRecord = allScores.find((s) => s.player_id === me.id && s.hole_number === holeNum);
+    const obj = {
+      player_id: me.id, hole_number: holeNum, score, round_id: round.id,
+      bet: bet !== null ? bet : (existingRecord?.bet || myBets[holeNum] || null),
+      banker_id: round.game_type === "banker" ? thisBankerId : undefined,
+      doubled: existingRecord?.doubled || false,
+      bet_locked: existingRecord?.bet_locked || false,
+    };
+    // Remove undefined keys
+    Object.keys(obj).forEach((k) => obj[k] === undefined && delete obj[k]);
     
     setAllScores((prev) => {
       const f = prev.filter((s) => !(s.player_id === me.id && s.hole_number === holeNum));
       return [...f, obj];
     });
-    await dbSaveScore(obj);
     
-    // After scoring - if all players scored, determine next banker
+    try {
+      await dbSaveScore(obj);
+    } catch (e) {
+      console.error("saveScore error:", e);
+      return; // Don't advance if save failed
+    }
+    
+    // Banker rotation - only when ALL players have REAL scores (score > 0)
     if (round.game_type === "banker") {
-      const updatedHoleScores = [...allScores.filter((s) => !(s.player_id === me.id && s.hole_number === holeNum)), obj].filter((s) => s.hole_number === holeNum);
       const allPlayersList2 = [...others, me];
-      if (updatedHoleScores.length >= allPlayersList2.length) {
+      const freshScores = [...allScores.filter((s) => !(s.player_id === me.id && s.hole_number === holeNum)), obj];
+      const realHoleScores = freshScores.filter((s) => s.hole_number === holeNum && s.score > 0);
+      const allRealScored = allPlayersList2.every((p) => realHoleScores.some((s) => s.player_id === p.id));
+      if (allRealScored) {
         let lowest = Infinity, winner = null, tied = false;
-        updatedHoleScores.forEach((s) => {
+        realHoleScores.forEach((s) => {
           const pl = allPlayersList2.find((p) => p.id === s.player_id); if (!pl) return;
           const hole = holes.find((h) => h.hole_number === holeNum);
           const net = s.score - getHcpStrokes(pl.handicap, hole?.stroke_index || 1);
           if (net < lowest) { lowest = net; winner = s.player_id; tied = false; }
           else if (net === lowest) { tied = true; }
         });
-        // Only rotate if clear winner - tied hole keeps current banker
         if (winner && !tied) {
           setCurrentBankerId(winner);
-          await dbSaveCurrentBanker(round.id, winner);
+          try { await dbSaveCurrentBanker(round.id, winner); } catch(e) { console.error(e); }
+        }
+        // Advance hole for all devices
+        if (holeNum < 18) {
+          try { await dbSaveCurrentHole(round.id, holeNum + 1); } catch(e) { console.error(e); }
         }
       }
     }
     
     if (holeNum < 18) {
-      const next = holeNum + 1;
-      if (round.game_type === "banker") {
-        const updatedScores = [...allScores.filter((s) => !(s.player_id === me.id && s.hole_number === holeNum)), obj];
-        const holeScoresFull = updatedScores.filter((s) => s.hole_number === holeNum && s.score > 0);
-        const allPlayersList = [...others, me];
-        const allScored = allPlayersList.every((p) => holeScoresFull.some((s) => s.player_id === p.id));
-        if (!allScored) return; // Wait for all players to score
-        // All scored - save current hole to Supabase so all devices advance together
-        await dbSaveCurrentHole(round.id, next);
+      if (round.game_type !== "banker") {
+        // Non-banker games advance immediately
+        const next = holeNum + 1;
+        setActiveHole(next);
+        setTimeout(() => {
+          const pos = Math.max(0, (next - 1) * 44 - 120);
+          document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { el.scrollLeft = pos; });
+        }, 50);
       }
-      setActiveHole(next);
-      setTimeout(() => {
-        const pos = Math.max(0, (next - 1) * 44 - 120);
-        document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { el.scrollLeft = pos; });
-      }, 50);
+      // Banker: hole advance happens via Supabase sync in 2s refresh
     } else {
-      if (round.game_type === "banker") await dbSaveCurrentHole(round.id, 18);
       setTimeout(() => onViewDashboard(), 800);
     }
   };
