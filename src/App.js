@@ -2778,8 +2778,8 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                             if (tied) return;
                             // Find lowest net and winners for this hole
                             let lowestOth = Infinity;
-                            holeScores.forEach((s) => { const pl = allP4.find((p) => p.id === s.player_id); if (!pl || s.score === 0) return; const net = s.score - getHcpStrokes(pl.handicap, h.stroke_index); if (net < lowestOth) lowestOth = net; });
-                            const winnersOth = holeScores.filter((s) => { const pl = allP4.find((p) => p.id === s.player_id); if (!pl || s.score === 0) return false; return (s.score - getHcpStrokes(pl.handicap, h.stroke_index)) === lowestOth; }).map((s) => s.player_id);
+                            holeScores.forEach((s) => { const pl = allP4.find((p) => p.id === s.player_id); if (!pl || s.score === 0) return; const net = s.score - getHcpStrokes(pl.handicap, hole.stroke_index); if (net < lowestOth) lowestOth = net; });
+                            const winnersOth = holeScores.filter((s) => { const pl = allP4.find((p) => p.id === s.player_id); if (!pl || s.score === 0) return false; return (s.score - getHcpStrokes(pl.handicap, hole.stroke_index)) === lowestOth; }).map((s) => s.player_id);
                             const bankerWonOth = winnersOth.includes(bankerId);
                             if (isBanker) {
                               if (bankerWonOth) { holeScores.forEach((s) => { if (s.player_id === player.id || s.score === 0) return; if (!winnersOth.includes(s.player_id)) total += (s.bet || 0) * (doubled ? 2 : 1); }); }
