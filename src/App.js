@@ -1938,6 +1938,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
   const [initialBankerId, setInitialBankerId] = useState(null);
   const [currentBankerId, setCurrentBankerId] = useState(null);
   const [pendingBets, setPendingBets] = useState({}); // unsubmitted bet amounts
+  const doubledHolesRef = useRef({}); // tracks which holes have been doubled - immune to refresh
   const holes = round.holes || [];
   const curHole = holes.find((h) => h.hole_number === activeHole);
 
@@ -2075,11 +2076,12 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
       return; // Don't advance if save failed
     }
     
-    // Banker rotation - only when ALL players have REAL scores (score > 0)
+    // Banker rotation - fetch fresh scores from Supabase to ensure we have everyone's score
     if (round.game_type === "banker") {
       const allPlayersList2 = [...others, me];
-      const freshScores = [...allScores.filter((s) => !(s.player_id === me.id && s.hole_number === holeNum)), obj];
-      const realHoleScores = freshScores.filter((s) => s.hole_number === holeNum && s.score > 0);
+      // Fetch fresh from Supabase so we have everyone's latest score
+      const freshFromDB = await dbGetScores(round.id);
+      const realHoleScores = freshFromDB.filter((s) => s.hole_number === holeNum && s.score > 0);
       const allRealScored = allPlayersList2.every((p) => realHoleScores.some((s) => s.player_id === p.id));
       if (allRealScored) {
         let lowest = Infinity, winner = null, tied = false;
@@ -2094,10 +2096,11 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
           setCurrentBankerId(winner);
           try { await dbSaveCurrentBanker(round.id, winner); } catch(e) { console.error(e); }
         }
-        // Advance hole for all devices
         if (holeNum < 18) {
           try { await dbSaveCurrentHole(round.id, holeNum + 1); } catch(e) { console.error(e); }
         }
+        // Update local scores with fresh data
+        setAllScores(freshFromDB);
       }
     }
     
@@ -2305,7 +2308,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
             const bankerPlayer = [...others, me].find((p) => p.id === thisBanker);
             const nonBankerPlayers = [...others, me].filter((p) => p.id !== thisBanker);
             const submittedBets = allScores.filter((s) => s.hole_number === activeHole && s.player_id !== thisBanker && s.bet > 0);
-            const isDoubled = allScores.some((s) => s.hole_number === activeHole && s.doubled);
+            const isDoubled = doubledHolesRef.current[activeHole] || allScores.some((s) => s.hole_number === activeHole && s.doubled);
             const totalPot = submittedBets.reduce((sum, s) => sum + ((s.bet || 0) * (isDoubled ? 2 : 1)), 0);
             const allBetsIn = submittedBets.length >= nonBankerPlayers.length && nonBankerPlayers.length > 0;
             const myBetConfirmed = !!myBets[activeHole];
@@ -2353,14 +2356,21 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                         {allBetsIn && !isDoubled && (
                           <button onClick={async () => {
                             if (!window.confirm("Double all bets on hole " + activeHole + "? Cannot be undone.")) return;
-                            // Only update records that already have a real bet - don't create placeholders
+                            // Mark as doubled immediately in ref - immune to 2s refresh
+                            doubledHolesRef.current = { ...doubledHolesRef.current, [activeHole]: true };
+                            // Save doubled bets to Supabase
                             const hScores = allScores.filter((s) => s.hole_number === activeHole && s.bet > 0);
-                            for (const s of hScores) { await dbSaveScore({ ...s, doubled: true }); }
-                            // Update local state immediately - don't re-fetch as it may return stale data
-                            setAllScores((prev) => prev.map((s) => 
-                              s.hole_number === activeHole && s.bet > 0 ? { ...s, doubled: true } : s
-                            ));
-                            await dbSendChat({ id: genId(), round_id: round.id, player_id: me.id, player_name: me.name, text: "🔥 " + me.name + " DOUBLED the bets on hole " + activeHole + "!", created_at: new Date().toISOString() });
+                            for (const s of hScores) {
+                              await dbSaveScore({ ...s, bet: s.bet * 2, doubled: true });
+                            }
+                            // Update local state
+                            setAllScores((prev) => prev.map((s) => {
+                              if (s.hole_number === activeHole && s.bet > 0) {
+                                return { ...s, bet: s.bet * 2, doubled: true };
+                              }
+                              return s;
+                            }));
+                            await dbSendChat({ id: genId(), round_id: round.id, player_id: me.id, player_name: me.name, text: "🔥 " + me.name + " DOUBLED the bets on hole " + activeHole + "! All bets are now x2.", created_at: new Date().toISOString() });
                           }} style={{ width: "100%", backgroundColor: "#f59e0b", color: "#0f172a", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", marginBottom: 8 }}>
                             💥 DOUBLE — ${totalPot} → ${totalPot * 2}
                           </button>
