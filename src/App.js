@@ -1998,12 +1998,16 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
           }
         }
         // Sync current hole from Supabase (hole progression)
+        // Only advance if ALL players on THIS device have scored the current hole
         if (bankerData?.current_hole && bankerData.current_hole > activeHole) {
-          setActiveHole(bankerData.current_hole);
-          setTimeout(() => {
-            const pos = Math.max(0, (bankerData.current_hole - 1) * 44 - 120);
-            document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { el.scrollLeft = pos; });
-          }, 50);
+          const myCurrentHoleScore = s.find((x) => x.player_id === me.id && x.hole_number === activeHole && x.score > 0);
+          if (myCurrentHoleScore) {
+            setActiveHole(bankerData.current_hole);
+            setTimeout(() => {
+              const pos = Math.max(0, (bankerData.current_hole - 1) * 44 - 120);
+              document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { el.scrollLeft = pos; });
+            }, 50);
+          }
         }
         // Recalculate current banker from all scores (hole by hole rotation)
         if (bankerData?.initial_banker_id) {
