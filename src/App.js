@@ -2184,6 +2184,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
   })();
   // Use calcLeaderboard result to avoid duplicate calculation
   const myBankerTotal = (() => {
+    if (!holes || !holes.length) return 0;
     const lbMe = calcLeaderboard([...others, me], allScores, holes, "banker").find((p) => p.id === me.id);
     if (lbMe) return lbMe.total;
     // Fallback calculation
@@ -2821,7 +2822,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                       <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800 }}>
                         {(() => {
                           // Use same calcLeaderboard for consistency
-                          const lbPlayer = calcLeaderboard([...others, me], allScores, holes, "banker").find((p) => p.id === player.id);
+                          const lbPlayer = holes?.length ? calcLeaderboard([...others, me], allScores, holes, "banker").find((p) => p.id === player.id) : null;
                           const total = lbPlayer?.total || 0;
                           return <span style={{ color: total > 0 ? "#22c55e" : total < 0 ? "#ef4444" : "#94a3b8" }}>{total >= 0 ? "+$" : "-$"}{Math.abs(total)}</span>;
                         })()}
