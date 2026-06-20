@@ -2184,7 +2184,8 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
     });
     return myHolesWon - oppHolesWon;
   })();
-  // Direct calculation - most reliable
+  // Direct calculation - most reliable, also build per-hole map
+  const bankerHoleMap = {};
   const myBankerTotal = (() => {
     if (!holes || !holes.length || !me) return 0;
     let total = 0;
@@ -2209,24 +2210,32 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
         return (s.score - getHcpStrokes(pl.handicap, hole.stroke_index)) === lowest2;
       }).map((s) => s.player_id);
       const bankerIsWinner2 = winners2.includes(bankerId);
+      let holeChange2 = 0;
       if (iAmBanker) {
         if (bankerIsWinner2) {
           holeScores.forEach((s) => {
             if (s.player_id === me.id || s.score === 0) return;
-            if (!winners2.includes(s.player_id)) total += (s.bet || 0);
+            if (!winners2.includes(s.player_id)) { total += (s.bet || 0); holeChange2 += (s.bet || 0); }
           });
         } else {
           holeScores.forEach((s) => {
             if (s.player_id === me.id || s.score === 0) return;
-            if (winners2.includes(s.player_id)) total -= (s.bet || 0);
+            if (winners2.includes(s.player_id)) { total -= (s.bet || 0); holeChange2 -= (s.bet || 0); }
           });
         }
       } else {
-        const myBet = (myScore?.bet || 0);
+        const myBet = myScore?.bet || allScores.find((s) => s.player_id === me.id && s.hole_number === hole.hole_number && s.bet > 0)?.bet || 0;
         if (!myBet) return;
-        if (winners2.includes(me.id) && !bankerIsWinner2) total += myBet;
-        else if (bankerIsWinner2 && !winners2.includes(me.id)) total -= myBet;
+        if (winners2.includes(me.id) && !bankerIsWinner2) { total += myBet; holeChange2 = myBet; }
+        else if (bankerIsWinner2 && !winners2.includes(me.id)) { total -= myBet; holeChange2 = -myBet; }
       }
+      bankerHoleMap[hole.hole_number] = {
+        holeChange: holeChange2,
+        tied: winners2.length === allPlayers.length,
+        iAmBanker,
+        bankerId,
+        doubled: holeScores.some((s) => s.doubled)
+      };
     });
     return total;
   })();
@@ -2657,32 +2666,15 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                 <div style={{ display: "flex", alignItems: "center" }}>
                   <div className="ff-slave-scroll" style={{ ...S.scoreInfoRow, flex: 1 }} onScroll={(e) => { document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { if (el !== e.target) el.scrollLeft = e.target.scrollLeft; }); }}>
                     {holes.map((h) => {
-                      const holeScores = allScores.filter((s) => s.hole_number === h.hole_number);
-                      const myScore = holeScores.find((s) => s.player_id === me.id && s.score > 0);
-                      // myBets state is the most reliable source
-                      const allScoredBk = myScore && allPlayers.every((p) => holeScores.some((s) => s.player_id === p.id && s.score > 0));
-                      if (!allScoredBk) return (<div key={"bk"+h.hole_number} style={S.scoreInfoCell}><div style={{ fontSize: 14, color: "#334155" }}>—</div></div>);
-                      const bankerId = holeScores.find((s) => s.banker_id)?.banker_id || currentBankerId || initialBankerId;
-                      const doubled = holeScores.some((s) => s.doubled);
-                      const iAmBankerHole = bankerId === me.id;
-                      let lowest = Infinity, winner = null, tied = false;
-                      holeScores.forEach((s) => { const pl = allPlayers.find((p) => p.id === s.player_id); if (!pl || !s.score) return; const net = s.score - getHcpStrokes(pl.handicap, h.stroke_index); if (net < lowest) { lowest = net; winner = s.player_id; tied = false; } else if (net === lowest) { tied = true; } });
-                      let holeChange = 0;
-                      if (!tied) {
-                        if (iAmBankerHole) { 
-                        allScores.filter((s) => s.hole_number === h.hole_number && s.player_id !== me.id && s.bet > 0).forEach((s) => { if (winner===me.id) holeChange+=s.bet; else holeChange-=s.bet; }); 
-                      } else { 
-                        const myBet = myBets[h.hole_number] || 0;
-                        if(myBet>0){if(winner===me.id)holeChange+=myBet;else if(winner===bankerId)holeChange-=myBet;}
-                      }
-                      }
-                      const color = holeChange > 0 ? "#22c55e" : holeChange < 0 ? "#ef4444" : "#94a3b8";
+                      const hd = bankerHoleMap[h.hole_number];
+                      if (!hd) return (<div key={"bk"+h.hole_number} style={S.scoreInfoCell}><div style={{ fontSize: 14, color: "#334155" }}>—</div></div>);
+                      const color = hd.holeChange > 0 ? "#22c55e" : hd.holeChange < 0 ? "#ef4444" : "#94a3b8";
                       return (
                         <div key={"bk"+h.hole_number} style={{ ...S.scoreInfoCell, minWidth: 40 }}>
-                          <div style={{ fontSize: 11, fontWeight: 800, color }}>{tied ? "T" : winner === me.id ? "W" : "L"}</div>
-                          {iAmBankerHole && <div style={{ fontSize: 9 }}>🏦</div>}
-                          {doubled && <div style={{ fontSize: 9 }}>🔥</div>}
-                          <div style={{ fontSize: 9, color, fontWeight: 700 }}>{holeChange !== 0 ? (holeChange > 0 ? "+$" : "-$") + Math.abs(holeChange) : ""}{doubled ? "×2" : ""}</div>
+                          <div style={{ fontSize: 11, fontWeight: 800, color }}>{hd.tied ? "T" : hd.holeChange > 0 ? "W" : hd.holeChange < 0 ? "L" : "T"}</div>
+                          {hd.iAmBanker && <div style={{ fontSize: 9 }}>🏦</div>}
+                          {hd.doubled && <div style={{ fontSize: 9 }}>🔥</div>}
+                          <div style={{ fontSize: 9, color, fontWeight: 700 }}>{hd.holeChange !== 0 ? (hd.holeChange > 0 ? "+$" : "-$") + Math.abs(hd.holeChange) : ""}</div>
                         </div>
                       );
                     })}
