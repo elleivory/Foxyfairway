@@ -1988,6 +1988,14 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
       if (!showChat) {
         setLastMsgCount((prev) => { if (msgs.length > prev && prev > 0) setUnreadChat((u) => u + (msgs.length - prev)); return msgs.length; });
       }
+      // Sync doubled bets to player - if banker doubled, update myBets to show doubled amount
+      if (round.game_type === "banker") {
+        const myActiveScore = s.find((x) => x.player_id === me.id && x.hole_number === activeHole);
+        if (myActiveScore?.doubled && myActiveScore?.bet) {
+          setMyBets((prev) => ({ ...prev, [activeHole]: myActiveScore.bet }));
+          doubledHolesRef.current = { ...doubledHolesRef.current, [activeHole]: true };
+        }
+      }
       if (round.game_type === "banker") {
         const bankerData = await dbGetBanker(round.id);
         // ALWAYS sync banker from Supabase - fixes "waiting" bug on all devices
