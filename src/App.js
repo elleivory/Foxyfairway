@@ -210,7 +210,7 @@ function calcLeaderboard(players, scores, holes, gameType) {
         const myS = scores.find((s) => s.player_id === p.id && s.hole_number === hole.hole_number);
         if (!myS) return;
         const allH = scores.filter((s) => s.hole_number === hole.hole_number);
-        if (!players.every((pl) => allH.some((s) => s.player_id === pl.id))) return;
+        if (!players.every((pl) => allH.some((s) => s.player_id === pl.id && s.score > 0))) return;
         // Find lowest net score
         let lowestNet = Infinity;
         allH.forEach((s) => { const pl = players.find((pl) => pl.id === s.player_id); if (!pl) return; const net = s.score - getHcpStrokes(pl.handicap, hole.stroke_index); if (net < lowestNet) lowestNet = net; });
@@ -251,7 +251,7 @@ function calcLeaderboard(players, scores, holes, gameType) {
         const myS = scores.find((s) => s.player_id === p.id && s.hole_number === hole.hole_number);
         if (!myS) return;
         const allH = scores.filter((s) => s.hole_number === hole.hole_number);
-        if (!players.every((pl) => allH.some((s) => s.player_id === pl.id))) return;
+        if (!players.every((pl) => allH.some((s) => s.player_id === pl.id && s.score > 0))) return;
         const bankerId = myS.banker_id || allH[0]?.banker_id;
         const doubled = allH.some((s) => s.doubled);
         const iAmBanker = bankerId === p.id;
@@ -1854,7 +1854,8 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
                   const holeScores = scores.filter((s) => s.hole_number === hole.hole_number);
                   const bankerId = holeScores[0]?.banker_id;
                   const bankerPlayer = players.find((p) => p.id === bankerId);
-                  const allScored = players.every((p) => holeScores.some((s) => s.player_id === p.id));
+                  // Only show when ALL players have real scores
+                  const allScored = players.every((p) => holeScores.some((s) => s.player_id === p.id && s.score > 0));
                   if (!allScored || !bankerPlayer) return (
                     <div key={hole.hole_number} style={{ minWidth: 44, backgroundColor: "#1e293b", borderRadius: 8, padding: "8px 4px", textAlign: "center", flexShrink: 0 }}>
                       <div style={{ fontSize: 9, color: "#475569", marginBottom: 4 }}>H{hole.hole_number}</div>
@@ -2157,7 +2158,8 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
     holes.forEach((hole) => {
       const myG = myScores[hole.hole_number]; if (!myG) return;
       const holeScores = allScores.filter((s) => s.hole_number === hole.hole_number);
-      if (!allPlayers.every((p) => holeScores.some((s) => s.player_id === p.id))) return;
+      // Only count when ALL players have REAL scores (score > 0, not placeholder bet records)
+      if (!allPlayers.every((p) => holeScores.some((s) => s.player_id === p.id && s.score > 0))) return;
       const myScore = holeScores.find((s) => s.player_id === me.id);
       const bankerId = myScore?.banker_id || holeScores[0]?.banker_id;
       const doubled = holeScores.some((s) => s.doubled);
@@ -2302,7 +2304,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
             const iAmBanker = thisBanker === me.id;
             const bankerPlayer = [...others, me].find((p) => p.id === thisBanker);
             const nonBankerPlayers = [...others, me].filter((p) => p.id !== thisBanker);
-            const submittedBets = allScores.filter((s) => s.hole_number === activeHole && s.player_id !== thisBanker && s.bet > 0);
+            const submittedBets = allScores.filter((s) => s.hole_number === activeHole && s.player_id !== thisBanker && s.bet > 0 && s.bet_locked);
             const isDoubled = allScores.some((s) => s.hole_number === activeHole && s.doubled);
             const totalPot = submittedBets.reduce((sum, s) => sum + ((s.bet || 0) * (isDoubled ? 2 : 1)), 0);
             const allBetsIn = submittedBets.length >= nonBankerPlayers.length && nonBankerPlayers.length > 0;
@@ -2360,6 +2362,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                               }
                             }
                             setAllScores((prev) => prev.map((s) => s.hole_number === activeHole ? { ...s, doubled: true } : s));
+                            const refreshedD = await dbGetScores(round.id); setAllScores(refreshedD);
                             await dbSendChat({ id: genId(), round_id: round.id, player_id: me.id, player_name: me.name, text: "🔥 " + me.name + " DOUBLED the bets on hole " + activeHole + "!", created_at: new Date().toISOString() });
                           }} style={{ width: "100%", backgroundColor: "#f59e0b", color: "#0f172a", border: "none", borderRadius: 8, padding: "10px", fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", marginBottom: 8 }}>
                             💥 DOUBLE — ${totalPot} → ${totalPot * 2}
@@ -2605,7 +2608,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                     {holes.map((h) => {
                       const holeScores = allScores.filter((s) => s.hole_number === h.hole_number);
                       const myScore = holeScores.find((s) => s.player_id === me.id);
-                      const allScoredBk = myScore && allPlayers.every((p) => holeScores.some((s) => s.player_id === p.id));
+                      const allScoredBk = myScore && allPlayers.every((p) => holeScores.some((s) => s.player_id === p.id && s.score > 0));
                       if (!allScoredBk) return (<div key={"bk"+h.hole_number} style={S.scoreInfoCell}><div style={{ fontSize: 14, color: "#334155" }}>—</div></div>);
                       const bankerId = myScore?.banker_id || holeScores[0]?.banker_id;
                       const doubled = holeScores.some((s) => s.doubled);
