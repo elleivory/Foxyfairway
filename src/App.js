@@ -2662,7 +2662,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                       // myBets state is the most reliable source
                       const allScoredBk = myScore && allPlayers.every((p) => holeScores.some((s) => s.player_id === p.id && s.score > 0));
                       if (!allScoredBk) return (<div key={"bk"+h.hole_number} style={S.scoreInfoCell}><div style={{ fontSize: 14, color: "#334155" }}>—</div></div>);
-                      const bankerId = holeScores.find((s) => s.banker_id)?.banker_id;
+                      const bankerId = holeScores.find((s) => s.banker_id)?.banker_id || currentBankerId || initialBankerId;
                       const doubled = holeScores.some((s) => s.doubled);
                       const iAmBankerHole = bankerId === me.id;
                       let lowest = Infinity, winner = null, tied = false;
@@ -2796,7 +2796,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                             const allScored5 = allP5.every((p) => hScores.some((s) => s.player_id === p.id && s.score > 0));
                             if (!allScored5) return <div style={{ height: 20 }} />;
                             // Get bankerId from ANY score record that has it set
-                            const bankerId5 = hScores.find((s) => s.banker_id)?.banker_id;
+                            const bankerId5 = hScores.find((s) => s.banker_id)?.banker_id || currentBankerId || initialBankerId;
                             const doubled5 = hScores.some((s) => s.doubled);
                             let low5 = Infinity, win5 = null, tie5 = false;
                             hScores.forEach((s) => { const pl = allP5.find((p) => p.id === s.player_id); if (!pl || !s.score) return; const net = s.score - getHcpStrokes(pl.handicap, h.stroke_index); if (net < low5) { low5 = net; win5 = s.player_id; tie5 = false; } else if (net === low5) tie5 = true; });
