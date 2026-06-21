@@ -1921,7 +1921,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
                 <div style={{ ...S.lbRow, backgroundColor: tl === "A" ? "rgba(34,197,94,0.1)" : "rgba(59,130,246,0.1)" }}>
                   <div style={{ fontSize: 18, fontWeight: 800, color: tl === "A" ? "#22c55e" : "#3b82f6", width: 40 }}>Team {tl}</div>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: "#f8fafc", marginBottom: 4 }}>{tt === 0 ? "All sq" : tt > 0 ? "+" + tt + " holes" : tt + " holes"}</div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: "#f8fafc", marginBottom: 4 }}>{tt === 0 ? "All Sq" : tt > 0 ? "+" + tt + " pts" : tt + " pts"}</div>
                     <div style={{ fontSize: 12, color: "#94a3b8" }}>{tp.map((p) => p.name + " (HCP " + p.handicap + ")").join(" & ")}</div>
                   </div>
                   <div style={S.lbHoles}>{(tp[0]?.holesPlayed || 0) + "/18"}</div>
@@ -1937,7 +1937,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
               <div style={S.lbRight}>
                 <div style={S.lbScore}>
                   {round.game_type === "stableford" ? (p.total + " pts")
-                    : round.game_type === "matchplay" ? (p.total === 0 ? "0 pts" : p.total + (p.total === 1 ? " hole won" : " holes won"))
+                    : round.game_type === "matchplay" ? (p.total === 0 ? "0 pts" : p.total + (p.total === 1 ? " pt" : " pts"))
                     : round.game_type === "banker" ? <span style={{ color: p.total > 0 ? "#22c55e" : p.total < 0 ? "#ef4444" : "#94a3b8", fontSize: 18, fontWeight: 800 }}>{p.total >= 0 ? "+$" : "-$"}{Math.abs(p.total)}</span>
                     : <><div style={{ fontSize: 14, color: "#94a3b8" }}>Gross: {p.grossTotal || 0}</div>
                        <div style={{ fontSize: 14, fontWeight: 700 }}>{formatToPar(p.toPar)}</div></>}
@@ -2290,6 +2290,8 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
             const pos = Math.max(0, (next - 1) * 48 - 120);
             document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { el.scrollLeft = pos; });
           }, 50);
+        } else {
+          // guests exist but not all scored yet - tryAdvance will fire when guest scores in
         }
       }
       // Banker: hole advance happens via Supabase sync in 2s refresh
@@ -2298,13 +2300,15 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
     }
   };
 
-  const tryAdvanceHole = (holeNum, latestScores) => {
+  const tryAdvanceHole = async (holeNum) => {
     if (round.game_type === "banker" || holeNum >= 18) return;
+    const freshScores = await dbGetScores(round.id);
+    setAllScores(freshScores);
     const guests = others.filter((p) => p.name?.endsWith("(Guest)"));
-    const myScored = latestScores.some((s) => s.player_id === me.id && s.hole_number === holeNum && s.score > 0);
+    const myScored = freshScores.some((s) => s.player_id === me.id && s.hole_number === holeNum && s.score > 0);
     if (!myScored) return;
     const allGuestsScored = guests.every((g) =>
-      latestScores.some((s) => s.player_id === g.id && s.hole_number === holeNum && s.score > 0)
+      freshScores.some((s) => s.player_id === g.id && s.hole_number === holeNum && s.score > 0)
     );
     if (allGuestsScored) {
       const next = holeNum + 1;
@@ -2323,7 +2327,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
     const updatedScores = [...allScores.filter((s) => !(s.player_id === player.id && s.hole_number === holeNum)), obj];
     setAllScores(updatedScores);
     try { await dbSaveScore(obj); } catch(e) { console.error(e); }
-    tryAdvanceHole(holeNum, updatedScores);
+    tryAdvanceHole(holeNum);
   };
 
   const hcpS = curHole ? getHcpStrokes(me.handicap, curHole.stroke_index) : 0;
@@ -2479,7 +2483,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                 } else if (round.game_type === "matchplay" || round.game_type === "matchplay_teams") {
                   const lead = Math.floor(myMatchTotal);
                   label = "Match"; color = lead > 0 ? "#22c55e" : "#94a3b8";
-                  value = lead === 0 ? "0 pts" : lead + (lead === 1 ? " hole won" : " holes won");
+                  value = lead === 0 ? "0 pts" : lead + (lead === 1 ? " pt" : " pts");
                   // Add holes played context
                 } else if (round.game_type === "banker") {
                   // Show MY running balance, not the pot
@@ -2872,7 +2876,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
               const winners = holeScores.filter((s) => { const pl = allP.find((p) => p.id === s.player_id); if (!pl) return false; return (s.score - getHcpStrokes(pl.handicap, hole.stroke_index)) === lowest; }).map((s) => s.player_id);
               if (winners.length < allP.length && winners.includes(player.id)) won++;
             });
-            return { val: won === 0 ? "0" : won + (won === 1 ? " hole" : " holes"), color: won > 0 ? "#22c55e" : "#94a3b8" };
+            return { val: won === 0 ? "0" : won + (won === 1 ? " pt" : " pts"), color: won > 0 ? "#22c55e" : "#94a3b8" };
           } else if (round.game_type === "banker") {
             const isMe = player.id === me.id;
             const total = isMe ? myBankerTotal : (() => {
@@ -3000,7 +3004,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                   <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800, color: myGrossTotal2 === 0 ? "#94a3b8" : myGrossTotal2 > 0 ? "#ef4444" : "#22c55e" }}>{formatToPar(myGrossTotal2)}</div>
                   {isHandicap && <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800, color: myNetTotal2 === 0 ? "#94a3b8" : myNetTotal2 > 0 ? "#ef4444" : "#22c55e" }}>{formatToPar(myNetTotal2)}</div>}
                   {round.game_type === "stableford" && <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800, color: "#22c55e" }}>{myStablefordTotal}pts</div>}
-                  {round.game_type === "matchplay" && <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800, color: myMatchTotal > 0 ? "#22c55e" : "#94a3b8" }}>{myMatchTotal === 0 ? "0" : myMatchTotal + (myMatchTotal === 1 ? " hole" : " holes")}</div>}
+                  {round.game_type === "matchplay" && <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800, color: myMatchTotal > 0 ? "#22c55e" : "#94a3b8" }}>{myMatchTotal === 0 ? "0" : myMatchTotal + (myMatchTotal === 1 ? " pt" : " pts")}</div>}
                   {round.game_type === "banker" && <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800, color: myBankerTotal > 0 ? "#22c55e" : myBankerTotal < 0 ? "#ef4444" : "#94a3b8" }}>{myBankerTotal >= 0 ? "+$" : "-$"}{Math.abs(myBankerTotal)}</div>}
                 </div>
               </div>
@@ -3038,7 +3042,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                     )}
                   </div>
                   {/* Scrollable scores */}
-                  <div style={{ ...S.playerScoresRow, flex: 1 }}>
+                  <div className="ff-slave-scroll" style={{ ...S.playerScoresRow, flex: 1 }} onScroll={(e) => { document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { if (el !== e.target) el.scrollLeft = e.target.scrollLeft; }); }}>
                     {holes.map((h) => {
                       const sc = ps.find((s) => s.hole_number === h.hole_number);
                       const g = sc ? sc.score : null, hs = getHcpStrokes(player.handicap, h.stroke_index);
@@ -3152,7 +3156,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                             if (!allTied && winners.includes(player.id)) won++;
                           });
                           const col = won > 0 ? "#22c55e" : "#94a3b8";
-                          return <span style={{ color: col }}>{won === 0 ? "0" : won + (won === 1 ? " hole" : " holes")}</span>;
+                          return <span style={{ color: col }}>{won === 0 ? "0" : won + (won === 1 ? " pt" : " pts")}</span>;
                         })()}
                       </div>
                     )}
@@ -3393,7 +3397,7 @@ export default function GolfApp() {
                   <div style={S.lbScore}>
                     {viewingRound.game_type === "stableford" ? p.total + " pts"
                       : viewingRound.game_type === "banker" ? (p.total >= 0 ? "+$" : "-$") + Math.abs(p.total)
-                      : viewingRound.game_type === "matchplay" ? (p.total === 0 ? "0 pts" : p.total + (p.total === 1 ? " hole won" : " holes won"))
+                      : viewingRound.game_type === "matchplay" ? (p.total === 0 ? "0 pts" : p.total + (p.total === 1 ? " pt" : " pts"))
                       : <><div style={{ fontSize: 13, color: "#94a3b8" }}>Gross: {p.grossTotal}</div><div style={{ fontSize: 14, fontWeight: 700 }}>{formatToPar(p.toPar)}</div></>}
                   </div>
                   <div style={S.lbHoles}>{p.holesPlayed}/18</div>
