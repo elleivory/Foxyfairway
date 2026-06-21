@@ -2631,10 +2631,10 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
             const nonBankerPlayers = [...others, me].filter((p) => p.id !== thisBanker);
             // Get bets - if thisBanker is null show all bets
             const submittedBets = thisBanker
-              ? allScores.filter((s) => s.hole_number === activeHole && s.player_id !== thisBanker && s.bet > 0)
+              ? allScores.filter((s) => s.hole_number === activeHole && s.player_id !== thisBanker && s.bet > 0 && (s.banker_id === thisBanker || !s.banker_id))
               : allScores.filter((s) => s.hole_number === activeHole && s.bet > 0);
             const uniqueBettors = [...new Set(submittedBets.map((s) => s.player_id))];
-            const isDoubled = doubledHolesRef.current[activeHole] === true || allScores.some((s) => s.hole_number === activeHole && s.doubled === true);
+            const isDoubled = doubledHolesRef.current[activeHole] === true || allScores.some((s) => s.hole_number === activeHole && s.doubled === true && (s.banker_id === thisBanker || !s.banker_id));
             const originalPot = originalPotRef.current[activeHole] || submittedBets.reduce((sum, s) => sum + (s.bet || 0), 0);
             const doubledPot = originalPot * 2;
             const totalPot = isDoubled ? doubledPot : originalPot;
@@ -2682,7 +2682,9 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                     {[me, ...others].map((player) => {
                       const isBankerPlayer = player.id === thisBanker;
                       const isMe = player.id === me.id;
-                      const playerBet = isMe ? myBets[activeHole] : allScores.find((s) => s.player_id === player.id && s.hole_number === activeHole && s.bet > 0)?.bet;
+                      const playerBet = isMe 
+                        ? (myBets[activeHole] && allScores.find((s) => s.player_id === me.id && s.hole_number === activeHole && s.bet > 0 && (s.banker_id === thisBanker || !s.banker_id))?.bet ? myBets[activeHole] : null)
+                        : allScores.find((s) => s.player_id === player.id && s.hole_number === activeHole && s.bet > 0 && (s.banker_id === thisBanker || !s.banker_id))?.bet;
                       const playerPending = isMe ? pendingBets[activeHole] : (guestPendingBets[player.id] || "");
                       const isGuest = player.name?.endsWith("(Guest)");
                       const canEdit = isMe || (isGuest && me.name === round.created_by);
