@@ -150,6 +150,84 @@ const DEFAULT_COURSES = [
     {hole_number:15,par:3,stroke_index:17},{hole_number:16,par:4,stroke_index:9},
     {hole_number:17,par:5,stroke_index:3},{hole_number:18,par:4,stroke_index:13},
   ]},
+  // SINGAPORE ELITE PRIVATE COURSES
+  { id: "sentosa-serapong", name: "Sentosa Golf Club (Serapong)", par: 72, holes: [
+    {hole_number:1,par:4,stroke_index:9},{hole_number:2,par:3,stroke_index:15},
+    {hole_number:3,par:4,stroke_index:1},{hole_number:4,par:5,stroke_index:5},
+    {hole_number:5,par:4,stroke_index:3},{hole_number:6,par:4,stroke_index:7},
+    {hole_number:7,par:4,stroke_index:11},{hole_number:8,par:3,stroke_index:17},
+    {hole_number:9,par:4,stroke_index:13},{hole_number:10,par:4,stroke_index:10},
+    {hole_number:11,par:4,stroke_index:4},{hole_number:12,par:5,stroke_index:14},
+    {hole_number:13,par:4,stroke_index:6},{hole_number:14,par:3,stroke_index:16},
+    {hole_number:15,par:5,stroke_index:8},{hole_number:16,par:4,stroke_index:2},
+    {hole_number:17,par:3,stroke_index:18},{hole_number:18,par:4,stroke_index:12},
+  ]},
+  { id: "sentosa-tanjong", name: "Sentosa Golf Club (Tanjong)", par: 72, holes: [
+    {hole_number:1,par:5,stroke_index:7},{hole_number:2,par:4,stroke_index:3},
+    {hole_number:3,par:4,stroke_index:11},{hole_number:4,par:3,stroke_index:17},
+    {hole_number:5,par:4,stroke_index:1},{hole_number:6,par:5,stroke_index:13},
+    {hole_number:7,par:3,stroke_index:15},{hole_number:8,par:4,stroke_index:5},
+    {hole_number:9,par:4,stroke_index:9},{hole_number:10,par:4,stroke_index:6},
+    {hole_number:11,par:3,stroke_index:16},{hole_number:12,par:5,stroke_index:2},
+    {hole_number:13,par:4,stroke_index:10},{hole_number:14,par:4,stroke_index:4},
+    {hole_number:15,par:4,stroke_index:12},{hole_number:16,par:3,stroke_index:18},
+    {hole_number:17,par:5,stroke_index:8},{hole_number:18,par:4,stroke_index:14},
+  ]},
+  { id: "laguna-masters", name: "Laguna National (Masters Course)", par: 72, holes: [
+    {hole_number:1,par:4,stroke_index:11},{hole_number:2,par:4,stroke_index:5},
+    {hole_number:3,par:5,stroke_index:15},{hole_number:4,par:3,stroke_index:17},
+    {hole_number:5,par:4,stroke_index:3},{hole_number:6,par:4,stroke_index:7},
+    {hole_number:7,par:3,stroke_index:13},{hole_number:8,par:5,stroke_index:9},
+    {hole_number:9,par:4,stroke_index:1},{hole_number:10,par:4,stroke_index:8},
+    {hole_number:11,par:3,stroke_index:18},{hole_number:12,par:4,stroke_index:4},
+    {hole_number:13,par:5,stroke_index:14},{hole_number:14,par:4,stroke_index:6},
+    {hole_number:15,par:4,stroke_index:10},{hole_number:16,par:3,stroke_index:16},
+    {hole_number:17,par:4,stroke_index:12},{hole_number:18,par:4,stroke_index:2},
+  ]},
+  { id: "tanah-merah-tampines", name: "Tanah Merah CC (Tampines)", par: 72, holes: [
+    {hole_number:1,par:4,stroke_index:9},{hole_number:2,par:4,stroke_index:3},
+    {hole_number:3,par:4,stroke_index:7},{hole_number:4,par:3,stroke_index:15},
+    {hole_number:5,par:5,stroke_index:1},{hole_number:6,par:3,stroke_index:17},
+    {hole_number:7,par:4,stroke_index:5},{hole_number:8,par:5,stroke_index:11},
+    {hole_number:9,par:4,stroke_index:13},{hole_number:10,par:5,stroke_index:2},
+    {hole_number:11,par:4,stroke_index:8},{hole_number:12,par:4,stroke_index:4},
+    {hole_number:13,par:4,stroke_index:10},{hole_number:14,par:3,stroke_index:18},
+    {hole_number:15,par:4,stroke_index:6},{hole_number:16,par:3,stroke_index:16},
+    {hole_number:17,par:4,stroke_index:12},{hole_number:18,par:5,stroke_index:14},
+  ]},
+  { id: "tanah-merah-garden", name: "Tanah Merah CC (Garden)", par: 71, holes: [
+    {hole_number:1,par:4,stroke_index:9},{hole_number:2,par:4,stroke_index:3},
+    {hole_number:3,par:4,stroke_index:11},{hole_number:4,par:4,stroke_index:1},
+    {hole_number:5,par:3,stroke_index:17},{hole_number:6,par:4,stroke_index:7},
+    {hole_number:7,par:5,stroke_index:13},{hole_number:8,par:3,stroke_index:15},
+    {hole_number:9,par:4,stroke_index:5},{hole_number:10,par:4,stroke_index:8},
+    {hole_number:11,par:4,stroke_index:2},{hole_number:12,par:3,stroke_index:16},
+    {hole_number:13,par:4,stroke_index:10},{hole_number:14,par:3,stroke_index:18},
+    {hole_number:15,par:4,stroke_index:4},{hole_number:16,par:5,stroke_index:14},
+    {hole_number:17,par:4,stroke_index:6},{hole_number:18,par:5,stroke_index:12},
+  ]},
+  { id: "sicc-bukit", name: "Singapore Island CC (Bukit)", par: 71, holes: [
+    {hole_number:1,par:4,stroke_index:13},{hole_number:2,par:3,stroke_index:15},
+    {hole_number:3,par:4,stroke_index:7},{hole_number:4,par:5,stroke_index:3},
+    {hole_number:5,par:3,stroke_index:17},{hole_number:6,par:4,stroke_index:1},
+    {hole_number:7,par:4,stroke_index:5},{hole_number:8,par:4,stroke_index:11},
+    {hole_number:9,par:4,stroke_index:9},{hole_number:10,par:4,stroke_index:14},
+    {hole_number:11,par:4,stroke_index:2},{hole_number:12,par:3,stroke_index:8},
+    {hole_number:13,par:5,stroke_index:6},{hole_number:14,par:3,stroke_index:16},
+    {hole_number:15,par:4,stroke_index:4},{hole_number:16,par:4,stroke_index:10},
+    {hole_number:17,par:4,stroke_index:12},{hole_number:18,par:4,stroke_index:18},
+  ]},
+  { id: "sicc-island", name: "Singapore Island CC (Island)", par: 72, holes: [
+    {hole_number:1,par:4,stroke_index:13},{hole_number:2,par:4,stroke_index:3},
+    {hole_number:3,par:3,stroke_index:15},{hole_number:4,par:5,stroke_index:5},
+    {hole_number:5,par:4,stroke_index:1},{hole_number:6,par:4,stroke_index:11},
+    {hole_number:7,par:3,stroke_index:17},{hole_number:8,par:5,stroke_index:9},
+    {hole_number:9,par:4,stroke_index:7},{hole_number:10,par:4,stroke_index:7},
+    {hole_number:11,par:3,stroke_index:13},{hole_number:12,par:5,stroke_index:9},
+    {hole_number:13,par:3,stroke_index:17},{hole_number:14,par:4,stroke_index:11},
+    {hole_number:15,par:4,stroke_index:3},{hole_number:16,par:4,stroke_index:5},
+    {hole_number:17,par:4,stroke_index:15},{hole_number:18,par:5,stroke_index:1},
+  ]},
 ];
 
 function getHolesForRound(round) {
@@ -1055,7 +1133,7 @@ function AdminDashboardScreen({ onLogout }) {
     (async () => {
       await dbSeedCourses();
       const c = await dbGetCourses();
-      setCourses(c.length > 0 ? c : DEFAULT_COURSES);
+      setCourses(c.length > 0 ? c.sort((a, b) => a.name.localeCompare(b.name)) : DEFAULT_COURSES.sort((a, b) => a.name.localeCompare(b.name)));
     })();
   }, []);
 
@@ -1541,10 +1619,11 @@ function ShareModal({ round, onClose }) {
 // =============================================================================
 function CreateRoundScreen({ onBack, onRoundCreated }) {
   const profile = getPlayerProfile();
-  const [step, setStep] = useState(1), [courses, setCourses] = useState(DEFAULT_COURSES);
+  const [step, setStep] = useState(1), [courses, setCourses] = useState([...DEFAULT_COURSES].sort((a, b) => a.name.localeCompare(b.name)));
   const [course, setCourse] = useState(null), [gameType, setGameType] = useState("stroke");
   const [name, setName] = useState(profile.name || ""), [hcp, setHcp] = useState(profile.handicap || ""), [team, setTeam] = useState("A");
   const [selectedTournament, setSelectedTournament] = useState("");
+  const [showTournamentPicker, setShowTournamentPicker] = useState(false);
   const [useHandicap, setUseHandicap] = useState(true);
   const [loading, setLoading] = useState(false), [err, setErr] = useState("");
 
@@ -1630,30 +1709,27 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
                 <option value="A">Team A</option><option value="B">Team B</option>
               </select>
             </>)}
-            {(() => {
-              const tournaments = getTournaments();
-              if (tournaments.length === 0) return null;
-              return (<>
-                <label style={S.label}>Link to Tournament (optional)</label>
-                <select style={S.input} value={selectedTournament} onChange={(e) => setSelectedTournament(e.target.value)}>
-                  <option value="">No tournament</option>
-                  {tournaments.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </select>
-              </>);
-            })()}
             {err && <p style={S.error}>{err}</p>}
-            {(() => {
-              const tournaments = getTournaments();
-              return tournaments.length > 0 ? (
-                <>
-                  <label style={S.label}>Link to tournament (optional)</label>
-                  <select style={S.input} value={selectedTournament} onChange={(e) => setSelectedTournament(e.target.value)}>
-                    <option value="">No tournament</option>
-                    {tournaments.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </select>
-                </>
-              ) : null;
-            })()}
+            <div style={{ marginBottom: 12 }}>
+              <button onClick={() => { setShowTournamentPicker(!showTournamentPicker); if (showTournamentPicker) setSelectedTournament(""); }}
+                style={{ background: "none", border: "none", color: showTournamentPicker ? "#22c55e" : "#64748b", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", padding: 0, textDecoration: "underline" }}>
+                {showTournamentPicker ? "Remove tournament link" : "+ Link to a tournament (optional)"}
+              </button>
+              {showTournamentPicker && (() => {
+                const tournaments = getTournaments();
+                return (
+                  <div style={{ marginTop: 10 }}>
+                    {tournaments.length === 0
+                      ? <p style={{ ...S.hint, color: "#475569" }}>No tournaments yet. Create one from the home screen first.</p>
+                      : <select style={S.input} value={selectedTournament} onChange={(e) => setSelectedTournament(e.target.value)}>
+                          <option value="">Select tournament...</option>
+                          {tournaments.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                        </select>
+                    }
+                  </div>
+                );
+              })()}
+            </div>
             <button style={name ? S.btnPrimary : S.btnDisabled} disabled={!name || loading} onClick={create}>{loading ? "Creating..." : "Create Round"}</button>
           </div>
         )}
@@ -1865,7 +1941,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
               <div style={S.lbRight}>
                 <div style={S.lbScore}>
                   {round.game_type === "stableford" ? (p.total + " pts")
-                    : round.game_type === "matchplay" ? (p.total === 0 ? "All Sq" : p.total > 0 ? Math.floor(p.total) + " Up" : Math.abs(Math.floor(p.total)) + " Dn")
+                    : round.game_type === "matchplay" ? (p.total === 0 ? "All Sq" : p.total > 0 ? Math.floor(p.total) + " holes won" : Math.abs(Math.floor(p.total)) + " holes won")
                     : round.game_type === "banker" ? <span style={{ color: p.total > 0 ? "#22c55e" : p.total < 0 ? "#ef4444" : "#94a3b8", fontSize: 18, fontWeight: 800 }}>{p.total >= 0 ? "+$" : "-$"}{Math.abs(p.total)}</span>
                     : <><div style={{ fontSize: 14, color: "#94a3b8" }}>Gross: {p.grossTotal || 0}</div>
                        <div style={{ fontSize: 14, fontWeight: 700 }}>{formatToPar(p.toPar)}</div></>}
@@ -1943,6 +2019,41 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
           </div>
         )}
 
+        {/* Banker settlement - who owes who */}
+        {round.game_type === "banker" && lb.length > 1 && (() => {
+          const settlements = [];
+          const balances = lb.map((p) => ({ ...p, balance: p.total }));
+          const debtors = balances.filter((p) => p.balance < 0).sort((a, b) => a.balance - b.balance);
+          const creditors = balances.filter((p) => p.balance > 0).sort((a, b) => b.balance - a.balance);
+          const d = debtors.map((p) => ({ ...p, remaining: Math.abs(p.balance) }));
+          const c = creditors.map((p) => ({ ...p, remaining: p.balance }));
+          let di = 0, ci = 0;
+          while (di < d.length && ci < c.length) {
+            const amount = Math.min(d[di].remaining, c[ci].remaining);
+            if (amount > 0) settlements.push({ from: d[di].name, to: c[ci].name, amount });
+            d[di].remaining -= amount; c[ci].remaining -= amount;
+            if (d[di].remaining <= 0) di++;
+            if (c[ci].remaining <= 0) ci++;
+          }
+          if (settlements.length === 0) return null;
+          return (
+            <div style={{ marginTop: 24, backgroundColor: "#1e293b", borderRadius: 12, padding: "16px", border: "1px solid #334155" }}>
+              <h3 style={{ ...S.stepTitle, marginBottom: 12 }}>Settlement</h3>
+              <p style={{ fontSize: 12, color: "#64748b", marginBottom: 12 }}>Who owes who to square up</p>
+              {settlements.map((s, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", backgroundColor: "#0f172a", borderRadius: 10, padding: "12px 14px", marginBottom: 8, border: "1px solid #334155" }}>
+                  <div>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "#ef4444" }}>{s.from}</span>
+                    <span style={{ fontSize: 13, color: "#64748b" }}> owes </span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "#22c55e" }}>{s.to}</span>
+                  </div>
+                  <span style={{ fontSize: 16, fontWeight: 800, color: "#f59e0b" }}>${s.amount}</span>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+
         {/* Round complete modal */}
         {showComplete && (
           <RoundCompleteScreen round={round} players={players} scores={scores}
@@ -1973,6 +2084,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
   const [initialBankerId, setInitialBankerId] = useState(null);
   const [currentBankerId, setCurrentBankerId] = useState(null);
   const [pendingBets, setPendingBets] = useState({}); // unsubmitted bet amounts
+  const [guestPendingBets, setGuestPendingBets] = useState({}); // keyed by guest player id
   const doubledHolesRef = useRef({}); // tracks which holes have been doubled - immune to refresh
   const originalPotRef = useRef({}); // stores original pot per hole - immune to refresh
   const holes = round.holes || [];
@@ -2168,13 +2280,20 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
     
     if (holeNum < 18) {
       if (round.game_type !== "banker") {
-        // Non-banker games advance immediately
-        const next = holeNum + 1;
-        setActiveHole(next);
-        setTimeout(() => {
-          const pos = Math.max(0, (next - 1) * 44 - 120);
-          document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { el.scrollLeft = pos; });
-        }, 50);
+        // Only advance when my score AND all guest scores are in for this hole
+        const guests = others.filter((p) => p.name?.endsWith("(Guest)"));
+        const allGuestsScored = guests.every((g) => {
+          const gs = (guestScores[g.id] || {})[holeNum] || allScores.find((s) => s.player_id === g.id && s.hole_number === holeNum)?.score;
+          return gs && gs > 0;
+        });
+        if (guests.length === 0 || allGuestsScored) {
+          const next = holeNum + 1;
+          setActiveHole(next);
+          setTimeout(() => {
+            const pos = Math.max(0, (next - 1) * 48 - 120);
+            document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { el.scrollLeft = pos; });
+          }, 50);
+        }
       }
       // Banker: hole advance happens via Supabase sync in 2s refresh
     } else {
@@ -2544,6 +2663,43 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
             );
           })()}
 
+          {/* Guest bet entry for banker mode */}
+          {round.game_type === "banker" && others.filter((p) => p.name?.endsWith("(Guest)")).map((guest) => {
+            const thisBanker = currentBankerId || initialBankerId;
+            const guestIsbanker = thisBanker === guest.id;
+            const guestBet = allScores.find((s) => s.player_id === guest.id && s.hole_number === activeHole && s.bet > 0)?.bet;
+            const guestPendingBet = guestPendingBets[guest.id] || "";
+            if (guestIsbanker) return null;
+            return (
+              <div key={guest.id} style={{ backgroundColor: "#1a1a2e", border: "1px solid #334155", borderRadius: 12, padding: "10px 14px", marginBottom: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", marginBottom: 8 }}>{guest.name} bet</div>
+                {guestBet ? (
+                  <div style={{ backgroundColor: "#022c22", border: "1px solid #22c55e", borderRadius: 8, padding: "8px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: 12, color: "#22c55e", fontWeight: 700 }}>Bet locked</span>
+                    <span style={{ fontSize: 18, fontWeight: 900, color: "#22c55e" }}>${guestBet}</span>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <span style={{ fontSize: 16, color: "#64748b", fontWeight: 700 }}>$</span>
+                    <input style={{ ...S.customInput, flex: 1, fontSize: 20, fontWeight: 900 }} type="number" min="1" placeholder="0"
+                      value={guestPendingBet} onChange={(e) => setGuestPendingBets((prev) => ({ ...prev, [guest.id]: e.target.value ? parseInt(e.target.value) : "" }))} />
+                    <button onClick={async () => {
+                      if (!guestPendingBet || guestPendingBet < 1) return;
+                      const obj = { player_id: guest.id, hole_number: activeHole, round_id: round.id, score: 0, bet: guestPendingBet, banker_id: thisBanker };
+                      await dbSaveScore(obj);
+                      const updated = await dbGetScores(round.id);
+                      setAllScores(updated);
+                      setGuestPendingBets((prev) => ({ ...prev, [guest.id]: "" }));
+                    }} disabled={!guestPendingBet}
+                      style={{ backgroundColor: guestPendingBet ? "#22c55e" : "#334155", color: guestPendingBet ? "#0f172a" : "#64748b", border: "none", borderRadius: 8, padding: "12px 16px", fontSize: 14, fontWeight: 800, cursor: guestPendingBet ? "pointer" : "not-allowed", fontFamily: "inherit", flexShrink: 0 }}>
+                      Submit
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
           {/* Override row - shows temporarily when creator taps edit on a joined player */}
           {overridePlayer && (() => {
             const op = others.find((p) => p.id === overridePlayer);
@@ -2700,7 +2856,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
         const color = lead > 0 ? "#22c55e" : lead < 0 ? "#ef4444" : "#94a3b8";
         const bg = lead > 0 ? "#022c22" : lead < 0 ? "#1a0a0a" : "#1e293b";
         const border = lead > 0 ? "#22c55e" : lead < 0 ? "#ef4444" : "#334155";
-        const status = lead === 0 ? "All Square" : lead > 0 ? lead + " Up" : Math.abs(lead) + " Down";
+        const status = lead === 0 ? "All Square" : lead > 0 ? lead + " holes won" : Math.abs(lead) + " holes won";
         return (
           <div style={{ margin: "0 16px 12px", backgroundColor: bg, border: "1px solid " + border, borderRadius: 10, padding: "10px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span style={{ fontSize: 13, color: "#94a3b8" }}>After {holesPlayed} hole{holesPlayed !== 1 ? "s" : ""}</span>
@@ -2800,14 +2956,13 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                   </div>
                   <div style={{ fontSize: 11, color: "#64748b" }}>
                     G: <span style={{ color: pGrossTotal === 0 ? "#94a3b8" : pGrossTotal > 0 ? "#ef4444" : "#22c55e", fontWeight: 700 }}>{formatToPar(pGrossTotal)}</span>
-                    {"  "}N: <span style={{ color: pNetTotal === 0 ? "#94a3b8" : pNetTotal > 0 ? "#ef4444" : "#22c55e", fontWeight: 700 }}>{formatToPar(pNetTotal)}</span>
+                    {round.use_handicap !== false && <>{" "}N: <span style={{ color: pNetTotal === 0 ? "#94a3b8" : pNetTotal > 0 ? "#ef4444" : "#22c55e", fontWeight: 700 }}>{formatToPar(pNetTotal)}</span></>}
                   </div>
                 </div>
                 <div style={{ display: "flex", alignItems: "flex-start" }}>
-                  {/* G / N labels on far left */}
                   <div style={{ display: "flex", flexDirection: "column", gap: 2, paddingTop: 14, marginRight: 4, flexShrink: 0 }}>
                     <div style={{ fontSize: 9, color: "#94a3b8", fontWeight: 700, height: 28, display: "flex", alignItems: "center" }}>G</div>
-                    <div style={{ fontSize: 9, color: "#94a3b8", fontWeight: 700, height: 28, display: "flex", alignItems: "center" }}>N</div>
+                    {round.use_handicap !== false && <div style={{ fontSize: 9, color: "#94a3b8", fontWeight: 700, height: 28, display: "flex", alignItems: "center" }}>N</div>}
                     {(round.game_type === "stableford" || round.game_type === "matchplay" || round.game_type === "banker") && (
                       <div style={{ fontSize: 9, color: "#94a3b8", fontWeight: 700, height: 28, display: "flex", alignItems: "center" }}>
                         {round.game_type === "stableford" ? "Pts" : round.game_type === "matchplay" ? "W/L" : "$"}
@@ -2857,9 +3012,11 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                           <div style={{ height: 28, display: "flex", alignItems: "center", justifyContent: "center" }}>
                             {g ? <div style={{ ...shapeStyle(gs), fontSize: 11 }}>{gn}</div> : <div style={{ fontSize: 12, color: "#334155" }}>—</div>}
                           </div>
+                          {round.use_handicap !== false && (
                           <div style={{ height: 28, display: "flex", alignItems: "center", justifyContent: "center" }}>
                             {g ? <div style={{ ...shapeStyle(ns), fontSize: 11 }}>{nn}</div> : <div style={{ fontSize: 12, color: "#334155" }}>—</div>}
                           </div>
+                          )}
                           {(round.game_type === "stableford" || round.game_type === "matchplay") && (
                             <div style={{ height: 20, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: thirdColor }}>{thirdValue}</div>
                           )}
@@ -2905,7 +3062,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                   {/* Running totals pinned right */}
                   <div style={{ display: "flex", flexDirection: "column", paddingTop: 14, marginLeft: 6, paddingLeft: 6, borderLeft: "1px solid #334155", flexShrink: 0 }}>
                     <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800, color: pGrossTotal === 0 ? "#94a3b8" : pGrossTotal > 0 ? "#ef4444" : "#22c55e" }}>{formatToPar(pGrossTotal)}</div>
-                    <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800, color: pNetTotal === 0 ? "#94a3b8" : pNetTotal > 0 ? "#ef4444" : "#22c55e" }}>{formatToPar(pNetTotal)}</div>
+                    {round.use_handicap !== false && <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800, color: pNetTotal === 0 ? "#94a3b8" : pNetTotal > 0 ? "#ef4444" : "#22c55e" }}>{formatToPar(pNetTotal)}</div>}
                     {round.game_type === "stableford" && (
                       <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800, color: "#22c55e" }}>
                         {holes.reduce((sum, h) => { const s = ps.find((x) => x.hole_number === h.hole_number); if (!s) return sum; return sum + stablefordPoints(s.score, h.par, getHcpStrokes(player.handicap, h.stroke_index)); }, 0)}pts
@@ -3167,7 +3324,7 @@ export default function GolfApp() {
                   <div style={S.lbScore}>
                     {viewingRound.game_type === "stableford" ? p.total + " pts"
                       : viewingRound.game_type === "banker" ? (p.total >= 0 ? "+$" : "-$") + Math.abs(p.total)
-                      : viewingRound.game_type === "matchplay" ? (p.total === 0 ? "All Sq" : p.total > 0 ? Math.floor(p.total) + " Up" : Math.abs(Math.floor(p.total)) + " Dn")
+                      : viewingRound.game_type === "matchplay" ? (p.total === 0 ? "All Sq" : Math.abs(Math.floor(p.total)) + " holes won")
                       : <><div style={{ fontSize: 13, color: "#94a3b8" }}>Gross: {p.grossTotal}</div><div style={{ fontSize: 14, fontWeight: 700 }}>{formatToPar(p.toPar)}</div></>}
                   </div>
                   <div style={S.lbHoles}>{p.holesPlayed}/18</div>
