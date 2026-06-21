@@ -2277,12 +2277,12 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
     
     if (holeNum < 18) {
       if (round.game_type !== "banker") {
-        // Only advance when my score AND all guest scores are in for this hole
+        // Build updated scores including the one just saved
+        const updatedScores = [...allScores.filter((s) => !(s.player_id === me.id && s.hole_number === holeNum)), obj];
         const guests = others.filter((p) => p.name?.endsWith("(Guest)"));
-        const allGuestsScored = guests.every((g) => {
-          const gs = allScores.find((s) => s.player_id === g.id && s.hole_number === holeNum && s.score > 0);
-          return !!gs;
-        });
+        const allGuestsScored = guests.every((g) =>
+          updatedScores.some((s) => s.player_id === g.id && s.hole_number === holeNum && s.score > 0)
+        );
         if (guests.length === 0 || allGuestsScored) {
           const next = holeNum + 1;
           setActiveHole(next);
@@ -2298,12 +2298,32 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
     }
   };
 
+  const tryAdvanceHole = (holeNum, latestScores) => {
+    if (round.game_type === "banker" || holeNum >= 18) return;
+    const guests = others.filter((p) => p.name?.endsWith("(Guest)"));
+    const myScored = latestScores.some((s) => s.player_id === me.id && s.hole_number === holeNum && s.score > 0);
+    if (!myScored) return;
+    const allGuestsScored = guests.every((g) =>
+      latestScores.some((s) => s.player_id === g.id && s.hole_number === holeNum && s.score > 0)
+    );
+    if (allGuestsScored) {
+      const next = holeNum + 1;
+      setActiveHole(next);
+      setTimeout(() => {
+        const pos = Math.max(0, (next - 1) * 48 - 120);
+        document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { el.scrollLeft = pos; });
+      }, 50);
+    }
+  };
+
   const saveGuestScore = async (player, holeNum, score) => {
     if (score < 1 || score > 15) return;
     setGuestScores((prev) => ({ ...prev, [player.id]: { ...(prev[player.id] || {}), [holeNum]: score } }));
     const obj = { player_id: player.id, hole_number: holeNum, score, round_id: round.id };
-    setAllScores((prev) => { const f = prev.filter((s) => !(s.player_id === player.id && s.hole_number === holeNum)); return [...f, obj]; });
+    const updatedScores = [...allScores.filter((s) => !(s.player_id === player.id && s.hole_number === holeNum)), obj];
+    setAllScores(updatedScores);
     try { await dbSaveScore(obj); } catch(e) { console.error(e); }
+    tryAdvanceHole(holeNum, updatedScores);
   };
 
   const hcpS = curHole ? getHcpStrokes(me.handicap, curHole.stroke_index) : 0;
@@ -2852,7 +2872,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
               const winners = holeScores.filter((s) => { const pl = allP.find((p) => p.id === s.player_id); if (!pl) return false; return (s.score - getHcpStrokes(pl.handicap, hole.stroke_index)) === lowest; }).map((s) => s.player_id);
               if (winners.length < allP.length && winners.includes(player.id)) won++;
             });
-            return { val: won, color: won > 0 ? "#22c55e" : "#94a3b8" };
+            return { val: won === 0 ? "0" : won + (won === 1 ? " hole" : " holes"), color: won > 0 ? "#22c55e" : "#94a3b8" };
           } else if (round.game_type === "banker") {
             const isMe = player.id === me.id;
             const total = isMe ? myBankerTotal : (() => {
@@ -2980,7 +3000,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                   <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800, color: myGrossTotal2 === 0 ? "#94a3b8" : myGrossTotal2 > 0 ? "#ef4444" : "#22c55e" }}>{formatToPar(myGrossTotal2)}</div>
                   {isHandicap && <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800, color: myNetTotal2 === 0 ? "#94a3b8" : myNetTotal2 > 0 ? "#ef4444" : "#22c55e" }}>{formatToPar(myNetTotal2)}</div>}
                   {round.game_type === "stableford" && <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800, color: "#22c55e" }}>{myStablefordTotal}pts</div>}
-                  {round.game_type === "matchplay" && <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800, color: myMatchTotal > 0 ? "#22c55e" : "#94a3b8" }}>{myMatchTotal}</div>}
+                  {round.game_type === "matchplay" && <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800, color: myMatchTotal > 0 ? "#22c55e" : "#94a3b8" }}>{myMatchTotal === 0 ? "0" : myMatchTotal + (myMatchTotal === 1 ? " hole" : " holes")}</div>}
                   {round.game_type === "banker" && <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800, color: myBankerTotal > 0 ? "#22c55e" : myBankerTotal < 0 ? "#ef4444" : "#94a3b8" }}>{myBankerTotal >= 0 ? "+$" : "-$"}{Math.abs(myBankerTotal)}</div>}
                 </div>
               </div>
