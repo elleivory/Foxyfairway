@@ -1756,8 +1756,21 @@ function JoinRoundScreen({ onBack, onJoined, prefillCode }) {
 function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
   const [players, setPlayers] = useState([]), [scores, setScores] = useState([]), [showShare, setShowShare] = useState(false);
   const [showComplete, setShowComplete] = useState(false);
+  const [showAddGuest, setShowAddGuest] = useState(false);
+  const [guestName, setGuestName] = useState(""), [guestHcp, setGuestHcp] = useState(""), [addingGuest, setAddingGuest] = useState(false);
   const completeDismissedRef = useRef(false);
   const holes = round.holes || [];
+
+  const addGuest = async () => {
+    if (!guestName.trim()) return;
+    setAddingGuest(true);
+    try {
+      await dbCreatePlayer({ name: guestName.trim() + " (Guest)", handicap: round.use_handicap === false ? 0 : (parseFloat(guestHcp) || 0), round_id: round.id, is_placeholder: false, is_guest: true });
+      setGuestName(""); setGuestHcp(""); setShowAddGuest(false);
+      const p = await dbGetPlayers(round.id); setPlayers(p);
+    } catch(e) { console.error(e); }
+    setAddingGuest(false);
+  };
 
   const refresh = useCallback(async () => {
     const [p, s] = await Promise.all([dbGetPlayers(round.id), dbGetScores(round.id)]);
@@ -1799,9 +1812,26 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
           </div>
           <div style={{ fontSize: 13, color: "#94a3b8" }}>Scan to join · Code: <span style={{ color: "#22c55e", fontWeight: 700, letterSpacing: 2 }}>{round.code}</span></div>
         </div>
-        <button style={{ ...S.btnPrimary, marginBottom: 16, fontSize: 17 }} onClick={onViewScorecard}>
-          ⛳ Live Scoring
-        </button>
+        <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+          <button style={{ ...S.btnPrimary, flex: 1, fontSize: 17, marginBottom: 0 }} onClick={onViewScorecard}>⛳ Live Scoring</button>
+          <button onClick={() => setShowAddGuest(true)} style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, color: "#94a3b8", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", padding: "0 14px", flexShrink: 0 }}>+ Guest</button>
+        </div>
+
+        {showAddGuest && (
+          <div style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 14, padding: 16, marginBottom: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#f8fafc", marginBottom: 12 }}>Add Guest Player</div>
+            <label style={S.label}>Name</label>
+            <input style={{ ...S.input, marginBottom: 10 }} placeholder="e.g. Matt" value={guestName} onChange={(e) => setGuestName(e.target.value)} />
+            {round.use_handicap !== false && <>
+              <label style={S.label}>Handicap</label>
+              <input style={{ ...S.input, marginBottom: 10 }} type="number" step="0.1" placeholder="0" value={guestHcp} onChange={(e) => setGuestHcp(e.target.value)} />
+            </>}
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={addGuest} disabled={!guestName.trim() || addingGuest} style={{ flex: 1, backgroundColor: guestName.trim() ? "#22c55e" : "#334155", color: guestName.trim() ? "#0f172a" : "#64748b", border: "none", borderRadius: 10, padding: "12px", fontSize: 14, fontWeight: 700, cursor: guestName.trim() ? "pointer" : "not-allowed", fontFamily: "inherit" }}>{addingGuest ? "Adding..." : "Add Guest"}</button>
+              <button onClick={() => { setShowAddGuest(false); setGuestName(""); setGuestHcp(""); }} style={{ flex: 1, backgroundColor: "transparent", color: "#64748b", border: "1px solid #334155", borderRadius: 10, padding: "12px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+            </div>
+          </div>
+        )}
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
           <h3 style={{ ...S.stepTitle, margin: 0 }}>Leaderboard</h3>
@@ -1934,6 +1964,8 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
 function ScorecardScreen({ round, me, onViewDashboard }) {
   const [myScores, setMyScores] = useState({}), [myBets, setMyBets] = useState({});
   const [allScores, setAllScores] = useState([]), [others, setOthers] = useState([]);
+  const [guestScores, setGuestScores] = useState({}); // { [playerId]: { [holeNum]: score } }
+  const [overridePlayer, setOverridePlayer] = useState(null); // player id being overridden
   const [activeHole, setActiveHole] = useState(1);
   const [showChat, setShowChat] = useState(false);
   const [unreadChat, setUnreadChat] = useState(0);
@@ -2148,6 +2180,14 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
     } else {
       setTimeout(() => onViewDashboard(), 800);
     }
+  };
+
+  const saveGuestScore = async (player, holeNum, score) => {
+    if (score < 1 || score > 15) return;
+    setGuestScores((prev) => ({ ...prev, [player.id]: { ...(prev[player.id] || {}), [holeNum]: score } }));
+    const obj = { player_id: player.id, hole_number: holeNum, score, round_id: round.id };
+    setAllScores((prev) => { const f = prev.filter((s) => !(s.player_id === player.id && s.hole_number === holeNum)); return [...f, obj]; });
+    try { await dbSaveScore(obj); } catch(e) { console.error(e); }
   };
 
   const hcpS = curHole ? getHcpStrokes(me.handicap, curHole.stroke_index) : 0;
@@ -2504,6 +2544,69 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
             );
           })()}
 
+          {/* Guest player score rows - shown above main score buttons */}
+          {others.filter((p) => p.is_guest || p.name?.endsWith("(Guest)")).map((guest) => {
+            const gHcpS = curHole ? getHcpStrokes(guest.handicap, curHole.stroke_index) : 0;
+            const gScore = (guestScores[guest.id] || {})[activeHole] || allScores.find((s) => s.player_id === guest.id && s.hole_number === activeHole)?.score;
+            return (
+              <div key={guest.id} style={{ backgroundColor: "#0f2744", border: "1px solid #1e3a5f", borderRadius: 12, padding: "10px 12px", marginBottom: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#e2e8f0" }}>{guest.name}</span>
+                    {gHcpS > 0 && <span style={{ fontSize: 10, color: "#f59e0b", fontWeight: 600 }}>+{gHcpS}</span>}
+                  </div>
+                  {gScore && <span style={{ fontSize: 16, fontWeight: 800, color: "#22c55e" }}>{gScore} <span style={{ fontSize: 10, color: "#475569", fontWeight: 500 }}>{scoreLabel(gScore, curHole?.par)}</span></span>}
+                </div>
+                <div style={{ display: "flex", gap: 6, overflowX: "auto", scrollbarWidth: "none" }}>
+                  {curHole && [curHole.par - 1, curHole.par, curHole.par + 1, curHole.par + 2, curHole.par + 3].map((s) => (
+                    <button key={s} onClick={() => saveGuestScore(guest, activeHole, s)}
+                      style={{ minWidth: 46, height: 46, borderRadius: 10, border: "none", flexShrink: 0, fontFamily: "inherit", cursor: "pointer",
+                        backgroundColor: gScore === s ? scoreColour(s, curHole.par, gHcpS) : "#0a1e3a",
+                        color: gScore === s ? "#fff" : "#64748b", fontSize: 15, fontWeight: 700,
+                        boxShadow: gScore !== s ? "0 2px 4px rgba(0,0,0,0.3)" : "none" }}>
+                      <div style={{ fontSize: 16, fontWeight: 800, lineHeight: 1 }}>{s}</div>
+                      <div style={{ fontSize: 8, fontWeight: 600, marginTop: 1, color: gScore === s ? "#fff" : "#475569" }}>{scoreLabel(s, curHole.par)}</div>
+                    </button>
+                  ))}
+                  <input style={{ ...S.customInput, width: 46, height: 46, padding: 0, textAlign: "center", fontSize: 15, flexShrink: 0 }}
+                    type="number" min="1" max="15" placeholder="+" title="Other score"
+                    value={gScore && curHole && ![curHole.par-1,curHole.par,curHole.par+1,curHole.par+2,curHole.par+3].includes(gScore) ? gScore : ""}
+                    onChange={(e) => e.target.value && saveGuestScore(guest, activeHole, parseInt(e.target.value))} />
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Override row - shows temporarily when creator taps edit on a joined player */}
+          {overridePlayer && (() => {
+            const op = others.find((p) => p.id === overridePlayer);
+            if (!op) return null;
+            const opHcpS = curHole ? getHcpStrokes(op.handicap, curHole.stroke_index) : 0;
+            const opScore = allScores.find((s) => s.player_id === op.id && s.hole_number === activeHole)?.score;
+            return (
+              <div style={{ backgroundColor: "#2a1a00", border: "1.5px solid #f59e0b", borderRadius: 12, padding: "10px 12px", marginBottom: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: 11, color: "#f59e0b", fontWeight: 700 }}>⚡ Override</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "#e2e8f0" }}>{op.name}</span>
+                  </div>
+                  <button onClick={() => setOverridePlayer(null)} style={{ background: "none", border: "none", color: "#64748b", fontSize: 14, cursor: "pointer", fontFamily: "inherit", fontWeight: 700 }}>✕ Done</button>
+                </div>
+                <div style={{ display: "flex", gap: 6, overflowX: "auto", scrollbarWidth: "none" }}>
+                  {curHole && [curHole.par - 1, curHole.par, curHole.par + 1, curHole.par + 2, curHole.par + 3].map((s) => (
+                    <button key={s} onClick={() => saveGuestScore(op, activeHole, s)}
+                      style={{ minWidth: 46, height: 46, borderRadius: 10, border: "none", flexShrink: 0, fontFamily: "inherit", cursor: "pointer",
+                        backgroundColor: opScore === s ? scoreColour(s, curHole.par, opHcpS) : "#0a1e3a",
+                        color: opScore === s ? "#fff" : "#64748b", fontSize: 15, fontWeight: 700 }}>
+                      <div style={{ fontSize: 16, fontWeight: 800, lineHeight: 1 }}>{s}</div>
+                      <div style={{ fontSize: 8, fontWeight: 600, marginTop: 1 }}>{scoreLabel(s, curHole.par)}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
                     <div style={{ position: "relative" }}>
           {round.game_type === "banker" && (() => {
             const thisBankerNow = activeHole === 1 ? initialBankerId : currentBankerId;
@@ -2717,7 +2820,13 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
             return (
               <div key={player.id} style={S.playerCard}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                  <div style={S.playerCardName}>{player.name} (HCP {player.handicap})</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <div style={S.playerCardName}>{player.name} (HCP {player.handicap})</div>
+                    {round.created_by === me.name && !player.is_guest && !player.name?.endsWith("(Guest)") && (
+                      <button onClick={() => setOverridePlayer(overridePlayer === player.id ? null : player.id)}
+                        title="Override score" style={{ background: "none", border: "none", color: overridePlayer === player.id ? "#f59e0b" : "#334155", fontSize: 13, cursor: "pointer", padding: "2px 4px", fontFamily: "inherit" }}>✏️</button>
+                    )}
+                  </div>
                   <div style={{ fontSize: 11, color: "#64748b" }}>
                     G: <span style={{ color: pGrossTotal === 0 ? "#94a3b8" : pGrossTotal > 0 ? "#ef4444" : "#22c55e", fontWeight: 700 }}>{formatToPar(pGrossTotal)}</span>
                     {"  "}N: <span style={{ color: pNetTotal === 0 ? "#94a3b8" : pNetTotal > 0 ? "#ef4444" : "#22c55e", fontWeight: 700 }}>{formatToPar(pNetTotal)}</span>
