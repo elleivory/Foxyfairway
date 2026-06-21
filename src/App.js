@@ -2831,19 +2831,77 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
         </div>
       )}
 
-      {/* Match play status banner */}
-      {(round.game_type === "matchplay" || round.game_type === "matchplay_teams") && (() => {
+      {/* Compact leaderboard strip - replaces the old match play banner */}
+      {(() => {
+        const allP = [me, ...others];
         const holesPlayed = Object.keys(myScores).length;
         if (holesPlayed === 0) return null;
-        const lead = Math.floor(myMatchTotal);
-        const color = myMatchTotal > 0 ? "#22c55e" : "#94a3b8";
-        const bg = myMatchTotal > 0 ? "#022c22" : "#1e293b";
-        const border = myMatchTotal > 0 ? "#22c55e" : "#334155";
-        const status = myMatchTotal === 0 ? "0 pts" : myMatchTotal + (myMatchTotal === 1 ? " hole won" : " holes won");
+
+        const getScore = (player) => {
+          const ps = allScores.filter((s) => s.player_id === player.id);
+          if (round.game_type === "stableford") {
+            return { val: holes.reduce((sum, h) => { const s = ps.find((x) => x.hole_number === h.hole_number); if (!s) return sum; return sum + stablefordPoints(s.score, h.par, getHcpStrokes(player.handicap, h.stroke_index)); }, 0) + "pts", color: "#22c55e" };
+          } else if (round.game_type === "matchplay" || round.game_type === "matchplay_teams") {
+            let won = 0;
+            holes.forEach((hole) => {
+              const myS = ps.find((s) => s.hole_number === hole.hole_number); if (!myS) return;
+              const holeScores = allScores.filter((s) => s.hole_number === hole.hole_number);
+              if (!allP.every((p) => holeScores.some((s) => s.player_id === p.id))) return;
+              let lowest = Infinity;
+              holeScores.forEach((s) => { const pl = allP.find((p) => p.id === s.player_id); if (!pl) return; const net = s.score - getHcpStrokes(pl.handicap, hole.stroke_index); if (net < lowest) lowest = net; });
+              const winners = holeScores.filter((s) => { const pl = allP.find((p) => p.id === s.player_id); if (!pl) return false; return (s.score - getHcpStrokes(pl.handicap, hole.stroke_index)) === lowest; }).map((s) => s.player_id);
+              if (winners.length < allP.length && winners.includes(player.id)) won++;
+            });
+            return { val: won, color: won > 0 ? "#22c55e" : "#94a3b8" };
+          } else if (round.game_type === "banker") {
+            const isMe = player.id === me.id;
+            const total = isMe ? myBankerTotal : (() => {
+              let t = 0;
+              holes.forEach((hole) => {
+                const pScore = ps.find((s) => s.hole_number === hole.hole_number); if (!pScore || !pScore.score) return;
+                const holeScores = allScores.filter((s) => s.hole_number === hole.hole_number);
+                if (!allP.every((p) => holeScores.some((s) => s.player_id === p.id && s.score > 0))) return;
+                const bankerId = pScore.banker_id || holeScores[0]?.banker_id;
+                const isBanker = bankerId === player.id;
+                let lowest = Infinity;
+                holeScores.forEach((s) => { const pl = allP.find((p) => p.id === s.player_id); if (!pl || !s.score) return; const net = s.score - getHcpStrokes(pl.handicap, hole.stroke_index); if (net < lowest) lowest = net; });
+                const winners = holeScores.filter((s) => { const pl = allP.find((p) => p.id === s.player_id); if (!pl || !s.score) return false; return (s.score - getHcpStrokes(pl.handicap, hole.stroke_index)) === lowest; }).map((s) => s.player_id);
+                if (winners.length === allP.length) return;
+                const bankerWon = winners.includes(bankerId);
+                if (isBanker) { if (bankerWon) { holeScores.forEach((s) => { if (s.player_id === player.id || !s.score || winners.includes(s.player_id)) return; t += (s.bet||0); }); } else { holeScores.forEach((s) => { if (s.player_id === player.id || !s.score || !winners.includes(s.player_id)) return; t -= (s.bet||0); }); } }
+                else { const bet = pScore.bet||0; if (bet > 0) { if (winners.includes(player.id) && !bankerWon) t += bet; else if (bankerWon && !winners.includes(player.id)) t -= bet; } }
+              });
+              return t;
+            })();
+            return { val: (total >= 0 ? "+$" : "-$") + Math.abs(total), color: total > 0 ? "#22c55e" : total < 0 ? "#ef4444" : "#94a3b8" };
+          } else {
+            const gross = ps.reduce((sum, s) => sum + (s.score || 0), 0);
+            const par = holes.filter((h) => ps.some((s) => s.hole_number === h.hole_number)).reduce((sum, h) => sum + h.par, 0);
+            const diff = gross - par;
+            return { val: diff === 0 ? "E" : (diff > 0 ? "+" : "") + diff, color: diff < 0 ? "#22c55e" : diff > 0 ? "#ef4444" : "#94a3b8" };
+          }
+        };
+
+        const rows = [];
+        for (let i = 0; i < allP.length; i += 4) rows.push(allP.slice(i, i + 4));
+
         return (
-          <div style={{ margin: "0 16px 12px", backgroundColor: bg, border: "1px solid " + border, borderRadius: 10, padding: "10px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: 13, color: "#94a3b8" }}>After {holesPlayed} hole{holesPlayed !== 1 ? "s" : ""}</span>
-            <span style={{ fontSize: 16, fontWeight: 800, color }}>{status}</span>
+          <div style={{ margin: "0 16px 12px" }}>
+            {rows.map((row, ri) => (
+              <div key={ri} style={{ display: "flex", gap: 6, marginBottom: ri < rows.length - 1 ? 6 : 0 }}>
+                {row.map((player) => {
+                  const { val, color } = getScore(player);
+                  const isMe = player.id === me.id;
+                  const shortName = player.name.replace(" (Guest)", "").split(" ")[0];
+                  return (
+                    <div key={player.id} style={{ flex: 1, backgroundColor: isMe ? "#022c22" : "#1e293b", border: "1px solid " + (isMe ? "#22c55e44" : "#334155"), borderRadius: 10, padding: "7px 8px", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, minWidth: 0 }}>
+                      <div style={{ fontSize: 10, fontWeight: 600, color: isMe ? "#22c55e" : "#94a3b8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", width: "100%", textAlign: "center" }}>{shortName}</div>
+                      <div style={{ fontSize: 15, fontWeight: 900, color, lineHeight: 1 }}>{val}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
           </div>
         );
       })()}
@@ -3061,18 +3119,19 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                     {round.game_type === "matchplay" && (
                       <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800 }}>
                         {(() => {
-                          let won = 0, lost = 0;
+                          let won = 0;
                           holes.forEach((hole) => {
                             const myS = ps.find((s) => s.hole_number === hole.hole_number); if (!myS) return;
                             const holeScores = allScores.filter((s) => s.hole_number === hole.hole_number);
                             const allP3 = [...others, me];
                             if (!allP3.every((p) => holeScores.some((s) => s.player_id === p.id))) return;
-                            let lowest = Infinity, winner = null, tied = false;
-                            holeScores.forEach((s) => { const pl = allP3.find((p) => p.id === s.player_id); if (!pl) return; const net = s.score - getHcpStrokes(pl.handicap, hole.stroke_index); if (net < lowest) { lowest = net; winner = s.player_id; tied = false; } else if (net === lowest) { tied = true; } });
-                            if (!tied) { if (winner === player.id) won++; else lost++; }
+                            let lowest = Infinity;
+                            holeScores.forEach((s) => { const pl = allP3.find((p) => p.id === s.player_id); if (!pl) return; const net = s.score - getHcpStrokes(pl.handicap, hole.stroke_index); if (net < lowest) lowest = net; });
+                            const winners = holeScores.filter((s) => { const pl = allP3.find((p) => p.id === s.player_id); if (!pl) return false; return (s.score - getHcpStrokes(pl.handicap, hole.stroke_index)) === lowest; }).map((s) => s.player_id);
+                            const allTied = winners.length === allP3.length;
+                            if (!allTied && winners.includes(player.id)) won++;
                           });
-                          const lead = won - lost;
-                          const col = lead > 0 ? "#22c55e" : "#94a3b8";
+                          const col = won > 0 ? "#22c55e" : "#94a3b8";
                           return <span style={{ color: col }}>{won === 0 ? "0" : won + (won === 1 ? " hole" : " holes")}</span>;
                         })()}
                       </div>
