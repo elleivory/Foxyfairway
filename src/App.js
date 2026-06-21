@@ -2544,39 +2544,6 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
             );
           })()}
 
-          {/* Guest player score rows - shown above main score buttons */}
-          {others.filter((p) => p.name?.endsWith("(Guest)")).map((guest) => {
-            const gHcpS = curHole ? getHcpStrokes(guest.handicap, curHole.stroke_index) : 0;
-            const gScore = (guestScores[guest.id] || {})[activeHole] || allScores.find((s) => s.player_id === guest.id && s.hole_number === activeHole)?.score;
-            return (
-              <div key={guest.id} style={{ backgroundColor: "#0f2744", border: "1px solid #1e3a5f", borderRadius: 12, padding: "10px 12px", marginBottom: 10 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: "#e2e8f0" }}>{guest.name}</span>
-                    {gHcpS > 0 && <span style={{ fontSize: 10, color: "#f59e0b", fontWeight: 600 }}>+{gHcpS}</span>}
-                  </div>
-                  {gScore && <span style={{ fontSize: 16, fontWeight: 800, color: "#22c55e" }}>{gScore} <span style={{ fontSize: 10, color: "#475569", fontWeight: 500 }}>{scoreLabel(gScore, curHole?.par)}</span></span>}
-                </div>
-                <div style={{ display: "flex", gap: 6, overflowX: "auto", scrollbarWidth: "none" }}>
-                  {curHole && [curHole.par - 1, curHole.par, curHole.par + 1, curHole.par + 2, curHole.par + 3].map((s) => (
-                    <button key={s} onClick={() => saveGuestScore(guest, activeHole, s)}
-                      style={{ minWidth: 46, height: 46, borderRadius: 10, border: "none", flexShrink: 0, fontFamily: "inherit", cursor: "pointer",
-                        backgroundColor: gScore === s ? scoreColour(s, curHole.par, gHcpS) : "#0a1e3a",
-                        color: gScore === s ? "#fff" : "#64748b", fontSize: 15, fontWeight: 700,
-                        boxShadow: gScore !== s ? "0 2px 4px rgba(0,0,0,0.3)" : "none" }}>
-                      <div style={{ fontSize: 16, fontWeight: 800, lineHeight: 1 }}>{s}</div>
-                      <div style={{ fontSize: 8, fontWeight: 600, marginTop: 1, color: gScore === s ? "#fff" : "#475569" }}>{scoreLabel(s, curHole.par)}</div>
-                    </button>
-                  ))}
-                  <input style={{ ...S.customInput, width: 46, height: 46, padding: 0, textAlign: "center", fontSize: 15, flexShrink: 0 }}
-                    type="number" min="1" max="15" placeholder="+" title="Other score"
-                    value={gScore && curHole && ![curHole.par-1,curHole.par,curHole.par+1,curHole.par+2,curHole.par+3].includes(gScore) ? gScore : ""}
-                    onChange={(e) => e.target.value && saveGuestScore(guest, activeHole, parseInt(e.target.value))} />
-                </div>
-              </div>
-            );
-          })}
-
           {/* Override row - shows temporarily when creator taps edit on a joined player */}
           {overridePlayer && (() => {
             const op = others.find((p) => p.id === overridePlayer);
@@ -2632,19 +2599,25 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
             const allBetsInNow = betsInNow >= nonBkrs.length && nonBkrs.length > 0;
             const isLocked = round.game_type === "banker" && (!iAmBkr ? !myBets[activeHole] : !allBetsInNow);
             return (
-              <div style={S.scoreRow}>
-                {[curHole.par - 1, curHole.par, curHole.par + 1, curHole.par + 2, curHole.par + 3].map((s) => (
-                  <button key={s} onClick={() => !isLocked && saveScore(activeHole, s)}
-                    style={{ ...S.scoreBtn,
-                    backgroundColor: isLocked ? "#1a2234" : myScores[activeHole] === s ? scoreColour(s, curHole.par, hcpS) : "#e2e8f0",
-                    color: isLocked ? "#2d3f5a" : myScores[activeHole] === s ? "#fff" : "#0f172a",
-                    border: "none", opacity: isLocked ? 0.4 : 1,
-                    cursor: isLocked ? "not-allowed" : "pointer",
-                    boxShadow: !isLocked && myScores[activeHole] !== s ? "0 2px 4px rgba(0,0,0,0.3)" : "none" }}>
-                    <span style={S.scoreBtnNum}>{s}</span>
-                    <span style={S.scoreBtnLabel}>{scoreLabel(s, curHole.par)}</span>
-                  </button>
-                ))}
+              <div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 2px 6px" }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "#22c55e", textTransform: "uppercase", letterSpacing: 0.5 }}>{me.name} (You){hcpS > 0 ? " +" + hcpS : ""}</span>
+                  {myScores[activeHole] && <span style={{ fontSize: 12, fontWeight: 700, color: "#22c55e" }}>{myScores[activeHole]} {scoreLabel(myScores[activeHole], curHole?.par)}</span>}
+                </div>
+                <div style={S.scoreRow}>
+                  {[curHole.par - 1, curHole.par, curHole.par + 1, curHole.par + 2, curHole.par + 3].map((s) => (
+                    <button key={s} onClick={() => !isLocked && saveScore(activeHole, s)}
+                      style={{ ...S.scoreBtn,
+                      backgroundColor: isLocked ? "#0f172a" : myScores[activeHole] === s ? scoreColour(s, curHole.par, hcpS) : "#1e293b",
+                      color: isLocked ? "#2d3f5a" : myScores[activeHole] === s ? "#fff" : "#64748b",
+                      border: "none", opacity: isLocked ? 0.4 : 1,
+                      cursor: isLocked ? "not-allowed" : "pointer",
+                      boxShadow: !isLocked && myScores[activeHole] !== s ? "0 2px 4px rgba(0,0,0,0.3)" : "none" }}>
+                      <span style={S.scoreBtnNum}>{s}</span>
+                      <span style={S.scoreBtnLabel}>{scoreLabel(s, curHole.par)}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             );
           })()}
@@ -2657,11 +2630,35 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
               onChange={(e) => e.target.value && saveScore(activeHole, parseInt(e.target.value))} />
           </div>
 
-
+          {/* Guest player score rows - below your own buttons, same style for alignment */}
+          {others.filter((p) => p.name?.endsWith("(Guest)")).map((guest) => {
+            const gHcpS = curHole ? getHcpStrokes(guest.handicap, curHole.stroke_index) : 0;
+            const gScore = (guestScores[guest.id] || {})[activeHole] || allScores.find((s) => s.player_id === guest.id && s.hole_number === activeHole)?.score;
+            return (
+              <div key={guest.id} style={{ marginBottom: 4 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 2px 6px" }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5 }}>{guest.name}{gHcpS > 0 ? " +" + gHcpS : ""}</span>
+                  {gScore && <span style={{ fontSize: 12, fontWeight: 700, color: "#22c55e" }}>{gScore} {scoreLabel(gScore, curHole?.par)}</span>}
+                </div>
+                <div style={S.scoreRow}>
+                  {curHole && [curHole.par - 1, curHole.par, curHole.par + 1, curHole.par + 2, curHole.par + 3].map((s) => (
+                    <button key={s} onClick={() => saveGuestScore(guest, activeHole, s)}
+                      style={{ ...S.scoreBtn,
+                        backgroundColor: gScore === s ? scoreColour(s, curHole.par, gHcpS) : "#1e293b",
+                        color: gScore === s ? "#fff" : "#64748b",
+                        border: "none", boxShadow: gScore !== s ? "0 2px 4px rgba(0,0,0,0.3)" : "none" }}>
+                      <span style={S.scoreBtnNum}>{s}</span>
+                      <span style={S.scoreBtnLabel}>{scoreLabel(s, curHole.par)}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
 
           <div style={S.scoreInfoBoxes}>
-            {/* Combined Course Info row - hole number dominant, par secondary, SI subtle */}
-            <div style={{ ...S.scoreInfoSection, padding: 0, overflow: "hidden" }}>
+            {/* Combined Course Info row */}
+            <div style={{ ...S.scoreInfoSection, padding: 0 }}>
               <div style={{ padding: "8px 12px 0", fontSize: 10, fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: 0.5 }}>Course</div>
               <div style={{ display: "flex", alignItems: "stretch" }}>
                 <div className="ff-slave-scroll" style={{ ...S.scoreInfoRow, flex: 1, padding: "8px 0 10px 12px" }} onScroll={(e) => {
@@ -2675,7 +2672,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                         const pos = Math.max(0, (h.hole_number - 1) * 54 - 20);
                         document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { el.scrollLeft = pos; });
                       }}
-                        style={{ minWidth: 40, width: 40, flex: "0 0 auto", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: "pointer",
+                        style={{ minWidth: 48, width: 48, flex: "0 0 auto", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: "pointer",
                           backgroundColor: isActive ? "#022c22" : "transparent", borderRadius: 8, padding: "6px 0", gap: 1,
                           outline: isActive ? "1px solid #22c55e" : "none", outlineOffset: -1 }}>
                         <div style={{ fontSize: 16, fontWeight: 900, color: isActive ? "#22c55e" : "#f8fafc", lineHeight: 1 }}>{h.hole_number}</div>
@@ -2688,107 +2685,9 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                     );
                   })}
                 </div>
-                {/* Invisible spacer matching TotalPin width so scroll endpoint aligns */}
-                <div style={{ minWidth: 40, width: 40, flexShrink: 0 }} />
+                <div style={{ minWidth: 48, width: 48, flexShrink: 0 }} />
               </div>
             </div>
-
-            <div style={S.scoreInfoSection}>
-              <div style={S.scoreInfoSectionTitle}>Gross Score</div>
-              <div style={{ display: "flex", alignItems: "center" }}>
-                <div className="ff-slave-scroll" style={{ ...S.scoreInfoRow, flex: 1 }} onScroll={(e) => { document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { if (el !== e.target) el.scrollLeft = e.target.scrollLeft; }); }}>
-                  {holes.map((h) => { const g = myScores[h.hole_number]; const { number, shape } = getScoreShape(g, h.par); return (
-                    <div key={"gs"+h.hole_number} style={S.scoreInfoCell}>
-                      {g ? <div style={{ ...S.scoreInfoCellValue, ...shapeStyle(shape) }}>{number}</div> : <div style={S.scoreInfoCellValue}>—</div>}
-                    </div>); })}
-                </div>
-                <RunningTotal value={myGrossTotal} />
-              </div>
-            </div>
-
-            <div style={S.scoreInfoSection}>
-              <div style={S.scoreInfoSectionTitle}>Net Score</div>
-              <div style={{ display: "flex", alignItems: "center" }}>
-                <div className="ff-slave-scroll" style={{ ...S.scoreInfoRow, flex: 1 }} onScroll={(e) => { document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { if (el !== e.target) el.scrollLeft = e.target.scrollLeft; }); }}>
-                  {holes.map((h) => { const hs = getHcpStrokes(me.handicap, h.stroke_index); const g = myScores[h.hole_number]; const { number, shape } = getNetShape(g, h.par, hs); return (
-                    <div key={"ns"+h.hole_number} style={S.scoreInfoCell}>
-                      {g ? <div style={{ ...S.scoreInfoCellValue, ...shapeStyle(shape) }}>{number}</div> : <div style={S.scoreInfoCellValue}>—</div>}
-                    </div>); })}
-                </div>
-                <RunningTotal value={myNetTotal} />
-              </div>
-            </div>
-
-            {round.game_type === "stableford" && (
-              <div style={S.scoreInfoSection}>
-                <div style={S.scoreInfoSectionTitle}>Points</div>
-                <div style={{ display: "flex", alignItems: "center" }}>
-                  <div className="ff-slave-scroll" style={{ ...S.scoreInfoRow, flex: 1 }} onScroll={(e) => { document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { if (el !== e.target) el.scrollLeft = e.target.scrollLeft; }); }}>
-                    {holes.map((h) => { const hs = getHcpStrokes(me.handicap, h.stroke_index); const g = myScores[h.hole_number]; return (
-                      <div key={"sp"+h.hole_number} style={S.scoreInfoCell}><div style={S.scoreInfoCellNumber}>{h.hole_number}</div>
-                        <div style={S.scoreInfoCellValue}>{g ? stablefordPoints(g, h.par, hs) : "—"}</div>
-                      </div>); })}
-                  </div>
-                  <RunningTotal value={myStablefordTotal} label={myStablefordTotal + "pts"} color="#22c55e" />
-                </div>
-              </div>
-            )}
-
-            {round.game_type === "matchplay" && (
-              <div style={S.scoreInfoSection}>
-                <div style={S.scoreInfoSectionTitle}>Hole Result</div>
-                <div style={{ display: "flex", alignItems: "center" }}>
-                  <div className="ff-slave-scroll" style={{ ...S.scoreInfoRow, flex: 1 }} onScroll={(e) => { document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { if (el !== e.target) el.scrollLeft = e.target.scrollLeft; }); }}>
-                    {holes.map((h) => {
-                      let label = "—", color = "#94a3b8";
-                      const myG = myScores[h.hole_number];
-                      if (myG) {
-                        const holeScores = allScores.filter((s) => s.hole_number === h.hole_number);
-                        const allPlayers2 = [...others, me];
-                        const allScored2 = allPlayers2.every((p) => holeScores.some((s) => s.player_id === p.id));
-                        if (allScored2) {
-                          let lowestWL = Infinity;
-                          holeScores.forEach((s) => { const pl = allPlayers2.find((p) => p.id === s.player_id); if (!pl) return; const net = s.score - getHcpStrokes(pl.handicap, h.stroke_index); if (net < lowestWL) lowestWL = net; });
-                          const hWinnersWL = holeScores.filter((s) => { const pl = allPlayers2.find((p) => p.id === s.player_id); if (!pl) return false; return (s.score - getHcpStrokes(pl.handicap, h.stroke_index)) === lowestWL; }).map((s) => s.player_id);
-                          const allTiedWL = hWinnersWL.length === allPlayers2.length;
-                          if (allTiedWL) { label = "T"; color = "#94a3b8"; } // everyone same score
-                          else if (hWinnersWL.includes(me.id)) { label = "W"; color = "#22c55e"; } // I beat at least one
-                          else { label = "L"; color = "#ef4444"; } // I didn't match the lowest
-                        }
-                      }
-                      return (<div key={"mp"+h.hole_number} style={S.scoreInfoCell}><div style={S.scoreInfoCellNumber}>{h.hole_number}</div><div style={{ ...S.scoreInfoCellValue, color }}>{label}</div></div>);
-                    })}
-                  </div>
-                  <RunningTotal value={myMatchTotal} label={myMatchTotal === 0 ? "All Sq" : myMatchTotal > 0 ? Math.floor(myMatchTotal) + " Up" : Math.abs(Math.floor(myMatchTotal)) + " Dn"} color={myMatchTotal > 0 ? "#22c55e" : myMatchTotal < 0 ? "#ef4444" : "#94a3b8"} />
-                </div>
-              </div>
-            )}
-
-            {round.game_type === "banker" && (
-              <div style={{ ...S.scoreInfoSection, padding: "8px 10px" }}>
-                <div style={S.scoreInfoSectionTitle}>Your Balance</div>
-                <div style={{ display: "flex", alignItems: "center" }}>
-                  <div className="ff-slave-scroll" style={{ ...S.scoreInfoRow, flex: 1 }} onScroll={(e) => { document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { if (el !== e.target) el.scrollLeft = e.target.scrollLeft; }); }}>
-                    {holes.map((h) => {
-                      const hd = bankerHoleMap[h.hole_number];
-                      if (!hd) return (<div key={"bk"+h.hole_number} style={S.scoreInfoCell}><div style={{ fontSize: 14, color: "#334155" }}>—</div></div>);
-                      const color = hd.holeChange > 0 ? "#22c55e" : hd.holeChange < 0 ? "#ef4444" : "#94a3b8";
-                      return (
-                        <div key={"bk"+h.hole_number} style={{ ...S.scoreInfoCell, minWidth: 40 }}>
-                          <div style={{ fontSize: 11, fontWeight: 800, color }}>{hd.tied ? "T" : hd.holeChange > 0 ? "W" : hd.holeChange < 0 ? "L" : "T"}</div>
-                          {hd.iAmBanker && <div style={{ fontSize: 9 }}>🏦</div>}
-                          {hd.doubled && <div style={{ fontSize: 9 }}>🔥</div>}
-                          <div style={{ fontSize: 9, color, fontWeight: 700 }}>{hd.holeChange !== 0 ? (hd.holeChange > 0 ? "+$" : "-$") + Math.abs(hd.holeChange) : ""}</div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minWidth: 48, paddingLeft: 8, borderLeft: "1px solid #334155", flexShrink: 0 }}>
-                    <span style={{ fontSize: 13, fontWeight: 800, color: myBankerTotal > 0 ? "#22c55e" : myBankerTotal < 0 ? "#ef4444" : "#94a3b8" }}>{myBankerTotal >= 0 ? "+$" : "-$"}{Math.abs(myBankerTotal)}</span>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       )}
@@ -2810,10 +2709,82 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
         );
       })()}
 
-      {others.length > 0 && (
-        <div style={S.otherPlayersSection}>
-          <div style={S.otherPlayersTitle}>Other Players</div>
-          {others.map((player) => {
+      {/* All players section - my card first then others, all same style */}
+      <div style={S.otherPlayersSection}>
+        <div style={S.otherPlayersTitle}>Players</div>
+
+        {/* MY card - same style as other players */}
+        {(() => {
+          const myGrossTotal2 = holes.reduce((sum, h) => sum + (myScores[h.hole_number] ? myScores[h.hole_number] - h.par : 0), 0);
+          const myNetTotal2 = holes.reduce((sum, h) => { const g = myScores[h.hole_number]; if (!g) return sum; return sum + (g - getHcpStrokes(me.handicap, h.stroke_index) - h.par); }, 0);
+          return (
+            <div style={{ ...S.playerCard, border: "1px solid #22c55e33", marginBottom: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <div style={{ ...S.playerCardName, color: "#22c55e" }}>{me.name} (HCP {me.handicap}) <span style={{ fontSize: 9, color: "#22c55e", fontWeight: 600 }}>YOU</span></div>
+                <div style={{ fontSize: 11, color: "#64748b" }}>
+                  G: <span style={{ color: myGrossTotal2 === 0 ? "#94a3b8" : myGrossTotal2 > 0 ? "#ef4444" : "#22c55e", fontWeight: 700 }}>{formatToPar(myGrossTotal2)}</span>
+                  {"  "}N: <span style={{ color: myNetTotal2 === 0 ? "#94a3b8" : myNetTotal2 > 0 ? "#ef4444" : "#22c55e", fontWeight: 700 }}>{formatToPar(myNetTotal2)}</span>
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "flex-start" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 2, paddingTop: 14, marginRight: 4, flexShrink: 0 }}>
+                  <div style={{ fontSize: 9, color: "#94a3b8", fontWeight: 700, height: 28, display: "flex", alignItems: "center" }}>G</div>
+                  <div style={{ fontSize: 9, color: "#94a3b8", fontWeight: 700, height: 28, display: "flex", alignItems: "center" }}>N</div>
+                  {(round.game_type === "stableford" || round.game_type === "matchplay" || round.game_type === "banker") && (
+                    <div style={{ fontSize: 9, color: "#94a3b8", fontWeight: 700, height: 28, display: "flex", alignItems: "center" }}>
+                      {round.game_type === "stableford" ? "Pts" : round.game_type === "matchplay" ? "W/L" : "$"}
+                    </div>
+                  )}
+                </div>
+                <div className="ff-slave-scroll" style={{ ...S.playerScoresRow, flex: 1 }} onScroll={(e) => { document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { if (el !== e.target) el.scrollLeft = e.target.scrollLeft; }); }}>
+                  {holes.map((h) => {
+                    const g = myScores[h.hole_number];
+                    const hs = getHcpStrokes(me.handicap, h.stroke_index);
+                    const { number: gn, shape: gs } = getScoreShape(g, h.par);
+                    const { number: nn, shape: ns } = getNetShape(g, h.par, hs);
+                    let thirdValue = "  ", thirdColor = "#94a3b8";
+                    if (g) {
+                      if (round.game_type === "stableford") { thirdValue = stablefordPoints(g, h.par, hs); thirdColor = "#22c55e"; }
+                      else if (round.game_type === "matchplay") {
+                        const holeScores = allScores.filter((s) => s.hole_number === h.hole_number);
+                        const allPlayers2 = [...others, me];
+                        if (!allPlayers2.every((p) => holeScores.some((s) => s.player_id === p.id))) { thirdValue = "  "; thirdColor = "#475569"; }
+                        else {
+                          let lowestNet = Infinity;
+                          holeScores.forEach((s) => { const pl = allPlayers2.find((p) => p.id === s.player_id); if (!pl) return; const net = s.score - getHcpStrokes(pl.handicap, h.stroke_index); if (net < lowestNet) lowestNet = net; });
+                          const hWinners = holeScores.filter((s) => { const pl = allPlayers2.find((p) => p.id === s.player_id); if (!pl) return false; return (s.score - getHcpStrokes(pl.handicap, h.stroke_index)) === lowestNet; }).map((s) => s.player_id);
+                          const allTied = hWinners.length === allPlayers2.length;
+                          if (allTied) { thirdValue = "T"; thirdColor = "#94a3b8"; }
+                          else if (hWinners.includes(me.id)) { thirdValue = "W"; thirdColor = "#22c55e"; }
+                          else { thirdValue = "L"; thirdColor = "#ef4444"; }
+                        }
+                      } else if (round.game_type === "banker") {
+                        const hd = bankerHoleMap[h.hole_number];
+                        if (hd) { thirdValue = hd.holeChange !== 0 ? (hd.holeChange > 0 ? "+$" : "-$") + Math.abs(hd.holeChange) : "T"; thirdColor = hd.holeChange > 0 ? "#22c55e" : hd.holeChange < 0 ? "#ef4444" : "#94a3b8"; }
+                      }
+                    }
+                    return (
+                      <div key={"me"+h.hole_number} style={{ minWidth: 44, flex: "0 0 auto", display: "flex", flexDirection: "column", alignItems: "center", overflow: "visible" }}>
+                        <div style={{ fontSize: 9, color: "#475569", height: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>{h.hole_number}</div>
+                        <div style={{ height: 28, display: "flex", alignItems: "center", justifyContent: "center", overflow: "visible" }}>
+                          {g ? <div style={{ ...shapeStyle(gs), fontSize: 11 }}>{gn}</div> : <div style={{ fontSize: 12, color: "#334155" }}>  </div>}
+                        </div>
+                        <div style={{ height: 28, display: "flex", alignItems: "center", justifyContent: "center", overflow: "visible" }}>
+                          {g ? <div style={{ ...shapeStyle(ns), fontSize: 11 }}>{nn}</div> : <div style={{ fontSize: 12, color: "#334155" }}>  </div>}
+                        </div>
+                        {(round.game_type === "stableford" || round.game_type === "matchplay" || round.game_type === "banker") && (
+                          <div style={{ height: 20, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: thirdColor }}>{thirdValue}</div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {others.map((player) => {
             const ps = allScores.filter((s) => s.player_id === player.id);
             const pGrossTotal = holes.reduce((sum, h) => { const s = ps.find((x) => x.hole_number === h.hole_number); return sum + (s ? s.score - h.par : 0); }, 0);
             const pNetTotal = holes.reduce((sum, h) => { const s = ps.find((x) => x.hole_number === h.hole_number); if (!s) return sum; return sum + (s.score - getHcpStrokes(player.handicap, h.stroke_index) - h.par); }, 0);
@@ -2881,7 +2852,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                         }
                       }
                       return (
-                        <div key={player.id + h.hole_number} style={{ minWidth: 36, flex: "0 0 auto", display: "flex", flexDirection: "column", alignItems: "center" }}>
+                        <div key={player.id + h.hole_number} style={{ minWidth: 44, flex: "0 0 auto", display: "flex", flexDirection: "column", alignItems: "center", overflow: "visible" }}>
                           <div style={{ fontSize: 9, color: "#475569", height: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>{h.hole_number}</div>
                           <div style={{ height: 28, display: "flex", alignItems: "center", justifyContent: "center" }}>
                             {g ? <div style={{ ...shapeStyle(gs), fontSize: 11 }}>{gn}</div> : <div style={{ fontSize: 12, color: "#334155" }}>—</div>}
@@ -3029,7 +3000,8 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
             );
           })}
         </div>
-      )}
+
+      {showChat && <ChatPanel round={round} me={me} onClose={() => { setShowChat(false); setUnreadChat(0); }} />}
     </div>
   );
 }
@@ -3318,10 +3290,10 @@ const S = {
   customLabel: { fontSize: 13, color: "#64748b" },
   customInput: { backgroundColor: "#1e293b", border: "1px solid #475569", borderRadius: 8, padding: "8px 12px", color: "#f8fafc", fontSize: 18, fontWeight: 700, width: 60, textAlign: "center", outline: "none", fontFamily: "inherit" },
   scoreInfoBoxes: { display: "flex", flexDirection: "column", gap: 6, marginTop: 10 },
-  scoreInfoSection: { backgroundColor: "#0f172a", border: "1px solid #1e293b", borderRadius: 6, padding: "6px 10px" },
+  scoreInfoSection: { backgroundColor: "#0f172a", border: "1px solid #1e293b", borderRadius: 6, padding: "6px 10px", overflow: "visible" },
   scoreInfoSectionTitle: { fontSize: 9, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 },
-  scoreInfoRow: { display: "flex", gap: 4, overflowX: "auto", paddingBottom: 4, scrollbarWidth: "none" },
-  scoreInfoCell: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minWidth: 40, width: 40, flex: "0 0 auto", padding: "2px 0" },
+  scoreInfoRow: { display: "flex", gap: 4, overflowX: "auto", paddingBottom: 6, paddingTop: 4, scrollbarWidth: "none" },
+  scoreInfoCell: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minWidth: 48, width: 48, flex: "0 0 auto", padding: "4px 0", overflow: "visible" },
   scoreInfoCellNumber: { fontSize: 9, color: "#64748b", fontWeight: 700, marginBottom: 2 },
   scoreInfoCellValue: { fontSize: 14, fontWeight: 800, color: "#22c55e" },
   lbRow: { display: "flex", alignItems: "center", gap: 12, padding: "14px 0", borderBottom: "1px solid #1e293b" },
@@ -3343,8 +3315,8 @@ const S = {
   otherPlayersTitle: { fontSize: 14, fontWeight: 700, color: "#f8fafc", marginBottom: 12, textTransform: "uppercase", letterSpacing: 0.5 },
   playerCard: { backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, padding: "12px", marginBottom: 12 },
   playerCardName: { fontSize: 12, fontWeight: 700, color: "#f8fafc", textTransform: "uppercase", letterSpacing: 0.5 },
-  playerScoresRow: { display: "flex", gap: 6, overflowX: "auto", paddingBottom: 4, scrollbarWidth: "none" },
-  playerHoleCell: { display: "flex", flexDirection: "column", alignItems: "center", minWidth: 36, flex: "0 0 auto" },
+  playerScoresRow: { display: "flex", gap: 6, overflowX: "auto", paddingBottom: 4, paddingTop: 4, scrollbarWidth: "none" },
+  playerHoleCell: { display: "flex", flexDirection: "column", alignItems: "center", minWidth: 44, flex: "0 0 auto", overflow: "visible" },
   playerHoleNumber: { fontSize: 8, color: "#64748b", fontWeight: 700, marginBottom: 2 },
   playerScoreLine: { display: "flex", alignItems: "center", gap: 2 },
   playerScoreLabel: { color: "#94a3b8", fontWeight: 600, fontSize: 9 },
