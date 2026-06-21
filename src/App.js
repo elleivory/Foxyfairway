@@ -343,6 +343,8 @@ function calcLeaderboard(players, scores, holes, gameType) {
         }).map((s) => s.player_id);
         
         const bankerIsWinner = winners.includes(bankerId);
+        const holeWinner = winners.length === 1 ? winners[0] : null;
+        const holeTied = winners.length !== 1 && winners.length > 0;
         let holeChange = 0;
         
         if (iAmBanker) {
@@ -377,7 +379,7 @@ function calcLeaderboard(players, scores, holes, gameType) {
           }
         }
         bankerTotal += holeChange;
-        bankerHoleData[hole.hole_number] = { bet: myS.bet || 0, effectiveBet: (myS.bet||0), iAmBanker, isWinner: winner === p.id, winnerId: winner, tied, holeChange, runningPot: bankerTotal, bankerId, doubled };
+        bankerHoleData[hole.hole_number] = { bet: myS.bet || 0, effectiveBet: (myS.bet||0), iAmBanker, isWinner: holeWinner === p.id, winnerId: holeWinner, tied: holeTied, holeChange, runningPot: bankerTotal, bankerId, doubled };
       });
       total = bankerTotal;
       holeScores.bankerHoleData = bankerHoleData;
@@ -2078,9 +2080,10 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
             return <span style={{ ...base, border: "1.5px solid #7f1d1d", color: "#7f1d1d", borderRadius: 2, boxShadow: "0 0 0 1px #fee2e2" }}>{score}</span>;
           };
           const nineTotal = (p, nine) => nine.reduce((sum, h) => { const s = scores.find((sc) => sc.player_id === p.id && sc.hole_number === h.hole_number); return sum + (s?.score || 0); }, 0);
-          const ninePar = (nine) => nine.reduce((sum, h) => sum + h.par, 0);
-          const tparStr = (val, par) => { const d = val - par; return d === 0 ? "E" : d > 0 ? "+" + d : "" + d; };
-          const tparColor = (val, par) => { const d = val - par; return d < 0 ? "#22c55e" : d > 0 ? "#ef4444" : "#64748b"; };
+          const nineParFull = (nine) => nine.reduce((sum, h) => sum + h.par, 0);
+          const ninePar = (p, nine) => nine.reduce((sum, h) => { const s = scores.find((sc) => sc.player_id === p.id && sc.hole_number === h.hole_number); return s?.score ? sum + h.par : sum; }, 0);
+          const tparStr = (val, par) => { if (par === 0) return "—"; const d = val - par; return d === 0 ? "E" : d > 0 ? "+" + d : "" + d; };
+          const tparColor = (val, par) => { if (par === 0) return "#64748b"; const d = val - par; return d < 0 ? "#22c55e" : d > 0 ? "#ef4444" : "#64748b"; };
 
           const cellStyle = { textAlign: "center", padding: "2px 0", borderRight: "1px solid #e8edf2", fontSize: 8, overflow: "hidden", whiteSpace: "nowrap" };
           const hdrStyle = { ...cellStyle, background: "#f1f5f9", fontWeight: 700, color: "#475569", fontSize: 7, textTransform: "uppercase" };
@@ -2118,7 +2121,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
                         <tr>
                           <td style={{ ...parStyle, textAlign: "left", paddingLeft: 4 }}>Par</td>
                           {front9.map((h) => <td key={h.hole_number} style={parStyle}>{h.par}</td>)}
-                          <td style={{ ...totStyle, borderRight: "none" }}>{ninePar(front9)}</td>
+                          <td style={{ ...totStyle, borderRight: "none" }}>{nineParFull(front9)}</td>
                         </tr>
                         <tr>
                           <td style={{ ...cellStyle, textAlign: "left", paddingLeft: 4, background: "#fff", fontSize: 7, color: "#64748b" }}></td>
@@ -2126,7 +2129,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
                             const s = scores.find((sc) => sc.player_id === player.id && sc.hole_number === h.hole_number);
                             return <td key={h.hole_number} style={{ ...cellStyle, background: "#fff", height: 20 }}>{shapeEl(s?.score, h.par)}</td>;
                           })}
-                          {(() => { const t = nineTotal(player, front9); const p = ninePar(front9); return <td style={{ ...totStyle, borderRight: "none", color: "#1e293b" }}>{t > 0 ? t : "—"}{t > 0 && <div style={{ fontSize: 6, fontWeight: 700, color: tparColor(t, p) }}>{tparStr(t, p)}</div>}</td>; })()}
+                          {(() => { const t = nineTotal(player, front9); return <td style={{ ...totStyle, borderRight: "none", color: "#1e293b" }}>{t > 0 ? t : "—"}</td>; })()}
                         </tr>
                       </tbody>
                     </table>
@@ -2152,7 +2155,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
                         <tr>
                           <td style={{ ...parStyle, textAlign: "left", paddingLeft: 4 }}>Par</td>
                           {back9.map((h) => <td key={h.hole_number} style={parStyle}>{h.par}</td>)}
-                          <td style={{ ...totStyle, borderRight: "none" }}>{ninePar(back9)}</td>
+                          <td style={{ ...totStyle, borderRight: "none" }}>{nineParFull(back9)}</td>
                         </tr>
                         <tr>
                           <td style={{ ...cellStyle, textAlign: "left", paddingLeft: 4, background: "#fff", fontSize: 7, color: "#64748b" }}></td>
@@ -2160,7 +2163,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
                             const s = scores.find((sc) => sc.player_id === player.id && sc.hole_number === h.hole_number);
                             return <td key={h.hole_number} style={{ ...cellStyle, background: "#fff", height: 20 }}>{shapeEl(s?.score, h.par)}</td>;
                           })}
-                          {(() => { const t = nineTotal(player, back9); const p = ninePar(back9); return <td style={{ ...totStyle, borderRight: "none", color: "#1e293b" }}>{t > 0 ? t : "—"}{t > 0 && <div style={{ fontSize: 6, fontWeight: 700, color: tparColor(t, p) }}>{tparStr(t, p)}</div>}</td>; })()}
+                          {(() => { const t = nineTotal(player, back9); return <td style={{ ...totStyle, borderRight: "none", color: "#1e293b" }}>{t > 0 ? t : "—"}</td>; })()}
                         </tr>
                       </tbody>
                     </table>
