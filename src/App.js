@@ -2385,6 +2385,13 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
         }
         if (holeNum < 18) {
           try { await dbSaveCurrentHole(round.id, holeNum + 1); } catch(e) { console.error(e); }
+          // Advance immediately - don't wait for polling loop
+          const next = holeNum + 1;
+          setActiveHole(next);
+          setTimeout(() => {
+            const pos = Math.max(0, (next - 1) * 48 - 120);
+            document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { el.scrollLeft = pos; });
+          }, 100);
         }
         // Update local scores with fresh data
         setAllScores(freshFromDB);
@@ -2443,7 +2450,39 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
     const updatedScores = [...allScores.filter((s) => !(s.player_id === player.id && s.hole_number === holeNum)), obj];
     setAllScores(updatedScores);
     try { await dbSaveScore(obj); } catch(e) { console.error(e); }
-    tryAdvanceHole(holeNum);
+
+    if (round.game_type === "banker") {
+      // Check if all players have now scored this hole and advance if so
+      const freshScores = await dbGetScores(round.id);
+      setAllScores(freshScores);
+      const allPlayersList = [...others, me];
+      const realHoleScores = freshScores.filter((s) => s.hole_number === holeNum && s.score > 0);
+      const allRealScored = allPlayersList.every((p) => realHoleScores.some((s) => s.player_id === p.id));
+      if (allRealScored && holeNum < 18) {
+        // Recalculate banker rotation
+        let lowest = Infinity, winner = null, tied = false;
+        realHoleScores.forEach((s) => {
+          const pl = allPlayersList.find((p) => p.id === s.player_id); if (!pl) return;
+          const hole = holes.find((h) => h.hole_number === holeNum);
+          const net = s.score - getHcpStrokes(pl.handicap, hole?.stroke_index || 1);
+          if (net < lowest) { lowest = net; winner = s.player_id; tied = false; }
+          else if (net === lowest) { tied = true; }
+        });
+        if (winner && !tied) {
+          setCurrentBankerId(winner);
+          try { await dbSaveCurrentBanker(round.id, winner); } catch(e) { console.error(e); }
+        }
+        try { await dbSaveCurrentHole(round.id, holeNum + 1); } catch(e) { console.error(e); }
+        const next = holeNum + 1;
+        setActiveHole(next);
+        setTimeout(() => {
+          const pos = Math.max(0, (next - 1) * 48 - 120);
+          document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { el.scrollLeft = pos; });
+        }, 100);
+      }
+    } else {
+      tryAdvanceHole(holeNum);
+    }
   };
 
   const hcpS = curHole ? getHcpStrokes(me.handicap, curHole.stroke_index) : 0;
