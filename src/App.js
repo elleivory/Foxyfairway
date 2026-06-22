@@ -2824,7 +2824,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                             setAllScores(updated);
                             await dbSendChat({ id: genId(), round_id: round.id, player_id: me.id, player_name: me.name, text: "🔥 " + me.name + " DOUBLED the bets on hole " + activeHole + "!", created_at: new Date().toISOString() });
                           }} style={{ width: "100%", backgroundColor: "#f59e0b", color: "#0f172a", border: "none", borderRadius: 10, padding: "13px", fontSize: 15, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", marginBottom: 8 }}>
-                            💥 Double All Bets — ${submittedBets.reduce((s,b)=>s+(b.bet||0),0)} → ${submittedBets.reduce((s,b)=>s+(b.bet||0),0) * 2}
+                            {"💥 Double All Bets — $" + submittedBets.reduce((s,b)=>s+(b.bet||0),0) + " → $" + submittedBets.reduce((s,b)=>s+(b.bet||0),0) * 2}
                           </button>
                         )}
                         {isDoubled && (
@@ -2920,7 +2920,8 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
             const nonBkrs = [...others, me].filter((p) => p.id !== tb);
             const betsInNow = allScores.filter((s) => s.hole_number === activeHole && s.player_id !== tb && s.bet > 0).length;
             const allBetsInNow = betsInNow >= nonBkrs.length && nonBkrs.length > 0;
-            const isLocked = round.game_type === "banker" && !iAmBkr && !myBetConfirmed;
+            const myBetConfirmedLocal = !!myBets[activeHole] || allScores.some((s) => s.player_id === me.id && s.hole_number === activeHole && s.bet > 0);
+            const isLocked = round.game_type === "banker" && !iAmBkr && !myBetConfirmedLocal;
             return (
               <div>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 2px 6px" }}>
