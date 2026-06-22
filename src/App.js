@@ -2696,7 +2696,8 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
             const doubledPot = originalPot * 2;
             const totalPot = isDoubled ? doubledPot : originalPot;
             const allBetsIn = uniqueBettors.length >= nonBankerPlayers.length && nonBankerPlayers.length > 0;
-            const myBetConfirmed = !!myBets[activeHole];
+            const allScoresIn = [...others, me].every((p) => allScores.some((s) => s.player_id === p.id && s.hole_number === activeHole && s.score > 0));
+            const myBetConfirmed = !!myBets[activeHole] || allScores.some((s) => s.player_id === me.id && s.hole_number === activeHole && s.bet > 0);
 
             return (
               <>
@@ -2739,9 +2740,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                     {[me, ...others].map((player) => {
                       const isBankerPlayer = player.id === thisBanker;
                       const isMe = player.id === me.id;
-                      const playerBet = isMe 
-                        ? (myBets[activeHole] && allScores.find((s) => s.player_id === me.id && s.hole_number === activeHole && s.bet > 0 && (s.banker_id === thisBanker || !s.banker_id))?.bet ? myBets[activeHole] : null)
-                        : allScores.find((s) => s.player_id === player.id && s.hole_number === activeHole && s.bet > 0 && (s.banker_id === thisBanker || !s.banker_id))?.bet;
+                      const playerBet = allScores.find((s) => s.player_id === player.id && s.hole_number === activeHole && s.bet > 0)?.bet;
                       const playerPending = isMe ? pendingBets[activeHole] : (guestPendingBets[player.id] || "");
                       const isGuest = player.name?.endsWith("(Guest)");
                       const canEdit = isMe || (isGuest && me.name === round.created_by);
@@ -2808,24 +2807,40 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                       );
                     })}
 
-                    {allBetsIn && allScores.filter((s) => s.hole_number === activeHole && s.score > 0).length >= [...others, me].length && (
-                      <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
-                        {!isDoubled && iAmBanker && (
+                    {/* All bets in - show double option BEFORE scoring is unlocked */}
+                    {allBetsIn && !allScoresIn && (
+                      <div style={{ marginTop: 10 }}>
+                        {iAmBanker && !isDoubled && (
                           <button onClick={async () => {
                             if (doubledHolesRef.current[activeHole]) return;
-                            if (!window.confirm("Double all bets on hole " + activeHole + "?")) return;
-                            originalPotRef.current = { ...originalPotRef.current, [activeHole]: originalPot };
+                            originalPotRef.current = { ...originalPotRef.current, [activeHole]: submittedBets.reduce((sum, s) => sum + (s.bet || 0), 0) };
                             doubledHolesRef.current = { ...doubledHolesRef.current, [activeHole]: true };
-                            const hScores = allScores.filter((s) => s.hole_number === activeHole && s.bet > 0);
-                            for (const s of hScores) {
+                            const freshBets = await dbGetScores(round.id);
+                            const holeBets = freshBets.filter((s) => s.hole_number === activeHole && s.bet > 0 && s.player_id !== thisBanker);
+                            for (const s of holeBets) {
                               await supabase.from("scores").update({ bet: s.bet * 2, doubled: true }).eq("player_id", s.player_id).eq("hole_number", s.hole_number).eq("round_id", s.round_id);
                             }
-                            setAllScores((prev) => prev.map((s) => s.hole_number === activeHole && s.bet > 0 ? { ...s, bet: s.bet * 2, doubled: true } : s));
+                            const updated = await dbGetScores(round.id);
+                            setAllScores(updated);
                             await dbSendChat({ id: genId(), round_id: round.id, player_id: me.id, player_name: me.name, text: "🔥 " + me.name + " DOUBLED the bets on hole " + activeHole + "!", created_at: new Date().toISOString() });
-                          }} style={{ flex: 1, backgroundColor: "#f59e0b22", color: "#f59e0b", border: "1.5px solid #f59e0b", borderRadius: 10, padding: "12px", fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
-                            💥 Double Bets
+                          }} style={{ width: "100%", backgroundColor: "#f59e0b", color: "#0f172a", border: "none", borderRadius: 10, padding: "13px", fontSize: 15, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", marginBottom: 8 }}>
+                            💥 Double All Bets — ${submittedBets.reduce((s,b)=>s+(b.bet||0),0)} → ${submittedBets.reduce((s,b)=>s+(b.bet||0),0) * 2}
                           </button>
                         )}
+                        {isDoubled && (
+                          <div style={{ backgroundColor: "#f59e0b22", border: "1px solid #f59e0b", borderRadius: 8, padding: "8px 12px", textAlign: "center", fontSize: 12, color: "#f59e0b", fontWeight: 700, marginBottom: 8 }}>
+                            🔥 DOUBLED — All bets x2
+                          </div>
+                        )}
+                        <div style={{ backgroundColor: "#022c22", border: "1px solid #22c55e", borderRadius: 8, padding: "8px 12px", textAlign: "center", fontSize: 13, color: "#22c55e", fontWeight: 700 }}>
+                          ⛳ {iAmBanker ? "Bets locked — enter scores below" : "Bets locked — enter your score below"}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* All scores in - Next Hole button, BANKER ONLY */}
+                    {allBetsIn && allScoresIn && iAmBanker && (
+                      <div style={{ marginTop: 10 }}>
                         <button onClick={async () => {
                           if (activeHole < 18) {
                             try { await dbSaveCurrentHole(round.id, activeHole + 1); } catch(e) { console.error(e); }
@@ -2836,9 +2851,14 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                               document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { el.scrollLeft = pos; });
                             }, 100);
                           } else { onViewDashboard(); }
-                        }} style={{ flex: 1, backgroundColor: "#22c55e", color: "#0f172a", border: "none", borderRadius: 10, padding: "12px", fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+                        }} style={{ width: "100%", backgroundColor: "#22c55e", color: "#0f172a", border: "none", borderRadius: 10, padding: "13px", fontSize: 15, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
                           {activeHole < 18 ? "Next Hole →" : "Finish Round"}
                         </button>
+                      </div>
+                    )}
+                    {allBetsIn && allScoresIn && !iAmBanker && (
+                      <div style={{ marginTop: 10, backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 8, padding: "8px 12px", textAlign: "center", fontSize: 12, color: "#64748b" }}>
+                        ⏳ Waiting for banker to advance to next hole...
                       </div>
                     )}
                   </div>
@@ -2900,7 +2920,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
             const nonBkrs = [...others, me].filter((p) => p.id !== tb);
             const betsInNow = allScores.filter((s) => s.hole_number === activeHole && s.player_id !== tb && s.bet > 0).length;
             const allBetsInNow = betsInNow >= nonBkrs.length && nonBkrs.length > 0;
-            const isLocked = round.game_type === "banker" && (!iAmBkr ? !myBets[activeHole] : !allBetsInNow);
+            const isLocked = round.game_type === "banker" && !iAmBkr && !myBetConfirmed;
             return (
               <div>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 2px 6px" }}>
