@@ -355,38 +355,34 @@ function calcLeaderboard(players, scores, holes, gameType) {
         let holeChange = 0;
         
         if (iAmBanker) {
-          if (bankerIsWinner) {
-            allHScores.forEach((s) => {
-              if (s.player_id === p.id) return;
-              if (!winners.includes(s.player_id)) {
-                const bet = s.bet || allH.find((r) => r.player_id === s.player_id && r.bet > 0)?.bet || 0;
-                holeChange += bet;
-              }
-            });
-          } else {
-            allHScores.forEach((s) => {
-              if (s.player_id === p.id) return;
-              if (winners.includes(s.player_id)) {
-                const bet = s.bet || allH.find((r) => r.player_id === s.player_id && r.bet > 0)?.bet || 0;
-                holeChange -= bet;
-              }
-            });
-          }
+          // Compare banker against each non-banker player individually
+          allHScores.forEach((s) => {
+            if (s.player_id === p.id) return; // skip self
+            const pl = players.find((pl) => pl.id === s.player_id); if (!pl) return;
+            const theirNet = s.score - getHcpStrokes(pl.handicap, hole.stroke_index);
+            const bet = s.bet || allH.find((r) => r.player_id === s.player_id && r.bet > 0)?.bet || 0;
+            if (bankerNet !== null && bet > 0) {
+              if (bankerNet < theirNet) holeChange += bet;  // banker beat this player
+              else if (bankerNet > theirNet) holeChange -= bet; // this player beat banker
+              // equal = tied = $0
+            }
+          });
         } else {
           const myBet = myS.bet || allH.find((s) => s.player_id === p.id && s.bet > 0)?.bet || 0;
-          if (myBet > 0) {
-            if (winners.includes(p.id) && !bankerIsWinner) {
-              // I beat the banker - collect my bet from banker
+          if (myBet > 0 && bankerNet !== null && myNet2 !== null) {
+            if (myNet2 < bankerNet) {
+              // I beat the banker - collect my bet
               holeChange += myBet;
-            } else if (bankerIsWinner && !winners.includes(p.id)) {
-              // Banker beat me - pay my bet to banker
+            } else if (myNet2 > bankerNet) {
+              // Banker beat me - pay my bet
               holeChange -= myBet;
             }
-            // If I tied with banker or tied with others but banker also won = $0
+            // myNet2 === bankerNet means tied with banker = $0
           }
         }
         bankerTotal += holeChange;
-        bankerHoleData[hole.hole_number] = { bet: myS.bet || 0, effectiveBet: (myS.bet||0), iAmBanker, isWinner: holeWinner === p.id, winnerId: holeWinner, tied: tiedWithBanker, holeChange, runningPot: bankerTotal, bankerId, doubled };
+        const iBeatedBanker = !iAmBanker && bankerNet !== null && myNet2 !== null && myNet2 < bankerNet;
+        bankerHoleData[hole.hole_number] = { bet: myS.bet || 0, effectiveBet: (myS.bet||0), iAmBanker, isWinner: iBeatedBanker, winnerId: holeWinner, tied: tiedWithBanker, holeChange, runningPot: bankerTotal, bankerId, doubled };
       });
       total = bankerTotal;
       holeScores.bankerHoleData = bankerHoleData;
@@ -3103,7 +3099,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
             const gHcpS = curHole ? getHcpStrokes(guest.handicap, curHole.stroke_index) : 0;
             const gScore = (guestScores[guest.id] || {})[activeHole] || allScores.find((s) => s.player_id === guest.id && s.hole_number === activeHole)?.score;
             return (
-              <div key={guest.id} style={{ marginBottom: 4 }}>
+              <div key={guest.id} style={{ marginBottom: 12, backgroundColor: "#0f2233", border: "1px solid #1e3a5f", borderRadius: 12, padding: "10px 12px" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 2px 6px" }}>
                   <span style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5 }}>{guest.name}{gHcpS > 0 ? " +" + gHcpS : ""}</span>
                   {gScore && <span style={{ fontSize: 12, fontWeight: 700, color: "#22c55e" }}>{gScore} {scoreLabel(gScore, curHole?.par)}</span>}
