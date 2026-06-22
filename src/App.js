@@ -2409,17 +2409,8 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
           setCurrentBankerId(winner);
           try { await dbSaveCurrentBanker(round.id, winner); } catch(e) { console.error(e); }
         }
-        if (holeNum < 18) {
-          try { await dbSaveCurrentHole(round.id, holeNum + 1); } catch(e) { console.error(e); }
-          // Advance immediately - don't wait for polling loop
-          const next = holeNum + 1;
-          setActiveHole(next);
-          setTimeout(() => {
-            const pos = Math.max(0, (next - 1) * 48 - 120);
-            document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { el.scrollLeft = pos; });
-          }, 100);
-        }
-        // Update local scores with fresh data
+        // Don't auto-advance in banker - banker needs chance to double first
+        // "Next Hole" button handles the advance
         setAllScores(freshFromDB);
       }
     }
@@ -2498,13 +2489,8 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
           setCurrentBankerId(winner);
           try { await dbSaveCurrentBanker(round.id, winner); } catch(e) { console.error(e); }
         }
-        try { await dbSaveCurrentHole(round.id, holeNum + 1); } catch(e) { console.error(e); }
-        const next = holeNum + 1;
-        setActiveHole(next);
-        setTimeout(() => {
-          const pos = Math.max(0, (next - 1) * 48 - 120);
-          document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { el.scrollLeft = pos; });
-        }, 100);
+        // Don't auto-advance - banker needs chance to double first
+        setAllScores(freshScores);
       }
     } else {
       tryAdvanceHole(holeNum);
@@ -2561,14 +2547,20 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
       let holeChange2 = 0;
       if (iAmBanker) {
         if (bankerIsWinner2) {
-          holeScores.forEach((s) => {
-            if (s.player_id === me.id || s.score === 0) return;
-            if (!winners2.includes(s.player_id)) { total += (s.bet || 0); holeChange2 += (s.bet || 0); }
+          allPlayers.forEach((pl) => {
+            if (pl.id === me.id) return;
+            const plScore = holeScores.find((s) => s.player_id === pl.id && s.score > 0);
+            if (!plScore || winners2.includes(pl.id)) return;
+            const bet = plScore.bet || allScores.find((s) => s.player_id === pl.id && s.hole_number === hole.hole_number && s.bet > 0)?.bet || 0;
+            total += bet; holeChange2 += bet;
           });
         } else {
-          holeScores.forEach((s) => {
-            if (s.player_id === me.id || s.score === 0) return;
-            if (winners2.includes(s.player_id)) { total -= (s.bet || 0); holeChange2 -= (s.bet || 0); }
+          allPlayers.forEach((pl) => {
+            if (pl.id === me.id) return;
+            const plScore = holeScores.find((s) => s.player_id === pl.id && s.score > 0);
+            if (!plScore || !winners2.includes(pl.id)) return;
+            const bet = plScore.bet || allScores.find((s) => s.player_id === pl.id && s.hole_number === hole.hole_number && s.bet > 0)?.bet || 0;
+            total -= bet; holeChange2 -= bet;
           });
         }
       } else {
@@ -2810,42 +2802,43 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                             <div style={{ flex: 1, fontSize: 11, color: "#475569" }}>—</div>
                           )}
 
-                          {/* Double button - active only for banker */}
-                          {isBankerPlayer && iAmBanker ? (
-                            isDoubled ? (
-                              <div style={{ fontSize: 11, color: "#f59e0b", fontWeight: 700, padding: "6px 8px" }}>🔥 Doubled</div>
-                            ) : allBetsIn ? (
-                              <button onClick={async () => {
-                                if (doubledHolesRef.current[activeHole]) return;
-                                if (!window.confirm("Double all bets on hole " + activeHole + "?")) return;
-                                originalPotRef.current = { ...originalPotRef.current, [activeHole]: originalPot };
-                                doubledHolesRef.current = { ...doubledHolesRef.current, [activeHole]: true };
-                                const hScores = allScores.filter((s) => s.hole_number === activeHole && s.bet > 0);
-                                for (const s of hScores) {
-                                  await supabase.from("scores").update({ bet: s.bet * 2, doubled: true }).eq("player_id", s.player_id).eq("hole_number", s.hole_number).eq("round_id", s.round_id);
-                                }
-                                setAllScores((prev) => prev.map((s) => s.hole_number === activeHole && s.bet > 0 ? { ...s, bet: s.bet * 2, doubled: true } : s));
-                                await dbSendChat({ id: genId(), round_id: round.id, player_id: me.id, player_name: me.name, text: "🔥 " + me.name + " DOUBLED the bets on hole " + activeHole + "!", created_at: new Date().toISOString() });
-                              }} style={{ backgroundColor: "#f59e0b22", color: "#f59e0b", border: "1px solid #f59e0b", borderRadius: 8, padding: "6px 10px", fontSize: 11, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>
-                                💥 Double
-                              </button>
-                            ) : (
-                              <button disabled style={{ backgroundColor: "transparent", color: "#1e3a5f", border: "1px solid #1e3a5f", borderRadius: 8, padding: "6px 10px", fontSize: 11, fontWeight: 800, cursor: "not-allowed", fontFamily: "inherit", flexShrink: 0 }}>
-                                💥 Double
-                              </button>
-                            )
-                          ) : (
-                            <button disabled style={{ backgroundColor: "transparent", color: "#1e293b", border: "1px solid #1e293b", borderRadius: 8, padding: "6px 10px", fontSize: 11, fontWeight: 800, cursor: "not-allowed", fontFamily: "inherit", flexShrink: 0 }}>
-                              💥 Double
-                            </button>
-                          )}
+                          {/* Doubled indicator */}
+                          {isDoubled && <div style={{ fontSize: 11, color: "#f59e0b", fontWeight: 700, flexShrink: 0 }}>🔥</div>}
                         </div>
                       );
                     })}
 
-                    {allBetsIn && (
-                      <div style={{ marginTop: 10, backgroundColor: "#022c22", border: "1px solid #22c55e", borderRadius: 8, padding: "8px 12px", textAlign: "center", fontSize: 13, color: "#22c55e", fontWeight: 700 }}>
-                        ⛳ All bets in — Enter your score below
+                    {allBetsIn && allScores.filter((s) => s.hole_number === activeHole && s.score > 0).length >= [...others, me].length && (
+                      <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
+                        {!isDoubled && iAmBanker && (
+                          <button onClick={async () => {
+                            if (doubledHolesRef.current[activeHole]) return;
+                            if (!window.confirm("Double all bets on hole " + activeHole + "?")) return;
+                            originalPotRef.current = { ...originalPotRef.current, [activeHole]: originalPot };
+                            doubledHolesRef.current = { ...doubledHolesRef.current, [activeHole]: true };
+                            const hScores = allScores.filter((s) => s.hole_number === activeHole && s.bet > 0);
+                            for (const s of hScores) {
+                              await supabase.from("scores").update({ bet: s.bet * 2, doubled: true }).eq("player_id", s.player_id).eq("hole_number", s.hole_number).eq("round_id", s.round_id);
+                            }
+                            setAllScores((prev) => prev.map((s) => s.hole_number === activeHole && s.bet > 0 ? { ...s, bet: s.bet * 2, doubled: true } : s));
+                            await dbSendChat({ id: genId(), round_id: round.id, player_id: me.id, player_name: me.name, text: "🔥 " + me.name + " DOUBLED the bets on hole " + activeHole + "!", created_at: new Date().toISOString() });
+                          }} style={{ flex: 1, backgroundColor: "#f59e0b22", color: "#f59e0b", border: "1.5px solid #f59e0b", borderRadius: 10, padding: "12px", fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+                            💥 Double Bets
+                          </button>
+                        )}
+                        <button onClick={async () => {
+                          if (activeHole < 18) {
+                            try { await dbSaveCurrentHole(round.id, activeHole + 1); } catch(e) { console.error(e); }
+                            const next = activeHole + 1;
+                            setActiveHole(next);
+                            setTimeout(() => {
+                              const pos = Math.max(0, (next - 1) * 48 - 120);
+                              document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { el.scrollLeft = pos; });
+                            }, 100);
+                          } else { onViewDashboard(); }
+                        }} style={{ flex: 1, backgroundColor: "#22c55e", color: "#0f172a", border: "none", borderRadius: 10, padding: "12px", fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+                          {activeHole < 18 ? "Next Hole →" : "Finish Round"}
+                        </button>
                       </div>
                     )}
                   </div>
