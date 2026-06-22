@@ -89,11 +89,11 @@ const DEFAULT_COURSES = [
     {hole_number:3,par:3,stroke_index:12},{hole_number:4,par:4,stroke_index:10},
     {hole_number:5,par:5,stroke_index:6},{hole_number:6,par:4,stroke_index:16},
     {hole_number:7,par:3,stroke_index:18},{hole_number:8,par:5,stroke_index:4},
-    {hole_number:9,par:4,stroke_index:8},{hole_number:10,par:4,stroke_index:9},
-    {hole_number:11,par:4,stroke_index:5},{hole_number:12,par:3,stroke_index:17},
-    {hole_number:13,par:4,stroke_index:11},{hole_number:14,par:4,stroke_index:15},
-    {hole_number:15,par:5,stroke_index:3},{hole_number:16,par:4,stroke_index:13},
-    {hole_number:17,par:3,stroke_index:1},{hole_number:18,par:5,stroke_index:7},
+    {hole_number:9,par:4,stroke_index:8},{hole_number:10,par:4,stroke_index:17},
+    {hole_number:11,par:4,stroke_index:11},{hole_number:12,par:3,stroke_index:3},
+    {hole_number:13,par:4,stroke_index:13},{hole_number:14,par:4,stroke_index:15},
+    {hole_number:15,par:5,stroke_index:9},{hole_number:16,par:4,stroke_index:7},
+    {hole_number:17,par:3,stroke_index:1},{hole_number:18,par:5,stroke_index:5},
   ]},
   { id: "alexandra-1", name: "Alexandra Golf Club", par: 72, holes: [
     {hole_number:1,par:4,stroke_index:5},{hole_number:2,par:4,stroke_index:11},
@@ -118,15 +118,15 @@ const DEFAULT_COURSES = [
     {hole_number:17,par:4,stroke_index:4},{hole_number:18,par:3,stroke_index:17},
   ]},
   { id: "queenstown-1", name: "Queenstown Golf Club", par: 72, holes: [
-    {hole_number:1,par:4,stroke_index:4},{hole_number:2,par:4,stroke_index:12},
-    {hole_number:3,par:3,stroke_index:16},{hole_number:4,par:4,stroke_index:6},
-    {hole_number:5,par:5,stroke_index:2},{hole_number:6,par:4,stroke_index:10},
-    {hole_number:7,par:3,stroke_index:18},{hole_number:8,par:5,stroke_index:8},
-    {hole_number:9,par:4,stroke_index:14},{hole_number:10,par:4,stroke_index:5},
-    {hole_number:11,par:4,stroke_index:11},{hole_number:12,par:3,stroke_index:17},
-    {hole_number:13,par:4,stroke_index:7},{hole_number:14,par:5,stroke_index:1},
-    {hole_number:15,par:4,stroke_index:9},{hole_number:16,par:4,stroke_index:15},
-    {hole_number:17,par:3,stroke_index:3},{hole_number:18,par:5,stroke_index:13},
+    {hole_number:1,par:4,stroke_index:13},{hole_number:2,par:4,stroke_index:11},
+    {hole_number:3,par:3,stroke_index:7},{hole_number:4,par:4,stroke_index:15},
+    {hole_number:5,par:5,stroke_index:5},{hole_number:6,par:4,stroke_index:1},
+    {hole_number:7,par:3,stroke_index:9},{hole_number:8,par:5,stroke_index:17},
+    {hole_number:9,par:4,stroke_index:3},{hole_number:10,par:4,stroke_index:14},
+    {hole_number:11,par:4,stroke_index:8},{hole_number:12,par:3,stroke_index:18},
+    {hole_number:13,par:4,stroke_index:2},{hole_number:14,par:5,stroke_index:12},
+    {hole_number:15,par:4,stroke_index:10},{hole_number:16,par:4,stroke_index:16},
+    {hole_number:17,par:3,stroke_index:4},{hole_number:18,par:5,stroke_index:6},
   ]},
   { id: "millbrook-remarkables", name: "Millbrook - Remarkables Course", par: 71, holes: [
     {hole_number:1,par:5,stroke_index:14},{hole_number:2,par:4,stroke_index:6},
@@ -140,15 +140,15 @@ const DEFAULT_COURSES = [
     {hole_number:17,par:4,stroke_index:5},{hole_number:18,par:4,stroke_index:3},
   ]},
   { id: "millbrook-coronet", name: "Millbrook - Coronet Course", par: 72, holes: [
-    {hole_number:1,par:4,stroke_index:8},{hole_number:2,par:4,stroke_index:4},
-    {hole_number:3,par:3,stroke_index:14},{hole_number:4,par:5,stroke_index:2},
-    {hole_number:5,par:4,stroke_index:12},{hole_number:6,par:5,stroke_index:6},
-    {hole_number:7,par:3,stroke_index:16},{hole_number:8,par:4,stroke_index:10},
+    {hole_number:1,par:5,stroke_index:14},{hole_number:2,par:3,stroke_index:6},
+    {hole_number:3,par:4,stroke_index:10},{hole_number:4,par:4,stroke_index:2},
+    {hole_number:5,par:4,stroke_index:16},{hole_number:6,par:4,stroke_index:4},
+    {hole_number:7,par:3,stroke_index:12},{hole_number:8,par:5,stroke_index:8},
     {hole_number:9,par:4,stroke_index:18},{hole_number:10,par:4,stroke_index:7},
     {hole_number:11,par:5,stroke_index:1},{hole_number:12,par:3,stroke_index:15},
     {hole_number:13,par:4,stroke_index:11},{hole_number:14,par:4,stroke_index:5},
     {hole_number:15,par:3,stroke_index:17},{hole_number:16,par:4,stroke_index:9},
-    {hole_number:17,par:5,stroke_index:3},{hole_number:18,par:4,stroke_index:13},
+    {hole_number:17,par:4,stroke_index:3},{hole_number:18,par:5,stroke_index:13},
   ]},
   // SINGAPORE ELITE PRIVATE COURSES
   { id: "sentosa-serapong", name: "Sentosa Golf Club (Serapong)", par: 72, holes: [
@@ -561,14 +561,26 @@ async function dbGetBanker(roundId) {
   return data || {};
 }
 
+// Device ID - unique per device, stored in localStorage forever
+function getDeviceId() {
+  let id = localStorage.getItem("ff_device_id");
+  if (!id) { id = genId(); localStorage.setItem("ff_device_id", id); }
+  return id;
+}
+
 async function dbSaveRoundHistory(entry) {
-  await supabase.from("saved_rounds").upsert({ id: entry.id, player_name: entry.createdBy, data: entry }, { onConflict: "id" });
+  await supabase.from("saved_rounds").upsert({ id: entry.id, player_name: entry.createdBy, device_id: getDeviceId(), data: entry }, { onConflict: "id" });
 }
 
 async function dbGetRoundHistory(playerName) {
+  const deviceId = getDeviceId();
   const { data } = await supabase.from("saved_rounds").select("*").order("created_at", { ascending: false });
   if (!data) return [];
-  return data.filter((r) => r.data?.players?.some((p) => p.name?.toLowerCase() === playerName?.toLowerCase())).map((r) => r.data);
+  // Filter by device ID first, fall back to name match for rounds saved before device ID was added
+  return data.filter((r) => {
+    if (r.device_id && r.device_id !== deviceId) return false;
+    return r.data?.players?.some((p) => p.name?.toLowerCase() === playerName?.toLowerCase());
+  }).map((r) => r.data);
 }
 
 async function dbGetBlockedPlayers() {
@@ -605,7 +617,11 @@ function getSavedRounds(playerName = null) {
     const saved = localStorage.getItem("ff_saved_rounds");
     const all = saved ? JSON.parse(saved) : [];
     if (!playerName) return all;
-    return all.filter((r) => r.players?.some((p) => p.name?.toLowerCase() === playerName.toLowerCase()));
+    const deviceId = getDeviceId();
+    return all.filter((r) => {
+      if (r.device_id && r.device_id !== deviceId) return false;
+      return r.players?.some((p) => p.name?.toLowerCase() === playerName.toLowerCase());
+    });
   } catch { return []; }
 }
 
@@ -625,6 +641,7 @@ async function saveRoundToHistory(round, players, scores, holes) {
     players,
     scores,
     savedAt: Date.now(),
+    device_id: getDeviceId(),
     date: new Date().toLocaleString("en-NZ", { day: "numeric", month: "long", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true }),
     createdBy: creator,
   };
@@ -2013,8 +2030,8 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
                     return (
                       <div key={hole.hole_number} style={{ minWidth: 40, backgroundColor: "#1e293b", borderRadius: 6, padding: "6px 4px", textAlign: "center", flexShrink: 0 }}>
                         <div style={{ fontSize: 9, color: "#475569", marginBottom: 2 }}>H{hole.hole_number}</div>
-                        <div style={{ fontSize: 11, fontWeight: 700, color }}>{hd.iAmBanker ? "🏦" : hd.isWinner ? "W" : hd.tied ? "T" : "L"}</div>
-                        <div style={{ fontSize: 10, color, fontWeight: 700 }}>{hd.holeChange !== 0 ? (hd.holeChange > 0 ? "+" : "") + "$" + hd.holeChange : ""}</div>
+                        <div style={{ fontSize: 11, fontWeight: 700, color }}>{hd.iAmBanker ? (hd.doubled ? "🏦🔥" : "🏦") : hd.isWinner ? "W" : hd.tied ? "T" : "L"}</div>
+                        <div style={{ fontSize: 10, color, fontWeight: 700 }}>{hd.holeChange !== 0 ? (hd.holeChange > 0 ? "+" : "") + "$" + hd.holeChange : ""}{hd.doubled && !hd.iAmBanker ? " 🔥" : ""}</div>
                       </div>
                     );
                   })}
@@ -3106,7 +3123,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                         }
                       } else if (round.game_type === "banker") {
                         const hd = bankerHoleMap[h.hole_number];
-                        if (hd) { thirdValue = hd.holeChange !== 0 ? (hd.holeChange > 0 ? "+$" : "-$") + Math.abs(hd.holeChange) : "T"; thirdColor = hd.holeChange > 0 ? "#22c55e" : hd.holeChange < 0 ? "#ef4444" : "#94a3b8"; }
+                        if (hd) { thirdValue = (hd.holeChange !== 0 ? (hd.holeChange > 0 ? "+$" : "-$") + Math.abs(hd.holeChange) : "T") + (hd.doubled ? " 🔥" : ""); thirdColor = hd.holeChange > 0 ? "#22c55e" : hd.holeChange < 0 ? "#ef4444" : "#94a3b8"; }
                       }
                     }
                     return (
