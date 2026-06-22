@@ -1947,6 +1947,9 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
   const [showComplete, setShowComplete] = useState(false);
   const [showAddGuest, setShowAddGuest] = useState(false);
   const [guestName, setGuestName] = useState(""), [guestHcp, setGuestHcp] = useState(""), [addingGuest, setAddingGuest] = useState(false);
+  const [editingPlayerId, setEditingPlayerId] = useState(null);
+  const [editPlayerName, setEditPlayerName] = useState("");
+  const [editPlayerHcp, setEditPlayerHcp] = useState("");
   const completeDismissedRef = useRef(false);
   const holes = round.holes || [];
 
@@ -2051,58 +2054,52 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
           lb.map((p, i) => {
             const isCreator = me?.name === round.created_by;
             const isMe = p.id === me?.id;
-            const [swipeOpen, setSwipeOpen] = React.useState(false);
-            const [editingPlayer, setEditingPlayer] = React.useState(false);
-            const [editName, setEditName] = React.useState(p.name);
-            const [editHcp, setEditHcp] = React.useState(p.handicap);
             return (
-              <div key={p.id} style={{ position: "relative", marginBottom: 4, overflow: "hidden", borderRadius: 12 }}>
-                {/* Action buttons revealed on swipe */}
-                {isCreator && !isMe && (
-                  <div style={{ position: "absolute", right: 0, top: 0, bottom: 0, display: "flex", alignItems: "center", gap: 4, padding: "0 8px", zIndex: 0 }}>
-                    <button onClick={async () => { setEditingPlayer(true); setSwipeOpen(false); }} style={{ backgroundColor: "#3b82f6", border: "none", borderRadius: 8, padding: "8px 12px", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Edit</button>
-                    <button onClick={async () => { if (!window.confirm("Remove " + p.name + " from this round?")) return; await supabase.from("players").delete().eq("id", p.id); refresh(); }} style={{ backgroundColor: "#ef4444", border: "none", borderRadius: 8, padding: "8px 12px", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Delete</button>
-                  </div>
-                )}
-                {/* Player row */}
-                <div
-                  onTouchStart={(e) => { if (!isCreator || isMe) return; e._startX = e.touches[0].clientX; }}
-                  onTouchEnd={(e) => { if (!isCreator || isMe) return; const dx = e.changedTouches[0].clientX - e._startX; if (dx < -40) setSwipeOpen(true); if (dx > 40) setSwipeOpen(false); }}
-                  style={{ ...S.lbRow, ...(isMe ? S.lbRowMe : {}), transform: swipeOpen ? "translateX(-110px)" : "translateX(0)", transition: "transform 0.2s ease", position: "relative", zIndex: 1 }}>
-                  <div style={{ ...S.lbPos, color: i === 0 ? "#f59e0b" : i === 1 ? "#94a3b8" : i === 2 ? "#cd7c2f" : "#475569" }}>{i + 1}</div>
-                  <div style={S.lbName}>{p.name}<span style={S.lbHcp}>HCP {p.handicap}</span></div>
-                  <div style={S.lbRight}>
-                    <div style={S.lbScore}>
-                      {round.game_type === "stableford" ? (p.total + " pts")
-                        : round.game_type === "matchplay" ? (p.total === 0 ? "0 pts" : p.total + (p.total === 1 ? " pt" : " pts"))
-                        : round.game_type === "banker" ? <span style={{ color: p.total > 0 ? "#22c55e" : p.total < 0 ? "#ef4444" : "#94a3b8", fontSize: 18, fontWeight: 800 }}>{p.total >= 0 ? "+$" : "-$"}{Math.abs(p.total)}</span>
-                        : <>
-                            <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 500 }}>Gross: {p.grossTotal || 0}{isHandicap ? "  Net: " + (p.netTotal || 0) : ""}</div>
-                            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                              <span style={{ fontSize: 14, fontWeight: 800, color: p.toPar < 0 ? "#22c55e" : p.toPar > 0 ? "#ef4444" : "#94a3b8" }}>{formatToPar(p.toPar)}</span>
-                              {isHandicap && <span style={{ fontSize: 14, fontWeight: 800, color: (p.toPar - parseInt(p.handicap||0)) < 0 ? "#22c55e" : (p.toPar - parseInt(p.handicap||0)) > 0 ? "#ef4444" : "#94a3b8" }}>{formatToPar(p.toPar - parseInt(p.handicap||0))}</span>}
-                            </div>
-                          </>}
-                    </div>
-                    <div style={S.lbHoles}>{p.holesPlayed}/18</div>
-                  </div>
+              <div key={p.id} style={{ ...S.lbRow, ...(isMe ? S.lbRowMe : {}) }}>
+                <div style={{ ...S.lbPos, color: i === 0 ? "#f59e0b" : i === 1 ? "#94a3b8" : i === 2 ? "#cd7c2f" : "#475569" }}>{i + 1}</div>
+                <div style={S.lbName}>{p.name}<span style={S.lbHcp}>HCP {p.handicap}</span>
+                  {isCreator && !isMe && <span onClick={() => { if (editingPlayerId === p.id) { setEditingPlayerId(null); } else { setEditingPlayerId(p.id); setEditPlayerName(p.name); setEditPlayerHcp(p.handicap); }}} style={{ marginLeft: 8, fontSize: 10, color: "#3b82f6", cursor: "pointer" }}>✏️</span>}
                 </div>
-                {/* Edit form */}
-                {editingPlayer && (
-                  <div style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: 14, marginTop: 4 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "#f8fafc", marginBottom: 10 }}>Edit {p.name}</div>
-                    <input style={{ ...S.input, marginBottom: 8 }} placeholder="Name" value={editName} onChange={(e) => setEditName(e.target.value)} />
-                    <input style={{ ...S.input, marginBottom: 10 }} type="number" placeholder="Handicap" value={editHcp} onChange={(e) => setEditHcp(e.target.value)} />
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <button onClick={async () => { await supabase.from("players").update({ name: editName, handicap: parseFloat(editHcp) || 0 }).eq("id", p.id); setEditingPlayer(false); refresh(); }} style={{ flex: 1, backgroundColor: "#22c55e", color: "#0f172a", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Save</button>
-                      <button onClick={() => setEditingPlayer(false)} style={{ flex: 1, backgroundColor: "transparent", color: "#64748b", border: "1px solid #334155", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
-                    </div>
+                <div style={S.lbRight}>
+                  <div style={S.lbScore}>
+                    {round.game_type === "stableford" ? (p.total + " pts")
+                      : round.game_type === "matchplay" ? (p.total === 0 ? "0 pts" : p.total + (p.total === 1 ? " pt" : " pts"))
+                      : round.game_type === "banker" ? <span style={{ color: p.total > 0 ? "#22c55e" : p.total < 0 ? "#ef4444" : "#94a3b8", fontSize: 18, fontWeight: 800 }}>{p.total >= 0 ? "+$" : "-$"}{Math.abs(p.total)}</span>
+                      : <>
+                          <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 500 }}>Gross: {p.grossTotal || 0}{isHandicap ? "  Net: " + (p.netTotal || 0) : ""}</div>
+                          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                            <span style={{ fontSize: 14, fontWeight: 800, color: p.toPar < 0 ? "#22c55e" : p.toPar > 0 ? "#ef4444" : "#94a3b8" }}>{formatToPar(p.toPar)}</span>
+                            {isHandicap && <span style={{ fontSize: 14, fontWeight: 800, color: (p.toPar - parseInt(p.handicap||0)) < 0 ? "#22c55e" : (p.toPar - parseInt(p.handicap||0)) > 0 ? "#ef4444" : "#94a3b8" }}>{formatToPar(p.toPar - parseInt(p.handicap||0))}</span>}
+                          </div>
+                        </>}
                   </div>
-                )}
+                  <div style={S.lbHoles}>{p.holesPlayed}/18</div>
+                  {isCreator && !isMe && (
+                    <button onClick={async () => { if (!window.confirm("Remove " + p.name + "?")) return; await supabase.from("players").delete().eq("id", p.id); refresh(); }}
+                      style={{ fontSize: 10, color: "#ef4444", background: "none", border: "none", cursor: "pointer", padding: "2px 4px", fontFamily: "inherit" }}>✕</button>
+                  )}
+                </div>
               </div>
             );
           })
         )}
+
+        {/* Edit player form */}
+        {editingPlayerId && (() => {
+          const ep = players.find((p) => p.id === editingPlayerId);
+          if (!ep) return null;
+          return (
+            <div style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: 14, marginBottom: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#f8fafc", marginBottom: 10 }}>Edit {ep.name}</div>
+              <input style={{ ...S.input, marginBottom: 8 }} placeholder="Name" value={editPlayerName} onChange={(e) => setEditPlayerName(e.target.value)} />
+              <input style={{ ...S.input, marginBottom: 10 }} type="number" placeholder="Handicap" value={editPlayerHcp} onChange={(e) => setEditPlayerHcp(e.target.value)} />
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={async () => { await supabase.from("players").update({ name: editPlayerName, handicap: parseFloat(editPlayerHcp) || 0 }).eq("id", ep.id); setEditingPlayerId(null); refresh(); }} style={{ flex: 1, backgroundColor: "#22c55e", color: "#0f172a", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Save</button>
+                <button onClick={() => setEditingPlayerId(null)} style={{ flex: 1, backgroundColor: "transparent", color: "#64748b", border: "1px solid #334155", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Banker hole breakdown */}
         {round.game_type === "banker" && lb.length > 0 && (
