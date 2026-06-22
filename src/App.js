@@ -1979,31 +1979,33 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
           <div style={{ marginTop: 24 }}>
             <h3 style={S.stepTitle}>Banker Story</h3>
             {/* Per hole banker result - who was banker and what they won */}
-            <div style={{ overflowX: "auto", marginBottom: 20 }}>
-              <div style={{ display: "flex", gap: 6 }}>
+            <div style={{ overflowX: "auto", marginBottom: 20, scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}>
+              <div style={{ display: "flex", gap: 6, minWidth: "max-content" }}>
                 {holes.map((hole) => {
                   const holeScores = scores.filter((s) => s.hole_number === hole.hole_number);
-                  const bankerId = holeScores[0]?.banker_id;
+                  const holeScoresReal = holeScores.filter((s) => s.score > 0);
+                  const bankerId = holeScores.find((s) => s.banker_id)?.banker_id;
                   const bankerPlayer = players.find((p) => p.id === bankerId);
-                  // Only show when ALL players have real scores
-                  const allScored = players.every((p) => holeScores.some((s) => s.player_id === p.id && s.score > 0));
+                  const allScored = players.every((p) => holeScoresReal.some((s) => s.player_id === p.id));
                   if (!allScored || !bankerPlayer) return (
-                    <div key={hole.hole_number} style={{ minWidth: 44, backgroundColor: "#1e293b", borderRadius: 8, padding: "8px 4px", textAlign: "center", flexShrink: 0 }}>
+                    <div key={hole.hole_number} style={{ minWidth: 52, backgroundColor: "#1e293b", borderRadius: 8, padding: "8px 4px", textAlign: "center", flexShrink: 0 }}>
                       <div style={{ fontSize: 9, color: "#475569", marginBottom: 4 }}>H{hole.hole_number}</div>
                       <div style={{ fontSize: 10, color: "#334155" }}>—</div>
                     </div>
                   );
-                  // Find winner
                   let lowest = Infinity, winner = null, tied = false;
-                  holeScores.forEach((s) => { const pl = players.find((p) => p.id === s.player_id); if (!pl) return; const net = s.score - getHcpStrokes(pl.handicap, hole.stroke_index); if (net < lowest) { lowest = net; winner = s.player_id; tied = false; } else if (net === lowest) tied = true; });
+                  holeScoresReal.forEach((s) => { const pl = players.find((p) => p.id === s.player_id); if (!pl) return; const net = s.score - getHcpStrokes(pl.handicap, hole.stroke_index); if (net < lowest) { lowest = net; winner = s.player_id; tied = false; } else if (net === lowest) tied = true; });
                   const bankerWon = winner === bankerId && !tied;
-                  const bankerBets = holeScores.filter((s) => s.player_id !== bankerId).reduce((sum, s) => sum + (s.bet || 0), 0);
+                  const doubled = holeScores.some((s) => s.doubled);
+                  const bankerBets = holeScores.filter((s) => s.player_id !== bankerId && s.bet > 0).reduce((sum, s) => sum + (s.bet || 0), 0);
+                  const color = bankerWon ? "#22c55e" : tied ? "#94a3b8" : "#ef4444";
                   return (
-                    <div key={hole.hole_number} style={{ minWidth: 52, backgroundColor: "#1e293b", borderRadius: 8, padding: "8px 4px", textAlign: "center", flexShrink: 0, border: "1px solid #334155" }}>
+                    <div key={hole.hole_number} style={{ minWidth: 52, backgroundColor: "#1e293b", borderRadius: 8, padding: "6px 4px", textAlign: "center", flexShrink: 0, border: "1px solid #334155" }}>
                       <div style={{ fontSize: 9, color: "#475569", marginBottom: 2 }}>H{hole.hole_number}</div>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", marginBottom: 2 }}>{bankerPlayer.name.split(" ")[0]}</div>
-                      <div style={{ fontSize: 11, fontWeight: 800, color: bankerWon ? "#22c55e" : tied ? "#94a3b8" : "#ef4444" }}>{tied ? "TIE" : bankerWon ? "WIN" : "LOSS"}</div>
-                      <div style={{ fontSize: 10, color: bankerWon ? "#22c55e" : tied ? "#94a3b8" : "#ef4444" }}>{tied ? "" : (bankerWon ? "+" : "-") + "$" + bankerBets}</div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", marginBottom: 1 }}>{bankerPlayer.name.split(" ")[0]}</div>
+                      <div style={{ fontSize: 12, fontWeight: 800 }}>{doubled ? "🏦🔥" : "🏦"}</div>
+                      <div style={{ fontSize: 11, fontWeight: 800, color }}>{tied ? "TIE" : bankerWon ? "WIN" : "LOSS"}</div>
+                      <div style={{ fontSize: 10, color, fontWeight: 700 }}>{tied ? "" : (bankerWon ? "+" : "-") + "$" + bankerBets}</div>
                     </div>
                   );
                 })}
@@ -2017,7 +2019,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
                   <div style={{ fontSize: 13, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 0.5 }}>{player.name}</div>
                   <div style={{ fontSize: 14, fontWeight: 800, color: player.total > 0 ? "#22c55e" : player.total < 0 ? "#ef4444" : "#94a3b8" }}>{player.total >= 0 ? "+$" : "-$"}{Math.abs(player.total)}</div>
                 </div>
-                <div style={{ display: "flex", gap: 4, overflowX: "auto", paddingBottom: 4 }}>
+                <div style={{ display: "flex", gap: 4, overflowX: "auto", paddingBottom: 4, scrollbarWidth: "none", WebkitOverflowScrolling: "touch", minWidth: 0 }}>
                   {holes.map((hole) => {
                     const hd = player.holeScores?.bankerHoleData?.[hole.hole_number];
                     if (!hd) return (
@@ -2028,10 +2030,13 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
                     );
                     const color = hd.holeChange > 0 ? "#22c55e" : hd.holeChange < 0 ? "#ef4444" : "#94a3b8";
                     return (
-                      <div key={hole.hole_number} style={{ minWidth: 40, backgroundColor: "#1e293b", borderRadius: 6, padding: "6px 4px", textAlign: "center", flexShrink: 0 }}>
+                      <div key={hole.hole_number} style={{ minWidth: 52, backgroundColor: "#1e293b", borderRadius: 6, padding: "6px 4px", textAlign: "center", flexShrink: 0 }}>
                         <div style={{ fontSize: 9, color: "#475569", marginBottom: 2 }}>H{hole.hole_number}</div>
-                        <div style={{ fontSize: 11, fontWeight: 700, color }}>{hd.iAmBanker ? (hd.doubled ? "🏦🔥" : "🏦") : hd.isWinner ? "W" : hd.tied ? "T" : "L"}</div>
-                        <div style={{ fontSize: 10, color, fontWeight: 700 }}>{hd.holeChange !== 0 ? (hd.holeChange > 0 ? "+" : "") + "$" + hd.holeChange : ""}{hd.doubled && !hd.iAmBanker ? " 🔥" : ""}</div>
+                        <div style={{ fontSize: 12, fontWeight: 800, color }}>
+                          {hd.iAmBanker ? (hd.doubled ? "🏦🔥" : "🏦") : hd.isWinner ? "W" : hd.tied ? "T" : "L"}
+                          {!hd.iAmBanker && hd.doubled ? " 🔥" : ""}
+                        </div>
+                        <div style={{ fontSize: 10, color, fontWeight: 700 }}>{hd.holeChange !== 0 ? (hd.holeChange > 0 ? "+" : "") + "$" + hd.holeChange : ""}</div>
                       </div>
                     );
                   })}
@@ -2691,10 +2696,10 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
             const nonBankerPlayers = [...others, me].filter((p) => p.id !== thisBanker);
             // Get bets - if thisBanker is null show all bets
             const submittedBets = thisBanker
-              ? allScores.filter((s) => s.hole_number === activeHole && s.player_id !== thisBanker && s.bet > 0 && (s.banker_id === thisBanker || !s.banker_id))
+              ? allScores.filter((s) => s.hole_number === activeHole && s.player_id !== thisBanker && s.bet > 0)
               : allScores.filter((s) => s.hole_number === activeHole && s.bet > 0);
             const uniqueBettors = [...new Set(submittedBets.map((s) => s.player_id))];
-            const isDoubled = doubledHolesRef.current[activeHole] === true || allScores.some((s) => s.hole_number === activeHole && s.doubled === true && (s.banker_id === thisBanker || !s.banker_id));
+            const isDoubled = doubledHolesRef.current[activeHole] === true || allScores.some((s) => s.hole_number === activeHole && s.doubled === true);
             const originalPot = originalPotRef.current[activeHole] || submittedBets.reduce((sum, s) => sum + (s.bet || 0), 0);
             const doubledPot = originalPot * 2;
             const totalPot = isDoubled ? doubledPot : originalPot;
