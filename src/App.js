@@ -498,7 +498,8 @@ async function dbSaveScore(obj) {
 
 async function dbGetCourses() {
   const { data } = await supabase.from("courses").select("*").order("name");
-  return data || [];
+  const deletedIds = getDeletedCourseIds();
+  return (data || []).filter((c) => !deletedIds.includes(c.id));
 }
 
 async function dbSaveCourse(course) {
@@ -952,13 +953,13 @@ function HomeScreen({ onCreateRound, onJoinRound, onAdminLogin, onRejoin, lastRo
 
   return (
     <div style={S.screen}>
+      <div style={{ position: "absolute", top: 12, left: 16, fontSize: 10, color: "#334155", fontWeight: 600 }}>v1.0.5</div>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 56, paddingBottom: 28 }}>
         <img src="/logo.png" alt="Foxy Fairways"
           style={{ width: 110, height: 110, borderRadius: 24, boxShadow: "0 8px 40px rgba(0,0,0,0.5)", marginBottom: 18 }}
           onError={(e) => { e.target.style.display = "none"; }} />
         <h1 style={{ fontSize: 34, fontWeight: 800, margin: 0, color: "#f8fafc", letterSpacing: "-0.5px" }}>Foxy Fairways</h1>
         <p style={{ fontSize: 14, color: "#475569", margin: "6px 0 0" }}>Live scoring for your round</p>
-
       </div>
       <div style={{ flex: 1, padding: "0 24px 40px", display: "flex", flexDirection: "column", gap: 10 }}>
         {lastRound && (() => {
@@ -978,16 +979,15 @@ function HomeScreen({ onCreateRound, onJoinRound, onAdminLogin, onRejoin, lastRo
         <div style={{ height: 1, backgroundColor: "#1e293b" }} />
         <button style={S.btnPrimary} onClick={onCreateRound}>Create a Round</button>
         <button style={{ ...S.btnSecondary, marginTop: 0, backgroundColor: "#1e293b", border: "1px solid #334155" }} onClick={onJoinRound}>Join a Round</button>
-        <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={onViewHistory} style={{ flex: 1, backgroundColor: "transparent", color: "#64748b", border: "1px solid #1e293b", borderRadius: 12, padding: "13px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+        <div style={{ marginTop: 6, display: "flex", gap: 10 }}>
+          <button onClick={onViewHistory} style={{ flex: 1, backgroundColor: "#1e293b", color: "#94a3b8", border: "1px solid #334155", borderRadius: 12, padding: "13px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
             Past Rounds{savedRounds.length > 0 ? " (" + savedRounds.length + ")" : ""}
           </button>
-          <button onClick={onViewTournaments} style={{ flex: 1, backgroundColor: "transparent", color: "#64748b", border: "1px solid #1e293b", borderRadius: 12, padding: "13px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+          <button onClick={onViewTournaments} style={{ flex: 1, backgroundColor: "#1e293b", color: "#94a3b8", border: "1px solid #334155", borderRadius: 12, padding: "13px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
             🏆 Tournaments
           </button>
         </div>
-        <button onClick={() => setShowShare(true)} style={{ backgroundColor: "transparent", color: "#64748b", border: "1px solid #1e293b", borderRadius: 12, padding: "13px", fontSize: 13, fontWeight: 600, cursor: "pointer", width: "100%", fontFamily: "inherit" }}>Share App</button>
-
+        <button onClick={() => setShowShare(true)} style={{ backgroundColor: "#1e293b", color: "#94a3b8", border: "1px solid #334155", borderRadius: 12, padding: "13px", fontSize: 13, fontWeight: 600, cursor: "pointer", width: "100%", fontFamily: "inherit" }}>Share App</button>
         <button style={{ background: "none", border: "none", color: "#334155", fontSize: 12, cursor: "pointer", padding: "8px 0 0", fontFamily: "inherit", textAlign: "center" }} onClick={onAdminLogin}>Admin</button>
       </div>
 
@@ -2009,7 +2009,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
             <QRCodeSVG value={window.location.origin + window.location.pathname + "?join=" + round.code} size={100} bgColor="#ffffff" fgColor="#0f172a" />
           </div>
           <div style={{ fontSize: 13, color: "#94a3b8" }}>Scan to join · Code: <span style={{ color: "#22c55e", fontWeight: 700, letterSpacing: 2 }}>{round.code}</span></div>
-          <button onClick={() => { navigator.clipboard.writeText(window.location.origin + window.location.pathname + "?join=" + round.code); }} style={{ marginTop: 10, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 12, fontWeight: 600, cursor: "pointer", padding: "8px 16px", fontFamily: "inherit" }}>🔗 Copy Game Link</button>
+          <button onClick={(e) => { navigator.clipboard.writeText(window.location.origin + window.location.pathname + "?join=" + round.code); const btn = e.target; btn.textContent = "✓ Copied!"; btn.style.color = "#22c55e"; btn.style.borderColor = "#22c55e"; setTimeout(() => { btn.textContent = "🔗 Copy Game Link"; btn.style.color = "#94a3b8"; btn.style.borderColor = "#334155"; }, 1500); }} style={{ marginTop: 10, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 12, fontWeight: 600, cursor: "pointer", padding: "8px 16px", fontFamily: "inherit" }}>🔗 Copy Game Link</button>
         </div>
         <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
           <button style={{ ...S.btnPrimary, flex: 1, fontSize: 17, marginBottom: 0 }} onClick={onViewScorecard}>⛳ Live Scoring</button>
@@ -2348,6 +2348,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
   const [myScores, setMyScores] = useState({}), [myBets, setMyBets] = useState({});
   const [allScores, setAllScores] = useState([]), [others, setOthers] = useState([]);
   const [guestScores, setGuestScores] = useState({}); // { [playerId]: { [holeNum]: score } }
+  const [guestCustomScores, setGuestCustomScores] = useState({}); // { [playerId]: string } for custom input
   const [overridePlayer, setOverridePlayer] = useState(null); // player id being overridden
   const [activeHole, setActiveHole] = useState(1);
   const [showChat, setShowChat] = useState(false);
@@ -3109,7 +3110,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                 </div>
                 <div style={S.scoreRow}>
                   {curHole && [curHole.par - 1, curHole.par, curHole.par + 1, curHole.par + 2, curHole.par + 3].map((s) => (
-                    <button key={s} onClick={() => saveGuestScore(guest, activeHole, s)}
+                    <button key={s} onClick={() => { saveGuestScore(guest, activeHole, s); setGuestCustomScores((prev) => ({ ...prev, [guest.id]: "" })); }}
                       style={{ ...S.scoreBtn,
                         backgroundColor: gScore === s ? "#22c55e" : "#ffffff",
                         color: "#0f172a",
@@ -3118,6 +3119,12 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                       <span style={{ ...S.scoreBtnLabel, color: gScore === s ? "#065f46" : "#475569" }}>{scoreLabel(s, curHole.par)}</span>
                     </button>
                   ))}
+                </div>
+                <div style={S.customScore}>
+                  <span style={S.customLabel}>Other score</span>
+                  <input style={S.customInput} type="number" min="1" max="15" placeholder="—"
+                    value={guestCustomScores[guest.id] || (gScore && ![curHole.par-1,curHole.par,curHole.par+1,curHole.par+2,curHole.par+3].includes(gScore) ? gScore : "")}
+                    onChange={(e) => { const v = parseInt(e.target.value); setGuestCustomScores((prev) => ({ ...prev, [guest.id]: e.target.value })); if (v >= 1 && v <= 15) saveGuestScore(guest, activeHole, v); }} />
                 </div>
               </div>
             );
