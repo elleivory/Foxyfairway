@@ -2791,7 +2791,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
           {/* Banker game - full banker UI */}
           {round.game_type === "banker" && (() => {
             const thisBanker = currentBankerId || initialBankerId;
-            const iAmBanker = thisBanker === me.id;
+            const iAmBanker = thisBanker === me.id || (bankerPlayer?.name?.endsWith("(Guest)") && me.name === round.created_by);
             const bankerPlayer = [...others, me].find((p) => p.id === thisBanker);
             const nonBankerPlayers = [...others, me].filter((p) => p.id !== thisBanker);
             // Get bets - if thisBanker is null show all bets
