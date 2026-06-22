@@ -2813,8 +2813,13 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                       const potTotal = submittedBets.reduce((s, b) => s + (b.bet || 0), 0);
                       const acceptBets = async () => {
                         betsAcceptedRef.current = { ...betsAcceptedRef.current, [activeHole]: true };
-                        // Save hole_pot on banker's record to signal all devices
-                        await supabase.from("scores").upsert({ player_id: thisBanker, hole_number: activeHole, round_id: round.id, score: 0, hole_pot: potTotal }, { onConflict: "player_id,hole_number,round_id" });
+                        // Update hole_pot on banker's existing record - don't overwrite score
+                        const bankerExisting = allScores.find((s) => s.player_id === thisBanker && s.hole_number === activeHole);
+                        if (bankerExisting) {
+                          await supabase.from("scores").update({ hole_pot: potTotal }).eq("player_id", thisBanker).eq("hole_number", activeHole).eq("round_id", round.id);
+                        } else {
+                          await supabase.from("scores").upsert({ player_id: thisBanker, hole_number: activeHole, round_id: round.id, score: 0, hole_pot: potTotal }, { onConflict: "player_id,hole_number,round_id" });
+                        }
                         const updated = await dbGetScores(round.id);
                         setAllScores(updated);
                       };
@@ -2832,8 +2837,13 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                             for (const s of holeBets) {
                               await supabase.from("scores").update({ bet: s.bet * 2, doubled: true }).eq("player_id", s.player_id).eq("hole_number", s.hole_number).eq("round_id", s.round_id);
                             }
-                            // Save hole_pot on banker record to unlock scoring on all devices
-                            await supabase.from("scores").upsert({ player_id: thisBanker, hole_number: activeHole, round_id: round.id, score: 0, hole_pot: potTotal * 2 }, { onConflict: "player_id,hole_number,round_id" });
+                            // Update hole_pot on banker record to unlock scoring - don't overwrite score
+                            const bankerExisting2 = allScores.find((s) => s.player_id === thisBanker && s.hole_number === activeHole);
+                            if (bankerExisting2) {
+                              await supabase.from("scores").update({ hole_pot: potTotal * 2 }).eq("player_id", thisBanker).eq("hole_number", activeHole).eq("round_id", round.id);
+                            } else {
+                              await supabase.from("scores").upsert({ player_id: thisBanker, hole_number: activeHole, round_id: round.id, score: 0, hole_pot: potTotal * 2 }, { onConflict: "player_id,hole_number,round_id" });
+                            }
                             const updated = await dbGetScores(round.id);
                             setAllScores(updated);
                             await dbSendChat({ id: genId(), round_id: round.id, player_id: me.id, player_name: me.name, text: "🔥 " + me.name + " DOUBLED on hole " + activeHole + "!", created_at: new Date().toISOString() });
