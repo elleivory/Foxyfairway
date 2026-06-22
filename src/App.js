@@ -1995,7 +1995,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
             <div style={{ fontSize: 15, fontWeight: 700, color: "#f8fafc" }}>{round.course_name}</div>
             <div style={{ fontSize: 11, color: "#64748b" }}>{GAME_TYPES[round.game_type]?.label}{round.use_handicap === false ? " · Scratch" : ""} · {me?.name} (HCP {me?.handicap})</div>
           </div>
-          <button onClick={() => setShowShare(true)} style={{ backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 11, fontWeight: 600, cursor: "pointer", padding: "8px 10px", fontFamily: "inherit", flexShrink: 0 }}>🔗</button>
+          <button onClick={() => setShowShare(true)} style={{ backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 11, fontWeight: 600, cursor: "pointer", padding: "8px 10px", fontFamily: "inherit", flexShrink: 0, opacity: 0 }} disabled>🔗</button>
         </div>
         <div style={{ display: "flex", gap: 8, padding: "0 16px 10px" }}>
           <button style={{ flex: 1, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 11, fontWeight: 600, cursor: "pointer", padding: "8px 4px", fontFamily: "inherit" }} onClick={() => { saveRoundToHistory(round, players, scores, holes); alert("Round saved!"); }}>💾 Save Round</button>
@@ -2009,6 +2009,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
             <QRCodeSVG value={window.location.origin + window.location.pathname + "?join=" + round.code} size={100} bgColor="#ffffff" fgColor="#0f172a" />
           </div>
           <div style={{ fontSize: 13, color: "#94a3b8" }}>Scan to join · Code: <span style={{ color: "#22c55e", fontWeight: 700, letterSpacing: 2 }}>{round.code}</span></div>
+          <button onClick={() => { navigator.clipboard.writeText(window.location.origin + window.location.pathname + "?join=" + round.code); }} style={{ marginTop: 10, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 12, fontWeight: 600, cursor: "pointer", padding: "8px 16px", fontFamily: "inherit" }}>🔗 Copy Game Link</button>
         </div>
         <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
           <button style={{ ...S.btnPrimary, flex: 1, fontSize: 17, marginBottom: 0 }} onClick={onViewScorecard}>⛳ Live Scoring</button>
@@ -2076,10 +2077,10 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <div style={S.lbHoles}>{p.holesPlayed}/18</div>
-                    {me?.name === round.created_by && p.id !== me?.id && !p.name?.endsWith("(Guest)") && (
+                    {me?.name === round.created_by && p.id !== me?.id && scores.filter(s => s.score > 0).length === 0 && (
                       <>
-                        <span onClick={() => { setEditingPlayerId(p.id); setEditPlayerName(p.name); setEditPlayerHcp(String(p.handicap)); }} style={{ fontSize: 12, cursor: "pointer", padding: "2px 4px" }}>✏️</span>
-                        <span onClick={async () => { if (!window.confirm("Remove " + p.name + "?")) return; await supabase.from("players").delete().eq("id", p.id); refresh(); }} style={{ fontSize: 12, cursor: "pointer", color: "#ef4444", padding: "2px 4px" }}>✕</span>
+                        <span onClick={() => { setEditingPlayerId(p.id); setEditPlayerName(p.name?.replace(" (Guest)", "") || p.name); setEditPlayerHcp(String(p.handicap)); }} style={{ fontSize: 12, cursor: "pointer", padding: "2px 4px" }}>✏️</span>
+                        <span onClick={async () => { await supabase.from("players").delete().eq("id", p.id); refresh(); }} style={{ fontSize: 12, cursor: "pointer", color: "#ef4444", padding: "2px 4px", fontWeight: 700, fontSize: 14 }}>✕</span>
                       </>
                     )}
                   </div>
@@ -2099,7 +2100,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
               <input style={{ ...S.input, marginBottom: 8 }} placeholder="Name" value={editPlayerName} onChange={(e) => setEditPlayerName(e.target.value)} />
               <input style={{ ...S.input, marginBottom: 10 }} type="number" placeholder="Handicap" value={editPlayerHcp} onChange={(e) => setEditPlayerHcp(e.target.value)} />
               <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={async () => { await supabase.from("players").update({ name: editPlayerName, handicap: parseFloat(editPlayerHcp) || 0 }).eq("id", ep.id); setEditingPlayerId(null); refresh(); }} style={{ flex: 1, backgroundColor: "#22c55e", color: "#0f172a", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Save</button>
+                <button onClick={async () => { const isGuest = ep.name?.endsWith("(Guest)"); const finalName = isGuest && !editPlayerName.endsWith("(Guest)") ? editPlayerName.trim() + " (Guest)" : editPlayerName.trim(); await supabase.from("players").update({ name: finalName, handicap: parseFloat(editPlayerHcp) || 0 }).eq("id", ep.id); setEditingPlayerId(null); refresh(); }} style={{ flex: 1, backgroundColor: "#22c55e", color: "#0f172a", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Save</button>
                 <button onClick={() => setEditingPlayerId(null)} style={{ flex: 1, backgroundColor: "transparent", color: "#64748b", border: "1px solid #334155", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
               </div>
             </div>
@@ -2228,11 +2229,11 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
             if (!score) return <span style={{ color: "#d1d5db", fontSize: 8 }}>—</span>;
             const diff = score - par;
             const base = { display: "inline-flex", alignItems: "center", justifyContent: "center", width: 16, height: 16, fontSize: 8, fontWeight: 800 };
-            if (diff <= -2) return <span style={{ ...base, borderRadius: "50%", border: "1.5px solid #f59e0b", color: "#f59e0b", boxShadow: "0 0 0 1px #fef3c7" }}>{score}</span>;
-            if (diff === -1) return <span style={{ ...base, borderRadius: "50%", border: "1.5px solid #22c55e", color: "#22c55e" }}>{score}</span>;
+            if (diff <= -2) return <span style={{ ...base, borderRadius: "50%", border: "1.5px solid #1e293b", color: "#0f172a", boxShadow: "0 0 0 1px #334155" }}>{score}</span>;
+            if (diff === -1) return <span style={{ ...base, borderRadius: "50%", border: "1.5px solid #1e293b", color: "#0f172a" }}>{score}</span>;
             if (diff === 0) return <span style={{ ...base, color: "#374151" }}>{score}</span>;
-            if (diff === 1) return <span style={{ ...base, border: "1.5px solid #ef4444", color: "#ef4444", borderRadius: 2 }}>{score}</span>;
-            return <span style={{ ...base, border: "1.5px solid #7f1d1d", color: "#7f1d1d", borderRadius: 2, boxShadow: "0 0 0 1px #fee2e2" }}>{score}</span>;
+            if (diff === 1) return <span style={{ ...base, border: "1.5px solid #1e293b", color: "#0f172a", borderRadius: 2 }}>{score}</span>;
+            return <span style={{ ...base, border: "1.5px solid #1e293b", color: "#0f172a", borderRadius: 2, boxShadow: "0 0 0 1px #334155" }}>{score}</span>;
           };
           const nineTotal = (p, nine) => nine.reduce((sum, h) => { const s = scores.find((sc) => sc.player_id === p.id && sc.hole_number === h.hole_number); return sum + (s?.score || 0); }, 0);
           const nineParFull = (nine) => nine.reduce((sum, h) => sum + h.par, 0);
@@ -3022,10 +3023,10 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                   {curHole && [curHole.par - 1, curHole.par, curHole.par + 1, curHole.par + 2, curHole.par + 3].map((s) => (
                     <button key={s} onClick={() => saveGuestScore(op, activeHole, s)}
                       style={{ minWidth: 46, height: 46, borderRadius: 10, border: "none", flexShrink: 0, fontFamily: "inherit", cursor: "pointer",
-                        backgroundColor: opScore === s ? scoreColour(s, curHole.par, opHcpS) : "#0a1e3a",
-                        color: opScore === s ? "#fff" : "#64748b", fontSize: 15, fontWeight: 700 }}>
+                        backgroundColor: opScore === s ? "#22c55e" : "#ffffff",
+                        color: "#0f172a", fontSize: 15, fontWeight: 700, boxShadow: "0 2px 4px rgba(0,0,0,0.3)" }}>
                       <div style={{ fontSize: 16, fontWeight: 800, lineHeight: 1 }}>{s}</div>
-                      <div style={{ fontSize: 8, fontWeight: 600, marginTop: 1 }}>{scoreLabel(s, curHole.par)}</div>
+                      <div style={{ fontSize: 8, fontWeight: 600, marginTop: 1, color: opScore === s ? "#065f46" : "#475569" }}>{scoreLabel(s, curHole.par)}</div>
                     </button>
                   ))}
                 </div>
@@ -3069,13 +3070,13 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                   {[curHole.par - 1, curHole.par, curHole.par + 1, curHole.par + 2, curHole.par + 3].map((s) => (
                     <button key={s} onClick={() => !isLocked && saveScore(activeHole, s)}
                       style={{ ...S.scoreBtn,
-                      backgroundColor: isLocked ? "#0f172a" : myScores[activeHole] === s ? scoreColour(s, curHole.par, hcpS) : "#1e293b",
-                      color: isLocked ? "#2d3f5a" : myScores[activeHole] === s ? "#fff" : "#64748b",
+                      backgroundColor: isLocked ? "#0f172a" : myScores[activeHole] === s ? "#22c55e" : "#ffffff",
+                      color: isLocked ? "#2d3f5a" : myScores[activeHole] === s ? "#0f172a" : "#0f172a",
                       border: "none", opacity: isLocked ? 0.4 : 1,
                       cursor: isLocked ? "not-allowed" : "pointer",
-                      boxShadow: !isLocked && myScores[activeHole] !== s ? "0 2px 4px rgba(0,0,0,0.3)" : "none" }}>
+                      boxShadow: !isLocked ? "0 2px 4px rgba(0,0,0,0.3)" : "none" }}>
                       <span style={S.scoreBtnNum}>{s}</span>
-                      <span style={S.scoreBtnLabel}>{scoreLabel(s, curHole.par)}</span>
+                      <span style={{ ...S.scoreBtnLabel, color: isLocked ? "#2d3f5a" : myScores[activeHole] === s ? "#065f46" : "#475569" }}>{scoreLabel(s, curHole.par)}</span>
                     </button>
                   ))}
                 </div>
@@ -3110,11 +3111,11 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                   {curHole && [curHole.par - 1, curHole.par, curHole.par + 1, curHole.par + 2, curHole.par + 3].map((s) => (
                     <button key={s} onClick={() => saveGuestScore(guest, activeHole, s)}
                       style={{ ...S.scoreBtn,
-                        backgroundColor: gScore === s ? scoreColour(s, curHole.par, gHcpS) : "#1e293b",
-                        color: gScore === s ? "#fff" : "#64748b",
-                        border: "none", boxShadow: gScore !== s ? "0 2px 4px rgba(0,0,0,0.3)" : "none" }}>
+                        backgroundColor: gScore === s ? "#22c55e" : "#ffffff",
+                        color: "#0f172a",
+                        border: "none", boxShadow: "0 2px 4px rgba(0,0,0,0.3)" }}>
                       <span style={S.scoreBtnNum}>{s}</span>
-                      <span style={S.scoreBtnLabel}>{scoreLabel(s, curHole.par)}</span>
+                      <span style={{ ...S.scoreBtnLabel, color: gScore === s ? "#065f46" : "#475569" }}>{scoreLabel(s, curHole.par)}</span>
                     </button>
                   ))}
                 </div>
