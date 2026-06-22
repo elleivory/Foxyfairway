@@ -2484,6 +2484,12 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
 
   const saveGuestScore = async (player, holeNum, score) => {
     if (score < 1 || score > 15) return;
+    // In banker mode, check bets have been accepted before allowing score entry
+    if (round.game_type === "banker") {
+      const thisBankerId = holeNum === 1 ? initialBankerId : currentBankerId;
+      const betsOpen = betsAcceptedRef.current[holeNum] || allScores.some((s) => s.player_id === thisBankerId && s.hole_number === holeNum && s.hole_pot > 0);
+      if (!betsOpen) return;
+    }
     setGuestScores((prev) => ({ ...prev, [player.id]: { ...(prev[player.id] || {}), [holeNum]: score } }));
     const obj = { player_id: player.id, hole_number: holeNum, score, round_id: round.id };
     const updatedScores = [...allScores.filter((s) => !(s.player_id === player.id && s.hole_number === holeNum)), obj];
@@ -2547,67 +2553,13 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
     });
     return myHolesWon;
   })();
-  // Direct calculation - most reliable, also build per-hole map
-  const bankerHoleMap = {};
-  const myBankerTotal = (() => {
-    if (!holes || !holes.length || !me) return 0;
-    let total = 0;
-    holes.forEach((hole) => {
-      const myG = myScores[hole.hole_number]; if (!myG) return;
-      const holeScores = allScores.filter((s) => s.hole_number === hole.hole_number);
-      // Only count when ALL players have REAL scores (score > 0, not placeholder bet records)
-      if (!allPlayers.every((p) => holeScores.some((s) => s.player_id === p.id && s.score > 0))) return;
-      const myScore = holeScores.find((s) => s.player_id === me.id);
-      const bankerId = myScore?.banker_id || holeScores[0]?.banker_id;
-      const doubled = holeScores.some((s) => s.doubled);
-      const iAmBanker = bankerId === me.id;
-      // Find lowest net and all winners
-      let lowest2 = Infinity;
-      holeScores.forEach((s) => {
-        const pl = allPlayers.find((p) => p.id === s.player_id); if (!pl || s.score === 0) return;
-        const net = s.score - getHcpStrokes(pl.handicap, hole.stroke_index);
-        if (net < lowest2) lowest2 = net;
-      });
-      const winners2 = holeScores.filter((s) => {
-        const pl = allPlayers.find((p) => p.id === s.player_id); if (!pl || s.score === 0) return false;
-        return (s.score - getHcpStrokes(pl.handicap, hole.stroke_index)) === lowest2;
-      }).map((s) => s.player_id);
-      const bankerIsWinner2 = winners2.includes(bankerId);
-      let holeChange2 = 0;
-      if (iAmBanker) {
-        if (bankerIsWinner2) {
-          allPlayers.forEach((pl) => {
-            if (pl.id === me.id) return;
-            const plScore = holeScores.find((s) => s.player_id === pl.id && s.score > 0);
-            if (!plScore || winners2.includes(pl.id)) return;
-            const bet = plScore.bet || allScores.find((s) => s.player_id === pl.id && s.hole_number === hole.hole_number && s.bet > 0)?.bet || 0;
-            total += bet; holeChange2 += bet;
-          });
-        } else {
-          allPlayers.forEach((pl) => {
-            if (pl.id === me.id) return;
-            const plScore = holeScores.find((s) => s.player_id === pl.id && s.score > 0);
-            if (!plScore || !winners2.includes(pl.id)) return;
-            const bet = plScore.bet || allScores.find((s) => s.player_id === pl.id && s.hole_number === hole.hole_number && s.bet > 0)?.bet || 0;
-            total -= bet; holeChange2 -= bet;
-          });
-        }
-      } else {
-        const myBet = myScore?.bet || allScores.find((s) => s.player_id === me.id && s.hole_number === hole.hole_number && s.bet > 0)?.bet || 0;
-        if (!myBet) return;
-        if (winners2.includes(me.id) && !bankerIsWinner2) { total += myBet; holeChange2 = myBet; }
-        else if (bankerIsWinner2 && !winners2.includes(me.id)) { total -= myBet; holeChange2 = -myBet; }
-      }
-      bankerHoleMap[hole.hole_number] = {
-        holeChange: holeChange2,
-        tied: winners2.length === allPlayers.length,
-        iAmBanker,
-        bankerId,
-        doubled: holeScores.some((s) => s.doubled)
-      };
-    });
-    return total;
-  })();
+  // Use calcLeaderboard for banker - same proven logic as dashboard
+  const scorecardLb = round.game_type === "banker" ? (() => {
+    try { return calcLeaderboard([...others, me], allScores, holes, "banker"); } catch(e) { return []; }
+  })() : [];
+  const myLbData = scorecardLb.find((p) => p.id === me.id);
+  const bankerHoleMap = myLbData?.holeScores?.bankerHoleData || {};
+  const myBankerTotal = myLbData?.total || 0;
 
   const RunningTotal = ({ value, label, color }) => (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minWidth: 48, paddingLeft: 8, borderLeft: "1px solid #334155", flexShrink: 0 }}>
@@ -2908,6 +2860,11 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
           {overridePlayer && (() => {
             const op = others.find((p) => p.id === overridePlayer);
             if (!op) return null;
+            if (round.game_type === "banker") {
+              const thisBankerNow = activeHole === 1 ? initialBankerId : currentBankerId;
+              const betsOpen = betsAcceptedRef.current[activeHole] || allScores.some((s) => s.player_id === thisBankerNow && s.hole_number === activeHole && s.hole_pot > 0);
+              if (!betsOpen) return null;
+            }
             const opHcpS = curHole ? getHcpStrokes(op.handicap, curHole.stroke_index) : 0;
             const opScore = allScores.find((s) => s.player_id === op.id && s.hole_number === activeHole)?.score;
             return (
@@ -2992,8 +2949,13 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
               onChange={(e) => e.target.value && saveScore(activeHole, parseInt(e.target.value))} />
           </div>
 
-          {/* Guest player score rows - only shown to round creator */}
+          {/* Guest player score rows - only shown to round creator AND only after banker accepts bets */}
           {me.name === round.created_by && others.filter((p) => p.name?.endsWith("(Guest)")).map((guest) => {
+            if (round.game_type === "banker") {
+              const thisBankerNow = activeHole === 1 ? initialBankerId : currentBankerId;
+              const betsOpen = betsAcceptedRef.current[activeHole] || allScores.some((s) => s.player_id === thisBankerNow && s.hole_number === activeHole && s.hole_pot > 0);
+              if (!betsOpen) return null;
+            }
             const gHcpS = curHole ? getHcpStrokes(guest.handicap, curHole.stroke_index) : 0;
             const gScore = (guestScores[guest.id] || {})[activeHole] || allScores.find((s) => s.player_id === guest.id && s.hole_number === activeHole)?.score;
             return (
@@ -3185,12 +3147,13 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                     }
                     return (
                       <div key={"me"+h.hole_number} style={{ minWidth: 44, flex: "0 0 auto", display: "flex", flexDirection: "column", alignItems: "center", overflow: "visible" }}>
-                        <div style={{ fontSize: 9, color: "#475569", height: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>{h.hole_number}</div>
-                        <div style={{ height: 28, display: "flex", alignItems: "center", justifyContent: "center", overflow: "visible" }}>
-                          {g ? <div style={{ ...shapeStyle(gs), fontSize: 11 }}>{gn}</div> : <div style={{ fontSize: 12, color: "#334155" }}>  </div>}
+                        <div style={{ fontSize: 8, color: "#94a3b8", height: 10, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>{h.hole_number}</div>
+                        <div style={{ fontSize: 7, color: "#475569", height: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>P{h.par}</div>
+                        <div style={{ height: 28, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#e2e8f0" }}>
+                          {g || <span style={{ color: "#334155" }}>—</span>}
                         </div>
-                        {isHandicap && <div style={{ height: 28, display: "flex", alignItems: "center", justifyContent: "center", overflow: "visible" }}>
-                          {g ? <div style={{ ...shapeStyle(ns), fontSize: 11 }}>{nn}</div> : <div style={{ fontSize: 12, color: "#334155" }}>  </div>}
+                        {isHandicap && <div style={{ height: 28, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#e2e8f0" }}>
+                          {g ? (g - hs) : <span style={{ color: "#334155" }}>—</span>}
                         </div>}
                         {(round.game_type === "stableford" || round.game_type === "matchplay" || round.game_type === "banker") && (
                           <div style={{ height: 20, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: thirdColor }}>{thirdValue}</div>
@@ -3255,7 +3218,6 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                           const allPlayers3 = [...others, me];
                           if (!allPlayers3.every((p) => holeScores.some((s) => s.player_id === p.id))) { thirdValue = "—"; thirdColor = "#475569"; }
                           else {
-                            // Find lowest net
                             let lowestNet3 = Infinity;
                             holeScores.forEach((s) => { const pl = allPlayers3.find((p) => p.id === s.player_id); if (!pl) return; const net = s.score - getHcpStrokes(pl.handicap, h.stroke_index); if (net < lowestNet3) lowestNet3 = net; });
                             const hWinners3 = holeScores.filter((s) => { const pl = allPlayers3.find((p) => p.id === s.player_id); if (!pl) return false; return (s.score - getHcpStrokes(pl.handicap, h.stroke_index)) === lowestNet3; }).map((s) => s.player_id);
@@ -3264,68 +3226,38 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                             else if (hWinners3.includes(player.id)) { thirdValue = "W"; thirdColor = "#22c55e"; }
                             else { thirdValue = "L"; thirdColor = "#ef4444"; }
                           }
-                        } else if (round.game_type === "banker") {
-                          const bet = sc?.bet || 0;
-                          const holeScores = allScores.filter((s) => s.hole_number === h.hole_number);
-                          let lowest = Infinity, winner = null;
-                          holeScores.forEach((s) => {
-                            const pl = [...others, me].find((p) => p.id === s.player_id); if (!pl) return;
-                            const net = s.score - getHcpStrokes(pl.handicap, h.stroke_index);
-                            if (net < lowest) { lowest = net; winner = s.player_id; }
-                          });
-                          thirdValue = (winner === player.id ? "W" : "L") + " $" + bet;
-                          thirdColor = winner === player.id ? "#22c55e" : "#ef4444";
                         }
                       }
+                      // Banker $ from scorecardLb
+                      const plLb = round.game_type === "banker" ? scorecardLb.find((p) => p.id === player.id) : null;
+                      const hd = plLb?.holeScores?.bankerHoleData?.[h.hole_number];
                       return (
                         <div key={player.id + h.hole_number} style={{ minWidth: 44, flex: "0 0 auto", display: "flex", flexDirection: "column", alignItems: "center", overflow: "visible" }}>
-                          <div style={{ fontSize: 9, color: "#475569", height: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>{h.hole_number}</div>
-                          <div style={{ height: 28, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            {g ? <div style={{ ...shapeStyle(gs), fontSize: 11 }}>{gn}</div> : <div style={{ fontSize: 12, color: "#334155" }}>—</div>}
+                          <div style={{ fontSize: 8, color: "#94a3b8", height: 10, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>{h.hole_number}</div>
+                          <div style={{ fontSize: 7, color: "#475569", height: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>P{h.par}</div>
+                          <div style={{ height: 28, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#e2e8f0" }}>
+                            {g || <span style={{ color: "#334155" }}>—</span>}
                           </div>
                           {isHandicap && (
-                          <div style={{ height: 28, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            {g ? <div style={{ ...shapeStyle(ns), fontSize: 11 }}>{nn}</div> : <div style={{ fontSize: 12, color: "#334155" }}>—</div>}
-                          </div>
+                            <div style={{ height: 28, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#e2e8f0" }}>
+                              {g ? (g - hs) : <span style={{ color: "#334155" }}>—</span>}
+                            </div>
                           )}
                           {(round.game_type === "stableford" || round.game_type === "matchplay") && (
                             <div style={{ height: 20, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: thirdColor }}>{thirdValue}</div>
                           )}
-                          {round.game_type === "banker" && (() => {
-                            const hScores = allScores.filter((s) => s.hole_number === h.hole_number);
-                            const allP5 = [...others, me];
-                            const allScored5 = allP5.every((p) => hScores.some((s) => s.player_id === p.id && s.score > 0));
-                            if (!allScored5) return <div style={{ height: 20 }} />;
-                            // Get bankerId from ANY score record that has it set
-                            const bankerId5 = hScores.find((s) => s.banker_id)?.banker_id || currentBankerId || initialBankerId;
-                            const doubled5 = hScores.some((s) => s.doubled);
-                            let low5 = Infinity, win5 = null, tie5 = false;
-                            hScores.forEach((s) => { const pl = allP5.find((p) => p.id === s.player_id); if (!pl || !s.score) return; const net = s.score - getHcpStrokes(pl.handicap, h.stroke_index); if (net < low5) { low5 = net; win5 = s.player_id; tie5 = false; } else if (net === low5) tie5 = true; });
-                            // Get bet from ANY record for this player this hole
-                            const pBet = allScores.find((s) => s.player_id === player.id && s.hole_number === h.hole_number && s.bet > 0)?.bet || 0;
-                            let pChange = 0;
-                            if (!tie5 && bankerId5) {
-                              if (player.id === bankerId5) {
-                                // Banker: sum all non-banker bets
-                                allScores.filter((s) => s.hole_number === h.hole_number && s.player_id !== bankerId5 && s.bet > 0).forEach((s) => { if (win5 === bankerId5) pChange += s.bet; else pChange -= s.bet; });
-                              } else {
-                                if (win5 === player.id && win5 !== bankerId5) pChange = pBet;
-                                else if (win5 === bankerId5) pChange = -pBet;
-                              }
-                            }
-                            const isWinner5 = win5 === player.id && !tie5;
-                            const isLoser5 = !tie5 && win5 !== player.id && (player.id === bankerId5 ? true : win5 === bankerId5);
-                            const pCol = isWinner5 ? "#22c55e" : isLoser5 ? "#ef4444" : "#94a3b8";
-                            const isBanker5 = player.id === bankerId5;
-                            return (
-                              <div style={{ height: 20, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-                                <div style={{ fontSize: 9, fontWeight: 700, color: pCol }}>{tie5 ? "T" : isWinner5 ? "W" : "L"}</div>
-                                <div style={{ fontSize: 8, color: pCol }}>{pChange !== 0 ? (pChange > 0 ? "+$" : "-$") + Math.abs(pChange) : ""}</div>
-                                {isBanker5 && <div style={{ fontSize: 7 }}>🏦</div>}
-                                {doubled5 && <div style={{ fontSize: 7 }}>🔥</div>}
-                              </div>
-                            );
-                          })()}
+                          {round.game_type === "banker" && (
+                            <div style={{ height: 20, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+                              {hd ? <>
+                                <div style={{ fontSize: 9, fontWeight: 700, color: hd.holeChange > 0 ? "#22c55e" : hd.holeChange < 0 ? "#ef4444" : "#94a3b8" }}>
+                                  {hd.iAmBanker ? "🏦" : hd.tied ? "T" : hd.isWinner ? "W" : "L"}{hd.doubled ? "🔥" : ""}
+                                </div>
+                                <div style={{ fontSize: 8, color: hd.holeChange > 0 ? "#22c55e" : hd.holeChange < 0 ? "#ef4444" : "#94a3b8" }}>
+                                  {hd.holeChange !== 0 ? (hd.holeChange > 0 ? "+$" : "-$") + Math.abs(hd.holeChange) : ""}
+                                </div>
+                              </> : <span style={{ color: "#334155" }}>—</span>}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -3362,31 +3294,8 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                     {round.game_type === "banker" && (
                       <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800 }}>
                         {(() => {
-                          // Same direct calc as myBankerTotal but for this player
-                          let total = 0;
-                          holes.forEach((hole) => {
-                            const pScore = ps.find((s) => s.hole_number === hole.hole_number); if (!pScore || !pScore.score) return;
-                            const holeScores = allScores.filter((s) => s.hole_number === hole.hole_number);
-                            const allP = [...others, me];
-                            if (!allP.every((p) => holeScores.some((s) => s.player_id === p.id && s.score > 0))) return;
-                            const bankerId = pScore.banker_id || holeScores[0]?.banker_id;
-                            const isBanker = bankerId === player.id;
-                            let lowest = Infinity;
-                            holeScores.forEach((s) => { const pl = allP.find((p) => p.id === s.player_id); if (!pl || !s.score) return; const net = s.score - getHcpStrokes(pl.handicap, hole.stroke_index); if (net < lowest) lowest = net; });
-                            const winners = holeScores.filter((s) => { const pl = allP.find((p) => p.id === s.player_id); if (!pl || !s.score) return false; return (s.score - getHcpStrokes(pl.handicap, hole.stroke_index)) === lowest; }).map((s) => s.player_id);
-                            const allTied = winners.length === allP.length;
-                            if (allTied) return;
-                            const bankerWon = winners.includes(bankerId);
-                            if (isBanker) {
-                              if (bankerWon) { holeScores.forEach((s) => { if (s.player_id === player.id || !s.score) return; if (!winners.includes(s.player_id)) total += (s.bet || 0); }); }
-                              else { holeScores.forEach((s) => { if (s.player_id === player.id || !s.score) return; if (winners.includes(s.player_id)) total -= (s.bet || 0); }); }
-                            } else {
-                              const bet = pScore.bet || 0;
-                              if (!bet) return;
-                              if (winners.includes(player.id) && !bankerWon) total += bet;
-                              else if (bankerWon && !winners.includes(player.id)) total -= bet;
-                            }
-                          });
+                          const plLb = scorecardLb.find((p) => p.id === player.id);
+                          const total = plLb?.total || 0;
                           return <span style={{ color: total > 0 ? "#22c55e" : total < 0 ? "#ef4444" : "#94a3b8" }}>{total >= 0 ? "+$" : "-$"}{Math.abs(total)}</span>;
                         })()}
                       </div>
