@@ -325,8 +325,9 @@ function calcLeaderboard(players, scores, holes, gameType) {
         const myS = scores.find((s) => s.player_id === p.id && s.hole_number === hole.hole_number);
         if (!myS) return;
         const allH = scores.filter((s) => s.hole_number === hole.hole_number);
-        if (!players.every((pl) => allH.some((s) => s.player_id === pl.id && s.score > 0))) return;
-        const bankerId = myS.banker_id || allH[0]?.banker_id;
+        const allHScores = allH.filter((s) => s.score > 0);
+        if (!players.every((pl) => allHScores.some((s) => s.player_id === pl.id))) return;
+        const bankerId = myS.banker_id || allH.find((s) => s.banker_id)?.banker_id;
         const doubled = allH.some((s) => s.doubled);
         const iAmBanker = bankerId === p.id;
         // Find lowest net score and all players at that score
@@ -349,24 +350,24 @@ function calcLeaderboard(players, scores, holes, gameType) {
         
         if (iAmBanker) {
           if (bankerIsWinner) {
-            // Banker won or tied for lead - collect from all losers
-            allH.forEach((s) => {
-              if (s.player_id === p.id || s.score === 0) return;
+            allHScores.forEach((s) => {
+              if (s.player_id === p.id) return;
               if (!winners.includes(s.player_id)) {
-                holeChange += (s.bet || 0);
+                const bet = s.bet || allH.find((r) => r.player_id === s.player_id && r.bet > 0)?.bet || 0;
+                holeChange += bet;
               }
             });
           } else {
-            // Banker lost - pay each winner their bet
-            allH.forEach((s) => {
-              if (s.player_id === p.id || s.score === 0) return;
+            allHScores.forEach((s) => {
+              if (s.player_id === p.id) return;
               if (winners.includes(s.player_id)) {
-                holeChange -= (s.bet || 0);
+                const bet = s.bet || allH.find((r) => r.player_id === s.player_id && r.bet > 0)?.bet || 0;
+                holeChange -= bet;
               }
             });
           }
         } else {
-          const myBet = (myS.bet || 0);
+          const myBet = myS.bet || allH.find((s) => s.player_id === p.id && s.bet > 0)?.bet || 0;
           if (myBet > 0) {
             if (winners.includes(p.id) && !bankerIsWinner) {
               // I beat the banker - collect my bet from banker
