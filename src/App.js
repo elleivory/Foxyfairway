@@ -949,7 +949,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onAdminLogin, onRejoin, lastRo
 
   return (
     <div style={S.screen}>
-      <div style={{ position: "absolute", top: 12, left: 16, fontSize: 10, color: "#334155", fontWeight: 600 }}>v1.0.7</div>
+      <div style={{ position: "absolute", top: 12, left: 16, fontSize: 10, color: "#334155", fontWeight: 600 }}>v1.0.8</div>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 56, paddingBottom: 28 }}>
         <img src="/logo.png" alt="Foxy Fairways"
           style={{ width: 110, height: 110, borderRadius: 24, boxShadow: "0 8px 40px rgba(0,0,0,0.5)", marginBottom: 18 }}
@@ -1222,6 +1222,30 @@ function AdminDashboardScreen({ onLogout }) {
         ) : (
           <div>
             <h3 style={S.stepTitle}>{editing.name}</h3>
+            {/* Live par totals and SI validator */}
+            {(() => {
+              const front = holes.slice(0, 9).reduce((s, h) => s + (parseInt(h.par) || 0), 0);
+              const back = holes.slice(9, 18).reduce((s, h) => s + (parseInt(h.par) || 0), 0);
+              const total = front + back;
+              const siVals = holes.map((h) => parseInt(h.stroke_index)).filter((v) => v > 0);
+              const siSet = new Set(siVals);
+              const siValid = siVals.length === 18 && siSet.size === 18 && siVals.reduce((s, v) => s + v, 0) === 171;
+              return (
+                <div style={{ backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 10, padding: "10px 14px", marginBottom: 14, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <div style={{ flex: 1, minWidth: 120 }}>
+                    <div style={{ fontSize: 10, color: "#64748b", marginBottom: 4 }}>Par Totals</div>
+                    <div style={{ display: "flex", gap: 12 }}>
+                      <span style={{ fontSize: 12, color: "#94a3b8" }}>F9: <strong style={{ color: "#f8fafc" }}>{front}</strong></span>
+                      <span style={{ fontSize: 12, color: "#94a3b8" }}>B9: <strong style={{ color: "#f8fafc" }}>{back}</strong></span>
+                      <span style={{ fontSize: 12, color: "#94a3b8" }}>Total: <strong style={{ color: "#22c55e" }}>{total}</strong></span>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: siValid ? "#22c55e" : "#ef4444" }}>
+                    {siValid ? "✅ SI Balanced" : "❌ Check SI values"}
+                  </div>
+                </div>
+              );
+            })()}
             <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
               {/* Front 9 */}
               <div style={{ flex: 1, backgroundColor: "#0f172a", border: "2px solid #334155", borderRadius: 10, padding: 12 }}>
@@ -1691,7 +1715,7 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
   }, []);
 
   const startNewCourse = () => {
-    const c = { id: genId(), name: newCourseName, par: 72, holes: Array.from({ length: 18 }, (_, i) => ({ hole_number: i + 1, par: 4, stroke_index: i + 1 })) };
+    const c = { id: genId(), name: newCourseName, par: 72, holes: Array.from({ length: 18 }, (_, i) => ({ hole_number: i + 1, par: "", stroke_index: "" })) };
     setCourseEditing(c); setCourseHoles(c.holes); setNewCourseName("");
   };
 
@@ -1764,37 +1788,30 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
             {courseEditing && (
               <div style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: 14, marginBottom: 14 }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: "#f8fafc", marginBottom: 12 }}>{courseEditing.name}</div>
-              <div style={{ marginBottom: 12 }}>
-                <label style={{ display: "block", fontSize: 12, color: "#64748b", marginBottom: 6 }}>📷 Import from scorecard photo</label>
-                <input type="file" accept="image/*" onChange={async (e) => {
-                  const file = e.target.files[0]; if (!file) return;
-                  const reader = new FileReader();
-                  reader.onload = async (ev) => {
-                    const base64 = ev.target.result.split(",")[1];
-                    try {
-                      const res = await fetch("https://api.anthropic.com/v1/messages", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          model: "claude-sonnet-4-6", max_tokens: 1000,
-                          messages: [{ role: "user", content: [
-                            { type: "image", source: { type: "base64", media_type: file.type, data: base64 } },
-                            { type: "text", text: "This is a golf scorecard. Extract the hole number, par, and stroke index for each hole. Return ONLY a JSON array like: [{\"hole_number\":1,\"par\":4,\"stroke_index\":7},{...}] for all 18 holes. No other text." }
-                          ]}]
-                        })
-                      });
-                      const data = await res.json();
-                      const text = data.content?.[0]?.text || "";
-                      const clean = text.replace(/```json|```/g, "").trim();
-                      const parsed = JSON.parse(clean);
-                      if (Array.isArray(parsed) && parsed.length === 18) {
-                        setCourseHoles(parsed);
-                      }
-                    } catch(err) { console.error("Photo import failed", err); alert("Could not read scorecard. Please enter manually."); }
-                  };
-                  reader.readAsDataURL(file);
-                }} style={{ width: "100%", backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 8, padding: "8px", color: "#94a3b8", fontSize: 12, fontFamily: "inherit", cursor: "pointer" }} />
-              </div>
+              {/* Live par totals */}
+              {(() => {
+                const front = courseHoles.slice(0, 9).reduce((s, h) => s + (parseInt(h.par) || 0), 0);
+                const back = courseHoles.slice(9, 18).reduce((s, h) => s + (parseInt(h.par) || 0), 0);
+                const total = front + back;
+                const siVals = courseHoles.map((h) => parseInt(h.stroke_index)).filter((v) => v > 0);
+                const siSet = new Set(siVals);
+                const siValid = siVals.length === 18 && siSet.size === 18 && siVals.reduce((s, v) => s + v, 0) === 171;
+                return (
+                  <div style={{ backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 10, padding: "10px 14px", marginBottom: 14, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                    <div style={{ flex: 1, minWidth: 120 }}>
+                      <div style={{ fontSize: 10, color: "#64748b", marginBottom: 4 }}>Par Totals</div>
+                      <div style={{ display: "flex", gap: 12 }}>
+                        <span style={{ fontSize: 12, color: "#94a3b8" }}>F9: <strong style={{ color: front > 0 ? "#f8fafc" : "#475569" }}>{front || "—"}</strong></span>
+                        <span style={{ fontSize: 12, color: "#94a3b8" }}>B9: <strong style={{ color: back > 0 ? "#f8fafc" : "#475569" }}>{back || "—"}</strong></span>
+                        <span style={{ fontSize: 12, color: "#94a3b8" }}>Total: <strong style={{ color: total > 0 ? "#22c55e" : "#475569" }}>{total || "—"}</strong></span>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: siValid ? "#22c55e" : "#ef4444" }}>
+                      {siValid ? "✅ SI Balanced" : "❌ Check SI values"}
+                    </div>
+                  </div>
+                );
+              })()}
                 <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
                   <div style={{ flex: 1, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, padding: 10 }}>
                     <div style={{ fontSize: 10, fontWeight: 800, color: "#22c55e", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8, textAlign: "center" }}>Front 9</div>
