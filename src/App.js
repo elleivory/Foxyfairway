@@ -949,7 +949,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onAdminLogin, onRejoin, lastRo
 
   return (
     <div style={S.screen}>
-      <div style={{ position: "absolute", top: 12, left: 16, fontSize: 10, color: "#334155", fontWeight: 600 }}>v1.0.5</div>
+      <div style={{ position: "absolute", top: 12, left: 16, fontSize: 10, color: "#334155", fontWeight: 600 }}>v1.0.7</div>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 56, paddingBottom: 28 }}>
         <img src="/logo.png" alt="Foxy Fairways"
           style={{ width: 110, height: 110, borderRadius: 24, boxShadow: "0 8px 40px rgba(0,0,0,0.5)", marginBottom: 18 }}
@@ -1230,8 +1230,16 @@ function AdminDashboardScreen({ onLogout }) {
                   <div key={hole.hole_number} style={{ ...S.holeEdit, marginBottom: 8 }}>
                     <div style={S.holeEditNum}>Hole {hole.hole_number}</div>
                     <div style={S.holeEditRow}>
-                      <div><label style={S.smallLabel}>Par</label><input style={S.smallInput} type="number" min="3" max="6" value={hole.par} onChange={(e) => updateHole(idx, "par", e.target.value)} /></div>
-                      <div><label style={S.smallLabel}>SI</label><input style={S.smallInput} type="number" min="1" max="18" value={hole.stroke_index} onChange={(e) => updateHole(idx, "stroke_index", e.target.value)} /></div>
+                      <div><label style={S.smallLabel}>Par</label>
+                        <select value={hole.par} onChange={(e) => updateHole(idx, "par", e.target.value)} style={{ ...S.smallInput, backgroundColor: hole.par ? "#22c55e" : "#1e293b", color: hole.par ? "#0f172a" : "#f8fafc", fontWeight: hole.par ? 700 : 400 }}>
+                          <option value="">-</option><option value="3">3</option><option value="4">4</option><option value="5">5</option>
+                        </select>
+                      </div>
+                      <div><label style={S.smallLabel}>SI</label>
+                        <select value={hole.stroke_index} onChange={(e) => updateHole(idx, "stroke_index", e.target.value)} style={{ ...S.smallInput, backgroundColor: hole.stroke_index ? "#22c55e" : "#1e293b", color: hole.stroke_index ? "#0f172a" : "#f8fafc", fontWeight: hole.stroke_index ? 700 : 400 }}>
+                          <option value="">-</option>{Array.from({length: 18}, (_, i) => <option key={i+1} value={i+1}>{i+1}</option>)}
+                        </select>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -1243,8 +1251,16 @@ function AdminDashboardScreen({ onLogout }) {
                   <div key={hole.hole_number} style={{ ...S.holeEdit, marginBottom: 8 }}>
                     <div style={S.holeEditNum}>Hole {hole.hole_number}</div>
                     <div style={S.holeEditRow}>
-                      <div><label style={S.smallLabel}>Par</label><input style={S.smallInput} type="number" min="3" max="6" value={hole.par} onChange={(e) => updateHole(idx + 9, "par", e.target.value)} /></div>
-                      <div><label style={S.smallLabel}>SI</label><input style={S.smallInput} type="number" min="1" max="18" value={hole.stroke_index} onChange={(e) => updateHole(idx + 9, "stroke_index", e.target.value)} /></div>
+                      <div><label style={S.smallLabel}>Par</label>
+                        <select value={hole.par} onChange={(e) => updateHole(idx + 9, "par", e.target.value)} style={{ ...S.smallInput, backgroundColor: hole.par ? "#22c55e" : "#1e293b", color: hole.par ? "#0f172a" : "#f8fafc", fontWeight: hole.par ? 700 : 400 }}>
+                          <option value="">-</option><option value="3">3</option><option value="4">4</option><option value="5">5</option>
+                        </select>
+                      </div>
+                      <div><label style={S.smallLabel}>SI</label>
+                        <select value={hole.stroke_index} onChange={(e) => updateHole(idx + 9, "stroke_index", e.target.value)} style={{ ...S.smallInput, backgroundColor: hole.stroke_index ? "#22c55e" : "#1e293b", color: hole.stroke_index ? "#0f172a" : "#f8fafc", fontWeight: hole.stroke_index ? 700 : 400 }}>
+                          <option value="">-</option>{Array.from({length: 18}, (_, i) => <option key={i+1} value={i+1}>{i+1}</option>)}
+                        </select>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -1748,14 +1764,59 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
             {courseEditing && (
               <div style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: 14, marginBottom: 14 }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: "#f8fafc", marginBottom: 12 }}>{courseEditing.name}</div>
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ display: "block", fontSize: 12, color: "#64748b", marginBottom: 6 }}>📷 Import from scorecard photo</label>
+                <input type="file" accept="image/*" onChange={async (e) => {
+                  const file = e.target.files[0]; if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = async (ev) => {
+                    const base64 = ev.target.result.split(",")[1];
+                    try {
+                      const res = await fetch("https://api.anthropic.com/v1/messages", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          model: "claude-sonnet-4-6", max_tokens: 1000,
+                          messages: [{ role: "user", content: [
+                            { type: "image", source: { type: "base64", media_type: file.type, data: base64 } },
+                            { type: "text", text: "This is a golf scorecard. Extract the hole number, par, and stroke index for each hole. Return ONLY a JSON array like: [{\"hole_number\":1,\"par\":4,\"stroke_index\":7},{...}] for all 18 holes. No other text." }
+                          ]}]
+                        })
+                      });
+                      const data = await res.json();
+                      const text = data.content?.[0]?.text || "";
+                      const clean = text.replace(/```json|```/g, "").trim();
+                      const parsed = JSON.parse(clean);
+                      if (Array.isArray(parsed) && parsed.length === 18) {
+                        setCourseHoles(parsed);
+                      }
+                    } catch(err) { console.error("Photo import failed", err); alert("Could not read scorecard. Please enter manually."); }
+                  };
+                  reader.readAsDataURL(file);
+                }} style={{ width: "100%", backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 8, padding: "8px", color: "#94a3b8", fontSize: 12, fontFamily: "inherit", cursor: "pointer" }} />
+              </div>
                 <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
                   <div style={{ flex: 1, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, padding: 10 }}>
                     <div style={{ fontSize: 10, fontWeight: 800, color: "#22c55e", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8, textAlign: "center" }}>Front 9</div>
                     {courseHoles.slice(0, 9).map((hole, idx) => (
                       <div key={hole.hole_number} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
                         <div style={{ fontSize: 10, color: "#64748b", width: 36 }}>H{hole.hole_number}</div>
-                        <div style={{ flex: 1 }}><div style={{ fontSize: 9, color: "#475569" }}>Par</div><input style={{ width: "100%", backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 6, padding: "4px 8px", color: "#f8fafc", fontSize: 12, fontFamily: "inherit" }} type="number" min="3" max="6" value={hole.par} onChange={(e) => updateCourseHole(idx, "par", e.target.value)} /></div>
-                        <div style={{ flex: 1 }}><div style={{ fontSize: 9, color: "#475569" }}>SI</div><input style={{ width: "100%", backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 6, padding: "4px 8px", color: "#f8fafc", fontSize: 12, fontFamily: "inherit" }} type="number" min="1" max="18" value={hole.stroke_index} onChange={(e) => updateCourseHole(idx, "stroke_index", e.target.value)} /></div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 9, color: "#475569" }}>Par</div>
+                          <select value={hole.par} onChange={(e) => updateCourseHole(idx, "par", e.target.value)} style={{ width: "100%", backgroundColor: hole.par ? "#22c55e" : "#1e293b", border: "1px solid #334155", borderRadius: 6, padding: "4px 8px", color: hole.par ? "#0f172a" : "#f8fafc", fontSize: 12, fontFamily: "inherit", fontWeight: hole.par ? 700 : 400 }}>
+                            <option value="">-</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                            <option value="5">5</option>
+                          </select>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 9, color: "#475569" }}>SI</div>
+                          <select value={hole.stroke_index} onChange={(e) => updateCourseHole(idx, "stroke_index", e.target.value)} style={{ width: "100%", backgroundColor: hole.stroke_index ? "#22c55e" : "#1e293b", border: "1px solid #334155", borderRadius: 6, padding: "4px 8px", color: hole.stroke_index ? "#0f172a" : "#f8fafc", fontSize: 12, fontFamily: "inherit", fontWeight: hole.stroke_index ? 700 : 400 }}>
+                            <option value="">-</option>
+                            {Array.from({length: 18}, (_, i) => <option key={i+1} value={i+1}>{i+1}</option>)}
+                          </select>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1764,8 +1825,22 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
                     {courseHoles.slice(9, 18).map((hole, idx) => (
                       <div key={hole.hole_number} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
                         <div style={{ fontSize: 10, color: "#64748b", width: 36 }}>H{hole.hole_number}</div>
-                        <div style={{ flex: 1 }}><div style={{ fontSize: 9, color: "#475569" }}>Par</div><input style={{ width: "100%", backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 6, padding: "4px 8px", color: "#f8fafc", fontSize: 12, fontFamily: "inherit" }} type="number" min="3" max="6" value={hole.par} onChange={(e) => updateCourseHole(idx + 9, "par", e.target.value)} /></div>
-                        <div style={{ flex: 1 }}><div style={{ fontSize: 9, color: "#475569" }}>SI</div><input style={{ width: "100%", backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 6, padding: "4px 8px", color: "#f8fafc", fontSize: 12, fontFamily: "inherit" }} type="number" min="1" max="18" value={hole.stroke_index} onChange={(e) => updateCourseHole(idx + 9, "stroke_index", e.target.value)} /></div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 9, color: "#475569" }}>Par</div>
+                          <select value={hole.par} onChange={(e) => updateCourseHole(idx + 9, "par", e.target.value)} style={{ width: "100%", backgroundColor: hole.par ? "#22c55e" : "#1e293b", border: "1px solid #334155", borderRadius: 6, padding: "4px 8px", color: hole.par ? "#0f172a" : "#f8fafc", fontSize: 12, fontFamily: "inherit", fontWeight: hole.par ? 700 : 400 }}>
+                            <option value="">-</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                            <option value="5">5</option>
+                          </select>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 9, color: "#475569" }}>SI</div>
+                          <select value={hole.stroke_index} onChange={(e) => updateCourseHole(idx + 9, "stroke_index", e.target.value)} style={{ width: "100%", backgroundColor: hole.stroke_index ? "#22c55e" : "#1e293b", border: "1px solid #334155", borderRadius: 6, padding: "4px 8px", color: hole.stroke_index ? "#0f172a" : "#f8fafc", fontSize: 12, fontFamily: "inherit", fontWeight: hole.stroke_index ? 700 : 400 }}>
+                            <option value="">-</option>
+                            {Array.from({length: 18}, (_, i) => <option key={i+1} value={i+1}>{i+1}</option>)}
+                          </select>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1783,7 +1858,7 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
                   <span style={S.courseIcon}>⛳</span>
                   <div style={{ flex: 1 }}>
                     <div style={S.courseName}>{c.name}</div>
-                    <div style={S.courseAddr}>18 holes · Par {c.par || (c.holes ? c.holes.reduce((s, h) => s + (h.par || 0), 0) : "—")}</div>
+                    <div style={S.courseAddr}>18 holes · Par {c.holes ? c.holes.reduce((s, h) => s + (h.par || 0), 0) : (c.par || "—")}</div>
                   </div>
                 </button>
               ))}
