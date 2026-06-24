@@ -962,9 +962,9 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
       <button onClick={onAdminLogin} style={{ position: "absolute", top: 10, right: 16, background: "none", border: "1px solid #1e293b", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", textTransform: "uppercase" }}>Admin</button>
 
       {/* Header */}
-      <div style={{ padding: "56px 24px 32px", textAlign: "center" }}>
+      <div style={{ padding: "calc(env(safe-area-inset-top, 44px) + 24px) 24px 32px", textAlign: "center" }}>
         <img src="/logo.png" alt="Foxy Fairways" style={{ width: 80, height: 80, borderRadius: 20, boxShadow: "0 8px 40px rgba(0,0,0,0.5)", marginBottom: 14, display: "block", margin: "0 auto 14px" }} onError={(e) => { e.target.style.display = "none"; }} />
-        <div style={{ fontSize: 38, fontWeight: 900, color: "#f8fafc", letterSpacing: "-1.5px", lineHeight: 1 }}>Foxy<span style={{ color: "#22c55e" }}>.</span></div>
+        <div style={{ fontSize: 34, fontWeight: 900, color: "#f8fafc", letterSpacing: "-1px", lineHeight: 1 }}>Foxy Fairways</div>
         <div style={{ fontSize: 11, color: "#334155", marginTop: 8, fontWeight: 600, letterSpacing: "2px", textTransform: "uppercase" }}>Golf Scoring</div>
       </div>
 
@@ -1462,7 +1462,7 @@ function SuperAdminScreen({ onLogout }) {
 // =============================================================================
 // CHAT PANEL (used inside ScorecardScreen)
 // =============================================================================
-function ChatPanel({ round, me, onClose }) {
+function ChatPanel({ round, me, onClose, isSpectator }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const bottomRef = useRef(null);
@@ -1517,18 +1517,19 @@ function ChatPanel({ round, me, onClose }) {
           })}
           <div ref={bottomRef} />
         </div>
-        {/* Quick reactions */}
-        <div style={{ display: "flex", gap: 6, padding: "8px 16px", borderTop: "1px solid #334155", flexShrink: 0 }}>
+        {/* Quick reactions - hidden for spectators */}
+        {!isSpectator && <div style={{ display: "flex", gap: 6, padding: "8px 16px", borderTop: "1px solid #334155", flexShrink: 0 }}>
           {QUICK_REACTIONS.map((emoji) => (
             <button key={emoji} onClick={() => send(emoji)} style={{ flex: 1, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, padding: "8px 0", fontSize: 18, cursor: "pointer" }}>{emoji}</button>
           ))}
-        </div>
-        {/* Input */}
-        <div style={{ display: "flex", gap: 8, padding: "8px 16px 32px", flexShrink: 0 }}>
+        </div>}
+        {/* Input - hidden for spectators */}
+        {!isSpectator && <div style={{ display: "flex", gap: 8, padding: "8px 16px 32px", flexShrink: 0 }}>
           <input style={{ flex: 1, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 20, padding: "10px 16px", color: "#f8fafc", fontSize: 14, outline: "none", fontFamily: "inherit" }}
             placeholder="Message..." value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send(input)} />
           <button onClick={() => send(input)} style={{ backgroundColor: "#22c55e", color: "#0f172a", border: "none", borderRadius: 20, padding: "10px 16px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Send</button>
-        </div>
+        </div>}
+        {isSpectator && <div style={{ padding: "10px 16px 32px", textAlign: "center", fontSize: 11, color: "#334155" }}>👀 Watching — join the round to chat</div>}
       </div>
     </div>
   );
@@ -1970,7 +1971,55 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
 // =============================================================================
 // JOIN ROUND
 // =============================================================================
-function JoinRoundScreen({ onBack, onJoined, onWatch, prefillCode }) {
+// WATCH ROUND SCREEN
+// =============================================================================
+function WatchRoundScreen({ onBack, onWatch, prefillCode }) {
+  const [code, setCode] = useState(prefillCode || "");
+  const [err, setErr] = useState(""), [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (prefillCode) {
+      (async () => {
+        setLoading(true);
+        try { const r = await dbGetRound(prefillCode); onWatch({ ...r, holes: getHolesForRound(r) }); }
+        catch { setErr("Round not found."); }
+        setLoading(false);
+      })();
+    }
+  }, [prefillCode]);
+
+  const findAndWatch = async () => {
+    if (!code) return;
+    setLoading(true); setErr("");
+    try {
+      const r = await dbGetRound(code);
+      onWatch({ ...r, holes: getHolesForRound(r) });
+    } catch { setErr("Round not found. Check the code and try again."); }
+    setLoading(false);
+  };
+
+  return (
+    <div style={S.screen}>
+      <div style={S.header}>
+        <button style={S.backBtn} onClick={onBack}>← Back</button>
+        <h2 style={S.headerTitle}>Watch a Round</h2><div />
+      </div>
+      <div style={S.content}>
+        <div style={S.stepWrap}>
+          <h3 style={S.stepTitle}>Enter round code</h3>
+          <p style={S.hint}>Ask the round creator for the 6-letter code.</p>
+          <input style={{ ...S.input, ...S.codeInput }} placeholder="ABC123" value={code}
+            onChange={(e) => setCode(e.target.value.toUpperCase())} maxLength={6} />
+          {err && <p style={S.error}>{err}</p>}
+          <button style={code.length >= 4 ? S.btnPrimary : S.btnDisabled} disabled={code.length < 4 || loading} onClick={findAndWatch}>{loading ? "Finding round..." : "👀 Watch Round"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
+function JoinRoundScreen({ onBack, onJoined, prefillCode }) {
   const profile2 = getPlayerProfile();
   const [code, setCode] = useState(prefillCode || ""), [name, setName] = useState(profile2.name || ""), [hcp, setHcp] = useState(profile2.handicap || ""), [team, setTeam] = useState("A");
   const [step, setStep] = useState(prefillCode ? 0 : 1), [round, setRound] = useState(null), [err, setErr] = useState(""), [loading, setLoading] = useState(false);
@@ -2048,12 +2097,6 @@ function JoinRoundScreen({ onBack, onJoined, onWatch, prefillCode }) {
             </>)}
             {err && <p style={S.error}>{err}</p>}
             <button style={name ? S.btnPrimary : S.btnDisabled} disabled={!name || loading} onClick={join}>{loading ? "Joining..." : "Join Round"}</button>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "16px 0 8px" }}>
-              <div style={{ flex: 1, height: 1, background: "#1e293b" }} />
-              <div style={{ fontSize: 10, color: "#334155", fontWeight: 600, textTransform: "uppercase", letterSpacing: "1px" }}>or</div>
-              <div style={{ flex: 1, height: 1, background: "#1e293b" }} />
-            </div>
-            <button onClick={() => onWatch(round)} style={{ width: "100%", backgroundColor: "transparent", color: "#64748b", border: "1px solid #1e293b", borderRadius: 14, padding: "14px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>👀 Watch this Round</button>
           </div>
         )}
       </div>
@@ -2064,7 +2107,7 @@ function JoinRoundScreen({ onBack, onJoined, onWatch, prefillCode }) {
 // =============================================================================
 // PLAYER DASHBOARD
 // =============================================================================
-function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
+function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator }) {
   const [players, setPlayers] = useState([]), [scores, setScores] = useState([]), [showShare, setShowShare] = useState(false);
   const [showComplete, setShowComplete] = useState(false);
   const [showAddGuest, setShowAddGuest] = useState(false);
@@ -2115,7 +2158,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
           <button onClick={() => setShowShare(true)} style={{ backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 11, fontWeight: 600, cursor: "pointer", padding: "8px 10px", fontFamily: "inherit", flexShrink: 0, opacity: 0 }} disabled>🔗</button>
         </div>
         <div style={{ display: "flex", gap: 8, padding: "0 16px 10px" }}>
-          <button style={{ flex: 1, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 11, fontWeight: 600, cursor: "pointer", padding: "8px 4px", fontFamily: "inherit" }} onClick={() => { saveRoundToHistory(round, players, scores, holes); alert("Round saved!"); }}>💾 Save Round</button>
+          {!isSpectator && <button style={{ flex: 1, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 11, fontWeight: 600, cursor: "pointer", padding: "8px 4px", fontFamily: "inherit" }} onClick={() => { saveRoundToHistory(round, players, scores, holes); alert("Round saved!"); }}>💾 Save Round</button>}
           <button style={{ flex: 1, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 11, fontWeight: 600, cursor: "pointer", padding: "8px 4px", fontFamily: "inherit" }} onClick={async () => { try { await exportScorecardPDF(round, players, scores, holes); } catch(e) { alert("Please allow popups to export scorecard"); } }}>📄 Scorecard</button>
         </div>
       </div>
@@ -2130,10 +2173,10 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
         </div>
         <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
           <button style={{ ...S.btnPrimary, flex: 1, fontSize: 17, marginBottom: 0 }} onClick={onViewScorecard}>⛳ Live Scoring</button>
-          {me?.name === round.created_by && <button onClick={() => setShowAddGuest(true)} style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, color: "#94a3b8", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", padding: "0 14px", flexShrink: 0 }}>+ Guest</button>}
+          {me?.name === round.created_by && !isSpectator && <button onClick={() => setShowAddGuest(true)} style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, color: "#94a3b8", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", padding: "0 14px", flexShrink: 0 }}>+ Guest</button>}
         </div>
 
-        {showAddGuest && (
+        {showAddGuest && !isSpectator && (
           <div style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 14, padding: 16, marginBottom: 16 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: "#f8fafc", marginBottom: 12 }}>Add Guest Player</div>
             <label style={S.label}>Name</label>
@@ -2263,7 +2306,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <div style={S.lbHoles}>{p.holesPlayed}/18</div>
-                    {me?.name === round.created_by && p.id !== me?.id && scores.filter(s => s.score > 0).length === 0 && (
+                    {!isSpectator && me?.name === round.created_by && p.id !== me?.id && scores.filter(s => s.score > 0).length === 0 && (
                       <>
                         <span onClick={() => { setEditingPlayerId(p.id); setEditPlayerName(p.name?.replace(" (Guest)", "") || p.name); setEditPlayerHcp(String(p.handicap)); }} style={{ fontSize: 12, cursor: "pointer", padding: "2px 4px" }}>✏️</span>
                         <span onClick={async () => { await supabase.from("players").delete().eq("id", p.id); refresh(); }} style={{ fontSize: 12, cursor: "pointer", color: "#ef4444", padding: "2px 4px", fontWeight: 700, fontSize: 14 }}>✕</span>
@@ -2277,7 +2320,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
         )}
 
         {/* Edit player form - outside map, no hooks in loops */}
-        {editingPlayerId && (() => {
+        {editingPlayerId && !isSpectator && (() => {
           const ep = players.find((p) => p.id === editingPlayerId);
           if (!ep) return null;
           return (
@@ -2528,7 +2571,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
 // =============================================================================
 // SCORECARD
 // =============================================================================
-function ScorecardScreen({ round, me, onViewDashboard }) {
+function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
   const isHandicap = round.use_handicap !== false && round.use_handicap !== "false" && round.use_handicap !== 0;
   const [myScores, setMyScores] = useState({}), [myBets, setMyBets] = useState({});
   const [allScores, setAllScores] = useState([]), [others, setOthers] = useState([]);
@@ -2900,7 +2943,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
           {unreadChat > 0 && <span style={{ position: "absolute", top: -6, right: -6, backgroundColor: "#ef4444", color: "#fff", borderRadius: "50%", width: 20, height: 20, fontSize: 10, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", animation: "pulse 1s infinite", boxShadow: "0 0 0 3px rgba(239,68,68,0.3)" }}>{unreadChat}</span>}
         </button>
       </div>
-      {showChat && <ChatPanel round={round} me={me} onClose={() => { setShowChat(false); setUnreadChat(0); }} />}
+      {showChat && <ChatPanel round={round} me={me} onClose={() => { setShowChat(false); setUnreadChat(0); }} isSpectator={isSpectator} />}
 
       {/* Hole nav - master scroll, drives all score rows */}
       <div style={{ backgroundColor: "#1e293b", borderBottom: "1px solid #334155", padding: "10px 16px" }}>
@@ -2981,8 +3024,8 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
             </div>
           </div>
 
-          {/* Banker game - full banker UI */}
-          {round.game_type === "banker" && (() => {
+          {/* Banker game - full banker UI - hidden for spectators */}
+          {round.game_type === "banker" && !isSpectator && (() => {
             const thisBanker = currentBankerId || initialBankerId;
             const bankerPlayer = [...others, me].find((p) => p.id === thisBanker);
             const iAmBanker = thisBanker === me.id || (bankerPlayer?.name?.endsWith("(Guest)") && me.name === round.created_by);
@@ -3189,7 +3232,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
           
 
                     <div style={{ position: "relative" }}>
-          {round.game_type === "banker" && (() => {
+          {!isSpectator && round.game_type === "banker" && (() => {
             const thisBankerNow = activeHole === 1 ? initialBankerId : currentBankerId;
             const iAmBankerNow2 = thisBankerNow === me.id;
             const nonBankers2 = [...others, me].filter((p) => p.id !== thisBankerNow);
@@ -3204,7 +3247,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
               </div>
             );
           })()}
-          {(() => {
+          {!isSpectator && (() => {
             // Banker lock logic
             const tb = activeHole === 1 ? initialBankerId : currentBankerId;
             const iAmBkr = tb === me.id;
@@ -3239,12 +3282,12 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
           })()}
           </div>
 
-          <div style={S.customScore}>
+          {!isSpectator && <div style={S.customScore}>
             <span style={S.customLabel}>Other score</span>
             <input style={S.customInput} type="number" min="1" max="15" placeholder="—"
               value={myScores[activeHole] && ![curHole.par-1,curHole.par,curHole.par+1,curHole.par+2,curHole.par+3].includes(myScores[activeHole]) ? myScores[activeHole] : ""}
               onChange={(e) => e.target.value && saveScore(activeHole, parseInt(e.target.value))} />
-          </div>
+          </div>}
 
           {/* Guest player score rows - only shown to round creator AND only after banker accepts bets */}
           {me.name === round.created_by && others.filter((p) => p.name?.endsWith("(Guest)")).map((guest) => {
@@ -3876,143 +3919,6 @@ function PastRoundsScreen({ onBack, onViewRound }) {
 }
 
 // =============================================================================
-// SPECTATOR SCREEN
-// =============================================================================
-function SpectatorScreen({ round, onBack }) {
-  const [players, setPlayers] = useState([]);
-  const [scores, setScores] = useState([]);
-  const holes = round.holes || [];
-
-  useEffect(() => {
-    const load = async () => {
-      const [p, s] = await Promise.all([dbGetPlayers(round.id), dbGetScores(round.id)]);
-      setPlayers(p); setScores(s);
-    };
-    load();
-    const t = setInterval(load, 5000);
-    return () => clearInterval(t);
-  }, [round.id]);
-
-  let lb = [];
-  try { lb = calcLeaderboard(players, scores, holes, round.game_type); } catch(e) { lb = []; }
-  if (lb.length === 0 && players.length > 0) lb = players.map((p) => ({ ...p, total: 0, toPar: 0, grossTotal: 0, holesPlayed: 0 }));
-
-  const holesPlayed = Math.max(0, ...players.map((p) => scores.filter((s) => s.player_id === p.id && s.score > 0).length));
-
-  return (
-    <div style={S.screen}>
-      <div style={{ backgroundColor: "#1e293b", borderBottom: "1px solid #334155", position: "sticky", top: 0, zIndex: 10 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 8px" }}>
-          <button style={S.backBtn} onClick={onBack}>← Back</button>
-          <div style={{ flex: 1, textAlign: "center" }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: "#f8fafc" }}>{round.course_name}</div>
-            <div style={{ fontSize: 11, color: "#64748b" }}>{GAME_TYPES[round.game_type]?.label}</div>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 4, backgroundColor: "#022c22", border: "1px solid #22c55e44", borderRadius: 20, padding: "4px 10px" }}>
-            <div style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: "#22c55e", animation: "pulse 1.5s infinite" }} />
-            <span style={{ fontSize: 10, color: "#22c55e", fontWeight: 700 }}>Live</span>
-          </div>
-        </div>
-      </div>
-
-      <div style={S.content}>
-        {/* Spectator banner */}
-        <div style={{ backgroundColor: "#1a1200", border: "1px solid #f59e0b33", borderRadius: 12, padding: "10px 14px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 18 }}>👀</span>
-          <div>
-            <div style={{ fontSize: 12, color: "#f59e0b", fontWeight: 700 }}>You're watching this round</div>
-            <div style={{ fontSize: 10, color: "#78716c", marginTop: 2 }}>Scores update every 5 seconds</div>
-          </div>
-        </div>
-
-        {/* Hole progress */}
-        <div style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: 14, marginBottom: 20 }}>
-          <div style={{ fontSize: 10, color: "#475569", fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 8 }}>Hole Progress</div>
-          <div style={{ display: "flex", gap: 4, overflowX: "auto", scrollbarWidth: "none" }}>
-            {holes.map((h) => {
-              const allScored = players.length > 0 && players.every((p) => scores.some((s) => s.player_id === p.id && s.hole_number === h.hole_number && s.score > 0));
-              const someScored = players.some((p) => scores.some((s) => s.player_id === p.id && s.hole_number === h.hole_number && s.score > 0));
-              return (
-                <div key={h.hole_number} style={{ minWidth: 28, height: 28, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, flexShrink: 0, backgroundColor: allScored ? "#022c22" : someScored ? "#1a1200" : "#1e293b", color: allScored ? "#22c55e" : someScored ? "#f59e0b" : "#334155", border: `1px solid ${allScored ? "#22c55e44" : someScored ? "#f59e0b44" : "#1e293b"}` }}>
-                  {h.hole_number}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Leaderboard */}
-        <h3 style={{ ...S.stepTitle, marginBottom: 12 }}>Leaderboard</h3>
-        {round.game_type === "matchplay_teams" ? (
-          ["A", "B"].map((tl) => {
-            const tc = tl === "A" ? "#22c55e" : "#3b82f6";
-            const tp = lb.filter((p) => p.team === tl);
-            const tt = tp[0]?.total || 0;
-            return (
-              <div key={tl} style={{ backgroundColor: tl === "A" ? "rgba(34,197,94,0.06)" : "rgba(59,130,246,0.06)", border: `1.5px solid ${tl === "A" ? "rgba(34,197,94,0.25)" : "rgba(59,130,246,0.25)"}`, borderRadius: 14, padding: 14, marginBottom: 10 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: tc, width: 28 }}>{tl}</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: "#f8fafc" }}>{tt} {tt === 1 ? "pt" : "pts"} won</div>
-                    <div style={{ fontSize: 11, color: "#94a3b8" }}>{tp.map((p) => p.name.replace(" (Guest)", "")).join(" & ")}</div>
-                  </div>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: tc }}>{tt} {tt === 1 ? "pt" : "pts"}</div>
-                </div>
-              </div>
-            );
-          })
-        ) : (
-          lb.map((p, i) => (
-            <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 0", borderBottom: "1px solid #1e293b" }}>
-              <div style={{ fontSize: 18, fontWeight: 800, width: 28, color: i === 0 ? "#f59e0b" : i === 1 ? "#94a3b8" : i === 2 ? "#cd7c2f" : "#475569" }}>{i + 1}</div>
-              <div style={{ flex: 1, fontSize: 15, fontWeight: 600, color: "#f8fafc" }}>{p.name}<span style={{ fontSize: 11, color: "#475569", fontWeight: 400, marginLeft: 6 }}>HCP {p.handicap}</span></div>
-              <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: 18, fontWeight: 800, color: round.game_type === "banker" ? (p.total > 0 ? "#22c55e" : p.total < 0 ? "#ef4444" : "#94a3b8") : (p.toPar < 0 ? "#22c55e" : p.toPar > 0 ? "#ef4444" : "#94a3b8") }}>
-                  {round.game_type === "stableford" ? p.total + " pts" : round.game_type === "banker" ? (p.total >= 0 ? "+$" : "-$") + Math.abs(p.total) : round.game_type === "matchplay" ? (p.total === 0 ? "0 pts" : p.total + (p.total === 1 ? " pt" : " pts")) : formatToPar(p.toPar)}
-                </div>
-                <div style={{ fontSize: 11, color: "#475569" }}>{p.holesPlayed}/18</div>
-              </div>
-            </div>
-          ))
-        )}
-
-        {/* Recent holes */}
-        {holes.filter((h) => players.every((p) => scores.some((s) => s.player_id === p.id && s.hole_number === h.hole_number && s.score > 0))).slice(-3).reverse().map((hole) => {
-          const holeScores = players.map((p) => ({ player: p, score: scores.find((s) => s.player_id === p.id && s.hole_number === hole.hole_number)?.score })).filter((x) => x.score);
-          return (
-            <div key={hole.hole_number} style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: 14, marginTop: 12 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#f8fafc" }}>Hole {hole.hole_number}</div>
-                <div style={{ fontSize: 11, color: "#475569" }}>Par {hole.par}</div>
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                {holeScores.map(({ player, score }) => {
-                  const diff = score - hole.par;
-                  const label = diff <= -2 ? "EAGLE" : diff === -1 ? "BIRDIE" : diff === 0 ? "PAR" : diff === 1 ? "BOGEY" : "+" + diff;
-                  const color = diff < 0 ? "#22c55e" : diff > 0 ? "#ef4444" : "#94a3b8";
-                  return (
-                    <div key={player.id} style={{ flex: 1, backgroundColor: "#0f172a", borderRadius: 8, padding: 8, textAlign: "center" }}>
-                      <div style={{ fontSize: 9, color: "#64748b", fontWeight: 600, textTransform: "uppercase", marginBottom: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{player.name.replace(" (Guest)", "")}</div>
-                      <div style={{ fontSize: 18, fontWeight: 800, color }}>{score}</div>
-                      <div style={{ fontSize: 8, color, marginTop: 2 }}>{label}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
-
-        <div style={{ marginTop: 24, padding: "16px", backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 14, textAlign: "center" }}>
-          <div style={{ fontSize: 13, color: "#475569", marginBottom: 4 }}>Watching · Code <span style={{ color: "#22c55e", fontWeight: 700, letterSpacing: 2 }}>{round.code}</span></div>
-          <div style={{ fontSize: 11, color: "#334155" }}>Open Foxy Fairways and tap Join to play</div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// =============================================================================
 // MAIN APP
 // =============================================================================
 export default function GolfApp() {
@@ -4048,8 +3954,9 @@ export default function GolfApp() {
       {screen === "home" && <HomeScreen onCreateRound={() => setScreen("create")} onJoinRound={() => setScreen("join")} onWatchRound={() => setScreen("watch")} onAdminLogin={() => setScreen("admin_login")} onRejoin={handleRejoin} lastRound={lastRound} savedRounds={savedRounds} onViewHistory={() => setScreen("history")} onViewTournaments={() => setScreen("tournaments")} />}
       {screen === "history" && <PastRoundsScreen onBack={() => setScreen("home")} onViewRound={(r) => { setViewingRound(r); setScreen("view_round"); }} />}
       {screen === "tournaments" && <TournamentScreen onBack={() => setScreen("home")} />}
-      {screen === "watch" && !spectatorRound && <JoinRoundScreen onBack={() => setScreen("home")} onJoined={(r, p) => { setRound(r); setMe(p); setJoinCode(null); setScreen("dashboard"); }} onWatch={(r) => { setSpectatorRound({ ...r, holes: getHolesForRound(r) }); setScreen("spectator"); }} prefillCode={joinCode} />}
-      {screen === "spectator" && spectatorRound && <SpectatorScreen round={spectatorRound} onBack={() => { setSpectatorRound(null); setScreen("home"); }} />}
+      {screen === "watch" && <WatchRoundScreen onBack={() => setScreen("home")} onWatch={(r) => { setSpectatorRound(r); setRound(r); setMe({ id: "spectator", name: "Spectator", handicap: 0 }); setScreen("dashboard_spectator"); }} prefillCode={joinCode} />}
+      {screen === "dashboard_spectator" && round && <PlayerDashboardScreen round={round} me={{ id: "spectator", name: "Spectator", handicap: 0 }} onViewScorecard={() => setScreen("scorecard_spectator")} onBack={() => { setScreen("home"); setRound(null); setSpectatorRound(null); }} isSpectator={true} />}
+      {screen === "scorecard_spectator" && round && <ScorecardScreen round={round} me={{ id: "spectator", name: "Spectator", handicap: 0 }} onViewDashboard={() => setScreen("dashboard_spectator")} isSpectator={true} />}
       {screen === "view_round" && viewingRound && (
         <div style={S.screen}>
           <div style={S.header}>
@@ -4143,7 +4050,7 @@ export default function GolfApp() {
       {screen === "admin" && adminLevel === "super" && <SuperAdminScreen onLogout={() => { localStorage.removeItem("ff_admin"); setScreen("home"); }} />}
       {screen === "admin" && adminLevel !== "super" && <AdminDashboardScreen onLogout={() => { localStorage.removeItem("ff_admin"); setScreen("home"); }} />}
       {screen === "create" && <CreateRoundScreen onBack={() => setScreen("home")} onRoundCreated={(r, p) => { setRound(r); setMe(p); setScreen("dashboard"); }} />}
-      {screen === "join" && <JoinRoundScreen onBack={() => { setJoinCode(null); setScreen("home"); }} onJoined={(r, p) => { setRound(r); setMe(p); setJoinCode(null); setScreen("dashboard"); }} onWatch={(r) => { setSpectatorRound({ ...r, holes: getHolesForRound(r) }); setScreen("spectator"); }} prefillCode={joinCode} />}
+      {screen === "join" && <JoinRoundScreen onBack={() => { setJoinCode(null); setScreen("home"); }} onJoined={(r, p) => { setRound(r); setMe(p); setJoinCode(null); setScreen("dashboard"); }} prefillCode={joinCode} />}
       {screen === "dashboard" && round && me && <PlayerDashboardScreen round={round} me={me} onViewScorecard={() => setScreen("scorecard")} onBack={() => { setScreen("home"); setRound(null); setMe(null); setLastRound(loadLastRound()); setSavedRounds(getSavedRounds()); }} />}
       {screen === "scorecard" && round && me && <ScorecardScreen round={round} me={me} onViewDashboard={() => setScreen("dashboard")} />}
     </div>
