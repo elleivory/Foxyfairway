@@ -663,6 +663,12 @@ async function saveRoundToHistory(round, players, scores, holes) {
   const updated = [entry, ...filtered].slice(0, 20); // keep last 20
   localStorage.setItem("ff_saved_rounds", JSON.stringify(updated));
   try { await dbSaveRoundHistory(entry); } catch(e) { console.log("Remote save failed", e); }
+  // Also refresh this round's data in any tournament it belongs to
+  const allTourneys = getTournaments();
+  allTourneys.forEach((t) => {
+    const existingR = t.rounds?.find((r) => r.id === round.id);
+    if (existingR) { addRoundToTournament(t.id, { ...existingR, players, scores, holes }); }
+  });
 }
 
 function deleteSavedRound(roundId) {
@@ -1585,11 +1591,77 @@ function RoundCompleteScreen({ round, players, scores, onSave, onDismiss }) {
 // =============================================================================
 // TOURNAMENT SCREEN
 // =============================================================================
+function RoundDetailScreen({ roundStub, onBack }) {
+  const [round, setRound] = useState(null);
+  const [players, setPlayers] = useState([]);
+  const [scores, setScores] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
+  const [viewingScorecard, setViewingScorecard] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const r = await dbGetRound(roundStub.code);
+        const fullRound = { ...r, holes: roundStub.holes || getHolesForRound(r) };
+        setRound(fullRound);
+        const [p, s] = await Promise.all([dbGetPlayers(r.id), dbGetScores(r.id)]);
+        setPlayers(p);
+        setScores(s);
+      } catch(e) {
+        setErr("Could not load round data. Check your connection.");
+      }
+      setLoading(false);
+    })();
+  }, [roundStub.code]);
+
+  if (loading) return (
+    <div style={S.screen}>
+      <div style={S.header}><button style={S.backBtn} onClick={onBack}>← Back</button><h2 style={S.headerTitle}>{roundStub.course_name}</h2><div /></div>
+      <div style={S.content}><div style={S.empty}>Loading round data...</div></div>
+    </div>
+  );
+
+  if (err || !round) return (
+    <div style={S.screen}>
+      <div style={S.header}><button style={S.backBtn} onClick={onBack}>← Back</button><h2 style={S.headerTitle}>{roundStub.course_name}</h2><div /></div>
+      <div style={S.content}><div style={S.empty}>{err || "Round not found."}</div></div>
+    </div>
+  );
+
+  if (viewingScorecard) {
+    return <ScorecardScreen round={round} me={{ id: "spectator", name: "Spectator", handicap: 0 }} onViewDashboard={() => setViewingScorecard(false)} isSpectator={true} />;
+  }
+
+  return <PlayerDashboardScreen round={round} me={{ id: "spectator", name: "Spectator", handicap: 0 }} onViewScorecard={() => setViewingScorecard(true)} onBack={onBack} isSpectator={true} />;
+}
+
 function TournamentScreen({ onBack }) {
   const [tournaments, setTournaments] = useState(getTournaments());
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
   const [viewing, setViewing] = useState(null);
+  const [viewingRound, setViewingRound] = useState(null);
+  const [viewingScorecardFromTournament, setViewingScorecardFromTournament] = useState(false);
+  const [liveRoundData, setLiveRoundData] = useState({}); // { [roundId]: { players, scores } }
+
+  // When a tournament is opened, fetch live player+score data for all its rounds from Supabase
+  useEffect(() => {
+    if (!viewing) return;
+    let cancelled = false;
+    (async () => {
+      const results = {};
+      await Promise.all(viewing.rounds.map(async (r) => {
+        try {
+          const [p, s] = await Promise.all([dbGetPlayers(r.id), dbGetScores(r.id)]);
+          if (!cancelled) results[r.id] = { players: p, scores: s };
+        } catch(e) {}
+      }));
+      if (!cancelled) setLiveRoundData(results);
+    })();
+    return () => { cancelled = true; };
+  }, [viewing?.id]);
 
   const create = () => {
     if (!newName.trim()) return;
@@ -1599,18 +1671,66 @@ function TournamentScreen({ onBack }) {
     setNewName(""); setCreating(false);
   };
 
+  if (viewingRound) {
+    return <RoundDetailScreen roundStub={viewingRound} onBack={() => setViewingRound(null)} />;
+  }
+
   if (viewing) {
-    const lb = {};
-    viewing.rounds.forEach((r) => {
-      r.players?.forEach((p) => {
-        if (!lb[p.name]) lb[p.name] = { name: p.name, handicap: p.handicap, rounds: 0, totalToPar: 0, totalGross: 0, totalPoints: 0 };
-        lb[p.name].rounds++;
-        const calc = calcLeaderboard(r.players, r.scores, r.holes, r.game_type);
-        const pData = calc.find((x) => x.name === p.name);
-        if (pData) { lb[p.name].totalToPar += pData.toPar || 0; lb[p.name].totalGross += pData.grossTotal || 0; lb[p.name].totalPoints += pData.total || 0; }
+    // Build per-game-type season aggregates using live Supabase data
+    const gameTypes = [...new Set(viewing.rounds.map((r) => r.game_type))];
+    const seasonStats = {};
+    gameTypes.forEach((gt) => {
+      const gtRounds = viewing.rounds.filter((r) => r.game_type === gt);
+      const playerMap = {};
+      gtRounds.forEach((r) => {
+        // Use live Supabase data if available, fall back to cached
+        const live = liveRoundData[r.id];
+        const players = live?.players || r.players;
+        const scores = live?.scores || r.scores;
+        if (!players?.length || !scores?.length) return;
+        try {
+          const lb = calcLeaderboard(players, scores, r.holes, gt);
+          lb.forEach((p) => {
+            if (!playerMap[p.name]) playerMap[p.name] = { name: p.name, rounds: 0, total: 0, toPar: 0, grossTotal: 0 };
+            playerMap[p.name].rounds++;
+            playerMap[p.name].total += p.total || 0;
+            playerMap[p.name].toPar += p.toPar || 0;
+            playerMap[p.name].grossTotal += p.grossTotal || 0;
+          });
+        } catch(e) {}
       });
+      const sorted = Object.values(playerMap).sort((a, b) => {
+        if (gt === "stableford" || gt === "matchplay" || gt === "matchplay_teams" || gt === "banker") return b.total - a.total;
+        return a.toPar - b.toPar;
+      });
+      seasonStats[gt] = { rounds: gtRounds.length, players: sorted };
     });
-    const sorted = Object.values(lb).sort((a, b) => a.totalToPar - b.totalToPar);
+
+    const gtLabel = { banker: "Banker", stableford: "Stableford", matchplay: "Match Play", matchplay_teams: "Team Best Ball", stroke: "Stroke Play" };
+    const gtIcon = { banker: "🏦", stableford: "⭐", matchplay: "🏌️", matchplay_teams: "👥", stroke: "⛳" };
+
+    const seasonMetricValue = (p, gt) => {
+      if (gt === "banker") return (p.total >= 0 ? "+" : "") + "$" + Math.abs(p.total);
+      if (gt === "stableford") return p.total + " pts";
+      if (gt === "matchplay" || gt === "matchplay_teams") return p.total + " holes";
+      return formatToPar(p.toPar);
+    };
+    const seasonMetricColor = (p, gt) => {
+      if (gt === "banker") return p.total > 0 ? "#22c55e" : p.total < 0 ? "#ef4444" : "#94a3b8";
+      if (gt === "stableford" || gt === "matchplay" || gt === "matchplay_teams") return "#22c55e";
+      return p.toPar < 0 ? "#22c55e" : p.toPar > 0 ? "#ef4444" : "#3b82f6";
+    };
+
+    const tileMetricValue = (p, gt) => {
+      if (gt === "banker") return (p.total >= 0 ? "+" : "") + "$" + Math.abs(p.total);
+      if (gt === "stableford") return p.total + " pts";
+      if (gt === "matchplay" || gt === "matchplay_teams") return p.total + " W";
+      return formatToPar(p.toPar);
+    };
+    const tileMetricColor = (p, gt) => {
+      if (gt === "banker") return p.total > 0 ? "#22c55e" : p.total < 0 ? "#ef4444" : "#94a3b8";
+      return gt === "stroke" ? (p.toPar < 0 ? "#22c55e" : p.toPar > 0 ? "#ef4444" : "#3b82f6") : "#22c55e";
+    };
 
     return (
       <div style={S.screen}>
@@ -1620,26 +1740,66 @@ function TournamentScreen({ onBack }) {
           <div style={{ fontSize: 12, color: "#64748b" }}>{viewing.rounds.length} rounds</div>
         </div>
         <div style={S.content}>
-          <h3 style={S.stepTitle}>Season Leaderboard</h3>
-          {sorted.length === 0 ? <div style={S.empty}>No rounds saved to this tournament yet.</div> : sorted.map((p, i) => (
-            <div key={p.name} style={{ ...S.lbRow, ...(i === 0 ? { backgroundColor: "#022c22", borderRadius: 10, padding: "14px 12px", margin: "0 -12px" } : {}) }}>
-              <div style={{ ...S.lbPos, color: i === 0 ? "#f59e0b" : i === 1 ? "#94a3b8" : i === 2 ? "#cd7c2f" : "#475569" }}>{i + 1}</div>
-              <div style={S.lbName}>{p.name}<span style={S.lbHcp}>HCP {p.handicap}</span></div>
-              <div style={S.lbRight}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: "#f8fafc" }}>{formatToPar(p.totalToPar)}</div>
-                <div style={{ fontSize: 11, color: "#475569" }}>{p.rounds} rounds</div>
-              </div>
-            </div>
-          ))}
 
-          <h3 style={{ ...S.stepTitle, marginTop: 24 }}>Rounds</h3>
-          {viewing.rounds.map((r) => (
-            <div key={r.id} style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 10, padding: "12px 14px", marginBottom: 8 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "#f8fafc" }}>{r.course_name}</div>
-              <div style={{ fontSize: 11, color: "#64748b" }}>{r.date} · {GAME_TYPES[r.game_type]?.label} · {r.players?.length || 0} players</div>
-              {r.createdBy && <div style={{ fontSize: 11, color: "#475569" }}>Created by {r.createdBy}</div>}
-            </div>
-          ))}
+          {/* Season Summaries per game type */}
+          {gameTypes.length === 0 && <div style={S.empty}>No rounds with data yet. Save rounds after playing to see season stats.</div>}
+          {gameTypes.map((gt) => {
+            const stats = seasonStats[gt];
+            if (!stats?.players?.length) return null;
+            return (
+              <div key={gt} style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "14px 14px", marginBottom: 14 }}>
+                <div style={{ fontSize: 12, fontWeight: 800, color: "#f59e0b", marginBottom: 10, textTransform: "uppercase", letterSpacing: 1 }}>{gtIcon[gt]} {gtLabel[gt]} Season · {stats.rounds} {stats.rounds === 1 ? "round" : "rounds"}</div>
+                {stats.players.map((p, i) => (
+                  <div key={p.name} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: i < stats.players.length - 1 ? "1px solid #334155" : "none" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: i === 0 ? "#f59e0b" : "#475569", width: 16 }}>{i + 1}</span>
+                      <span style={{ fontSize: 13, color: "#f8fafc" }}>{p.name}</span>
+                      <span style={{ fontSize: 10, color: "#475569" }}>{p.rounds}R</span>
+                    </div>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: seasonMetricColor(p, gt) }}>{seasonMetricValue(p, gt)}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+
+          {/* Individual Rounds */}
+          {viewing.rounds.length > 0 && <h3 style={{ ...S.stepTitle, marginTop: 8 }}>Rounds</h3>}
+          {viewing.rounds.map((r) => {
+            const live = liveRoundData[r.id];
+            const tilePlayers = live?.players || r.players;
+            const tileScores = live?.scores || r.scores;
+            const hasData = tilePlayers?.length > 0 && tileScores?.length > 0;
+            let roundLb = [];
+            if (hasData) {
+              try { roundLb = calcLeaderboard(tilePlayers, tileScores, r.holes, r.game_type); } catch(e) {}
+            }
+            return (
+              <div key={r.id} onClick={() => setViewingRound(r)} style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 10, padding: "12px 14px", marginBottom: 8, cursor: "pointer" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: hasData ? 8 : 0 }}>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "#f8fafc" }}>{r.course_name}</div>
+                    <div style={{ fontSize: 11, color: "#64748b" }}>{r.date} · {GAME_TYPES[r.game_type]?.label}</div>
+                  </div>
+                  <span style={{ fontSize: 11, color: "#475569" }}>›</span>
+                </div>
+                {hasData && roundLb.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    {roundLb.map((p, i) => (
+                      <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <span style={{ fontSize: 10, color: i === 0 ? "#f59e0b" : "#475569", width: 14, fontWeight: 700 }}>{i + 1}</span>
+                          <span style={{ fontSize: 12, color: "#f8fafc" }}>{p.name}</span>
+                        </div>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: tileMetricColor(p, r.game_type) }}>{tileMetricValue(p, r.game_type)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {!hasData && <div style={{ fontSize: 11, color: "#475569", fontStyle: "italic" }}>Save round to see full data</div>}
+              </div>
+            );
+          })}
         </div>
       </div>
     );
@@ -1769,7 +1929,9 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
       const fullRound = { ...round, holes: course.holes };
       saveLastRound(fullRound, me);
       if (selectedTournament) {
-        addRoundToTournament(selectedTournament, { id: round.id, code: round.code, course_name: round.course_name, game_type: round.game_type, holes: course.holes, players: [], scores: [], date: new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' }) });
+        // Fetch full player and score data at round creation time so tournament has real data
+        const [tournPlayers, tournScores] = await Promise.all([dbGetPlayers(round.id), dbGetScores(round.id)]);
+        addRoundToTournament(selectedTournament, { id: round.id, code: round.code, course_name: round.course_name, game_type: round.game_type, holes: course.holes, players: tournPlayers, scores: tournScores, date: new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' }), createdBy: name });
       }
       onRoundCreated(fullRound, me);
     } catch (e) { console.error(e); setErr("Could not create round. Please check your connection."); }
@@ -2165,11 +2327,13 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
 
       <div style={S.content}>
         <div style={{ textAlign: "center", marginBottom: 20, padding: 16, backgroundColor: "#1e293b", borderRadius: 12, border: "1px solid #334155" }}>
-          <div style={{ display: "inline-block", backgroundColor: "#fff", borderRadius: 10, padding: 12, marginBottom: 8 }}>
+          {!isSpectator && <div style={{ display: "inline-block", backgroundColor: "#fff", borderRadius: 10, padding: 12, marginBottom: 8 }}>
             <QRCodeSVG value={window.location.origin + window.location.pathname + "?join=" + round.code} size={100} bgColor="#ffffff" fgColor="#0f172a" />
-          </div>
-          <div style={{ fontSize: 13, color: "#94a3b8" }}>Scan to join · Code: <span style={{ color: "#22c55e", fontWeight: 700, letterSpacing: 2 }}>{round.code}</span></div>
-          <button onClick={(e) => { navigator.clipboard.writeText(window.location.origin + window.location.pathname + "?join=" + round.code); const btn = e.target; btn.textContent = "✓ Copied!"; btn.style.color = "#22c55e"; btn.style.borderColor = "#22c55e"; setTimeout(() => { btn.textContent = "🔗 Copy Game Link"; btn.style.color = "#94a3b8"; btn.style.borderColor = "#334155"; }, 1500); }} style={{ marginTop: 10, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 12, fontWeight: 600, cursor: "pointer", padding: "8px 16px", fontFamily: "inherit" }}>🔗 Copy Game Link</button>
+          </div>}
+          <div style={{ fontSize: 13, color: "#94a3b8" }}>{isSpectator ? "Round code: " : "Scan to join · Code: "}<span style={{ color: "#22c55e", fontWeight: 700, letterSpacing: 2 }}>{round.code}</span></div>
+          {isSpectator
+            ? <button onClick={(e) => { navigator.clipboard.writeText(window.location.origin + window.location.pathname + "?watch=" + round.code); const btn = e.target; btn.textContent = "✓ Copied!"; btn.style.color = "#22c55e"; btn.style.borderColor = "#22c55e"; setTimeout(() => { btn.textContent = "👀 Copy Watch Link"; btn.style.color = "#94a3b8"; btn.style.borderColor = "#334155"; }, 1500); }} style={{ marginTop: 10, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 12, fontWeight: 600, cursor: "pointer", padding: "8px 16px", fontFamily: "inherit" }}>👀 Copy Watch Link</button>
+            : <button onClick={(e) => { navigator.clipboard.writeText(window.location.origin + window.location.pathname + "?join=" + round.code); const btn = e.target; btn.textContent = "✓ Copied!"; btn.style.color = "#22c55e"; btn.style.borderColor = "#22c55e"; setTimeout(() => { btn.textContent = "🔗 Copy Game Link"; btn.style.color = "#94a3b8"; btn.style.borderColor = "#334155"; }, 1500); }} style={{ marginTop: 10, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 12, fontWeight: 600, cursor: "pointer", padding: "8px 16px", fontFamily: "inherit" }}>🔗 Copy Game Link</button>}
         </div>
         <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
           <button style={{ ...S.btnPrimary, flex: 1, fontSize: 17, marginBottom: 0 }} onClick={onViewScorecard}>⛳ Live Scoring</button>
@@ -2479,7 +2643,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
           return (
             <div style={{ marginTop: 24 }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Scorecards · Live</div>
-              {players.map((player, pi) => (
+              {players.filter((player) => player.id !== "spectator").map((player, pi) => (
                 <div key={player.id} style={{ marginBottom: 12 }}>
                   {/* Header */}
                   <div style={{ background: "#1e3a5f", borderRadius: "6px 6px 0 0", padding: "5px 8px", border: "1px solid #334155", borderBottom: "none", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -2767,7 +2931,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
     
     // Banker rotation - fetch fresh scores from Supabase to ensure we have everyone's score
     if (round.game_type === "banker") {
-      const allPlayersList2 = [...others, me];
+      const allPlayersList2 = isSpectator ? [...others] : [...others, me];
       // Fetch fresh from Supabase so we have everyone's latest score
       const freshFromDB = await dbGetScores(round.id);
       const realHoleScores = freshFromDB.filter((s) => s.hole_number === holeNum && s.score > 0);
@@ -2863,7 +3027,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
       // Check if all players have now scored this hole and advance if so
       const freshScores = await dbGetScores(round.id);
       setAllScores(freshScores);
-      const allPlayersList = [...others, me];
+      const allPlayersList = isSpectator ? [...others] : [...others, me];
       const realHoleScores = freshScores.filter((s) => s.hole_number === holeNum && s.score > 0);
       const allRealScored = allPlayersList.every((p) => realHoleScores.some((s) => s.player_id === p.id));
       if (allRealScored && holeNum < 18) {
@@ -2900,7 +3064,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
   const myGrossTotal = holes.reduce((sum, h) => sum + (myScores[h.hole_number] ? myScores[h.hole_number] - h.par : 0), 0);
   const myNetTotal = holes.reduce((sum, h) => { const g = myScores[h.hole_number]; if (!g) return sum; return sum + (g - getHcpStrokes(me.handicap, h.stroke_index) - h.par); }, 0);
   const myStablefordTotal = holes.reduce((sum, h) => { const g = myScores[h.hole_number]; if (!g) return sum; return sum + stablefordPoints(g, h.par, getHcpStrokes(me.handicap, h.stroke_index)); }, 0);
-  const allPlayers = [...others, me];
+  const allPlayers = isSpectator ? [...others] : [...others, me];
   const myMatchTotal = (() => {
     let myHolesWon = 0;
     holes.forEach((hole) => {
@@ -2918,7 +3082,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
   })();
   // Use calcLeaderboard for banker - same proven logic as dashboard
   const scorecardLb = round.game_type === "banker" ? (() => {
-    try { return calcLeaderboard([...others, me], allScores, holes, "banker"); } catch(e) { return []; }
+    try { return calcLeaderboard(isSpectator ? [...others] : [...others, me], allScores, holes, "banker"); } catch(e) { return []; }
   })() : [];
   const myLbData = scorecardLb.find((p) => p.id === me.id);
   const bankerHoleMap = myLbData?.holeScores?.bankerHoleData || {};
@@ -2987,7 +3151,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
               <div style={S.holeMeta}>SI {curHole.stroke_index}</div>
               {round.game_type === "banker" && (() => {
                 const thisBankerId2 = activeHole === 1 ? initialBankerId : currentBankerId;
-                const bankerName = [...others, me].find((p) => p.id === thisBankerId2)?.name;
+                const bankerName = (isSpectator ? [...others] : [...others, me]).find((p) => p.id === thisBankerId2)?.name;
                 if (!bankerName) return null;
                 return <div style={{ fontSize: 11, color: "#f59e0b", fontWeight: 700, marginTop: 2 }}>🏦 {thisBankerId2 === me.id ? "YOU ARE BANKER" : bankerName + " is Banker"}</div>;
               })()}
@@ -3040,7 +3204,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
             const doubledPot = originalPot * 2;
             const totalPot = isDoubled ? doubledPot : originalPot;
             const allBetsIn = uniqueBettors.length >= nonBankerPlayers.length && nonBankerPlayers.length > 0;
-            const allScoresIn = [...others, me].every((p) => allScores.some((s) => s.player_id === p.id && s.hole_number === activeHole && s.score > 0));
+            const allScoresIn = (isSpectator ? [...others] : [...others, me]).every((p) => allScores.some((s) => s.player_id === p.id && s.hole_number === activeHole && s.score > 0));
             const myBetConfirmed = !!myBets[activeHole] || allScores.some((s) => s.player_id === me.id && s.hole_number === activeHole && s.bet > 0);
 
             return (
@@ -3592,7 +3756,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
                       if (round.game_type === "stableford") { thirdValue = stablefordPoints(g, h.par, hs); thirdColor = "#22c55e"; }
                       else if (round.game_type === "matchplay") {
                         const holeScores = allScores.filter((s) => s.hole_number === h.hole_number);
-                        const allPlayers2 = [...others, me];
+                        const allPlayers2 = isSpectator ? [...others] : [...others, me];
                         if (!allPlayers2.every((p) => holeScores.some((s) => s.player_id === p.id))) { thirdValue = "  "; thirdColor = "#475569"; }
                         else {
                           let lowestNet = Infinity;
@@ -3696,7 +3860,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
                         if (round.game_type === "stableford") { thirdValue = stablefordPoints(g, h.par, hs); thirdColor = "#22c55e"; }
                         else if (round.game_type === "matchplay") {
                           const holeScores = allScores.filter((s) => s.hole_number === h.hole_number);
-                          const allPlayers3 = [...others, me];
+                          const allPlayers3 = isSpectator ? [...others] : [...others, me];
                           if (!allPlayers3.every((p) => holeScores.some((s) => s.player_id === p.id))) { thirdValue = "—"; thirdColor = "#475569"; }
                           else {
                             let lowestNet3 = Infinity;
@@ -3776,7 +3940,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
                           holes.forEach((hole) => {
                             const myS = ps.find((s) => s.hole_number === hole.hole_number); if (!myS) return;
                             const holeScores = allScores.filter((s) => s.hole_number === hole.hole_number);
-                            const allP3 = [...others, me];
+                            const allP3 = isSpectator ? [...others] : [...others, me];
                             if (!allP3.every((p) => holeScores.some((s) => s.player_id === p.id))) return;
                             let lowest = Infinity;
                             holeScores.forEach((s) => { const pl = allP3.find((p) => p.id === s.player_id); if (!pl) return; const net = s.score - getHcpStrokes(pl.handicap, hole.stroke_index); if (net < lowest) lowest = net; });
@@ -3802,7 +3966,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
                       <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800 }}>
                         {(() => {
                           let total = 0;
-                          const allP4 = [...others, me];
+                          const allP4 = isSpectator ? [...others] : [...others, me];
                           holes.forEach((hole) => {
                             const myS = ps.find((s) => s.hole_number === hole.hole_number); if (!myS) return;
                             const holeScores = allScores.filter((s) => s.hole_number === hole.hole_number);
@@ -3933,10 +4097,12 @@ export default function GolfApp() {
   const [spectatorRound, setSpectatorRound] = useState(null);
 
   useEffect(() => {
-    // Check for QR code join link ?join=XXXXXX
+    // Check for QR code join link ?join=XXXXXX or watch link ?watch=XXXXXX
     const params = new URLSearchParams(window.location.search);
     const code = params.get("join");
+    const watchCode = params.get("watch");
     if (code) { setJoinCode(code); setScreen("join"); }
+    if (watchCode) { setJoinCode(watchCode); setScreen("watch"); }
 
     // Load last round
     setLastRound(loadLastRound());
