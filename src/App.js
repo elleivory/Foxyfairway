@@ -949,7 +949,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onAdminLogin, onRejoin, lastRo
 
   return (
     <div style={S.screen}>
-      <div style={{ position: "absolute", top: 12, left: 16, fontSize: 10, color: "#334155", fontWeight: 600 }}>v1.0.8</div>
+      <div style={{ position: "absolute", top: 12, left: 16, fontSize: 10, color: "#334155", fontWeight: 600 }}>v1.0.9</div>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 56, paddingBottom: 28 }}>
         <img src="/logo.png" alt="Foxy Fairways"
           style={{ width: 110, height: 110, borderRadius: 24, boxShadow: "0 8px 40px rgba(0,0,0,0.5)", marginBottom: 18 }}
@@ -1173,7 +1173,7 @@ function AdminDashboardScreen({ onLogout }) {
       setMsg("Course saved successfully!");
       setTimeout(() => setMsg(""), 3000);
       setEditing(null); setHoles([]);
-    } catch { setMsg("Save failed. Try again."); }
+    } catch(e) { setMsg("Save failed: " + (e?.message || e?.toString() || "Unknown error")); }
     setSaving(false);
   };
 
@@ -1729,7 +1729,7 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
       setCourses(updated);
       setCourse(final);
       setCourseEditing(null); setCourseHoles([]); setShowAddCourse(false);
-    } catch(e) { console.error(e); }
+    } catch(e) { console.error(e); alert("Save failed: " + (e?.message || e?.toString() || "Unknown error")); }
     setAddingCourse(false);
   };
 
