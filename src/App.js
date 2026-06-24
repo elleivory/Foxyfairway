@@ -228,6 +228,17 @@ const DEFAULT_COURSES = [
     {hole_number:15,par:4,stroke_index:3},{hole_number:16,par:4,stroke_index:5},
     {hole_number:17,par:4,stroke_index:15},{hole_number:18,par:5,stroke_index:1},
   ]},
+  { id: "rnzaf-whenuapai", name: "RNZAF Whenuapai", par: 71, holes: [
+    {hole_number:1,par:4,stroke_index:10},{hole_number:2,par:4,stroke_index:14},
+    {hole_number:3,par:3,stroke_index:18},{hole_number:4,par:4,stroke_index:6},
+    {hole_number:5,par:4,stroke_index:2},{hole_number:6,par:3,stroke_index:16},
+    {hole_number:7,par:4,stroke_index:12},{hole_number:8,par:4,stroke_index:4},
+    {hole_number:9,par:5,stroke_index:8},{hole_number:10,par:4,stroke_index:1},
+    {hole_number:11,par:5,stroke_index:5},{hole_number:12,par:3,stroke_index:13},
+    {hole_number:13,par:5,stroke_index:3},{hole_number:14,par:4,stroke_index:15},
+    {hole_number:15,par:3,stroke_index:17},{hole_number:16,par:4,stroke_index:9},
+    {hole_number:17,par:4,stroke_index:11},{hole_number:18,par:4,stroke_index:7},
+  ]},
 ];
 
 function getHolesForRound(round) {
@@ -949,7 +960,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onAdminLogin, onRejoin, lastRo
 
   return (
     <div style={S.screen}>
-      <div style={{ position: "absolute", top: 12, left: 16, fontSize: 10, color: "#334155", fontWeight: 600 }}>v1.0.9</div>
+      <div style={{ position: "absolute", top: 12, left: 16, fontSize: 10, color: "#334155", fontWeight: 600 }}>v1.1.1</div>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 56, paddingBottom: 28 }}>
         <img src="/logo.png" alt="Foxy Fairways"
           style={{ width: 110, height: 110, borderRadius: 24, boxShadow: "0 8px 40px rgba(0,0,0,0.5)", marginBottom: 18 }}
@@ -1880,7 +1891,11 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
                 </button>
               ))}
             </div>
-            <button style={course ? S.btnPrimary : S.btnDisabled} disabled={!course} onClick={() => setStep(2)}>Next</button>
+            <div style={{ position: "sticky", bottom: 0, backgroundColor: "#0f172a", paddingTop: 12, paddingBottom: 8, marginTop: 8 }}>
+              <button style={course ? S.btnPrimary : S.btnDisabled} disabled={!course} onClick={() => setStep(2)}>
+                {course ? `Next → ${course.name}` : "Select a course to continue"}
+              </button>
+            </div>
           </div>
         )}
         {step === 2 && (
@@ -3387,11 +3402,28 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                       <div key={"me"+h.hole_number} style={{ minWidth: 44, flex: "0 0 auto", display: "flex", flexDirection: "column", alignItems: "center", overflow: "visible" }}>
                         <div style={{ fontSize: 8, color: "#94a3b8", height: 10, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>{h.hole_number}</div>
                         <div style={{ fontSize: 7, color: "#475569", height: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>P{h.par}</div>
-                        <div style={{ height: 28, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#e2e8f0" }}>
-                          {g || <span style={{ color: "#334155" }}>—</span>}
+                        <div style={{ height: 28, display: "flex", alignItems: "center", justifyContent: "center", overflow: "visible" }}>
+                          {g ? (() => {
+                            const diff = g - h.par;
+                            const base = { fontSize: 10, fontWeight: 800, width: 20, height: 20, display: "inline-flex", alignItems: "center", justifyContent: "center" };
+                            if (diff <= -2) return <span style={{ ...base, borderRadius: "50%", border: "1.5px solid #f59e0b", color: "#f59e0b", boxShadow: "0 0 0 1.5px #f59e0b" }}>{g}</span>;
+                            if (diff === -1) return <span style={{ ...base, borderRadius: "50%", border: "1.5px solid #22c55e", color: "#22c55e" }}>{g}</span>;
+                            if (diff === 0) return <span style={{ ...base, color: "#e2e8f0" }}>{g}</span>;
+                            if (diff === 1) return <span style={{ ...base, border: "1.5px solid #ef4444", color: "#ef4444", borderRadius: 2 }}>{g}</span>;
+                            return <span style={{ ...base, border: "1.5px solid #7f1d1d", color: "#fca5a5", borderRadius: 2, boxShadow: "0 0 0 1.5px #7f1d1d" }}>{g}</span>;
+                          })() : <span style={{ color: "#334155" }}>—</span>}
                         </div>
-                        {isHandicap && <div style={{ height: 28, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#e2e8f0" }}>
-                          {g ? (g - hs) : <span style={{ color: "#334155" }}>—</span>}
+                        {isHandicap && <div style={{ height: 28, display: "flex", alignItems: "center", justifyContent: "center", overflow: "visible" }}>
+                          {g ? (() => {
+                            const net = g - hs;
+                            const diff = net - h.par;
+                            const base = { fontSize: 10, fontWeight: 800, width: 20, height: 20, display: "inline-flex", alignItems: "center", justifyContent: "center" };
+                            if (diff <= -2) return <span style={{ ...base, borderRadius: "50%", border: "1.5px solid #f59e0b", color: "#f59e0b", boxShadow: "0 0 0 1.5px #f59e0b" }}>{net}</span>;
+                            if (diff === -1) return <span style={{ ...base, borderRadius: "50%", border: "1.5px solid #22c55e", color: "#22c55e" }}>{net}</span>;
+                            if (diff === 0) return <span style={{ ...base, color: "#e2e8f0" }}>{net}</span>;
+                            if (diff === 1) return <span style={{ ...base, border: "1.5px solid #ef4444", color: "#ef4444", borderRadius: 2 }}>{net}</span>;
+                            return <span style={{ ...base, border: "1.5px solid #7f1d1d", color: "#fca5a5", borderRadius: 2, boxShadow: "0 0 0 1.5px #7f1d1d" }}>{net}</span>;
+                          })() : <span style={{ color: "#334155" }}>—</span>}
                         </div>}
                         {(round.game_type === "stableford" || round.game_type === "matchplay" || round.game_type === "banker") && (
                           <div style={{ height: 20, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: thirdColor }}>{thirdValue}</div>
@@ -3473,12 +3505,29 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                         <div key={player.id + h.hole_number} style={{ minWidth: 44, flex: "0 0 auto", display: "flex", flexDirection: "column", alignItems: "center", overflow: "visible" }}>
                           <div style={{ fontSize: 8, color: "#94a3b8", height: 10, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>{h.hole_number}</div>
                           <div style={{ fontSize: 7, color: "#475569", height: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>P{h.par}</div>
-                          <div style={{ height: 28, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#e2e8f0" }}>
-                            {g || <span style={{ color: "#334155" }}>—</span>}
+                          <div style={{ height: 28, display: "flex", alignItems: "center", justifyContent: "center", overflow: "visible" }}>
+                            {g ? (() => {
+                              const diff = g - h.par;
+                              const base = { fontSize: 10, fontWeight: 800, width: 20, height: 20, display: "inline-flex", alignItems: "center", justifyContent: "center" };
+                              if (diff <= -2) return <span style={{ ...base, borderRadius: "50%", border: "1.5px solid #f59e0b", color: "#f59e0b", boxShadow: "0 0 0 1.5px #f59e0b" }}>{g}</span>;
+                              if (diff === -1) return <span style={{ ...base, borderRadius: "50%", border: "1.5px solid #22c55e", color: "#22c55e" }}>{g}</span>;
+                              if (diff === 0) return <span style={{ ...base, color: "#e2e8f0" }}>{g}</span>;
+                              if (diff === 1) return <span style={{ ...base, border: "1.5px solid #ef4444", color: "#ef4444", borderRadius: 2 }}>{g}</span>;
+                              return <span style={{ ...base, border: "1.5px solid #7f1d1d", color: "#fca5a5", borderRadius: 2, boxShadow: "0 0 0 1.5px #7f1d1d" }}>{g}</span>;
+                            })() : <span style={{ color: "#334155" }}>—</span>}
                           </div>
                           {isHandicap && (
-                            <div style={{ height: 28, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#e2e8f0" }}>
-                              {g ? (g - hs) : <span style={{ color: "#334155" }}>—</span>}
+                            <div style={{ height: 28, display: "flex", alignItems: "center", justifyContent: "center", overflow: "visible" }}>
+                              {g ? (() => {
+                                const net = g - hs;
+                                const diff = net - h.par;
+                                const base = { fontSize: 10, fontWeight: 800, width: 20, height: 20, display: "inline-flex", alignItems: "center", justifyContent: "center" };
+                                if (diff <= -2) return <span style={{ ...base, borderRadius: "50%", border: "1.5px solid #f59e0b", color: "#f59e0b", boxShadow: "0 0 0 1.5px #f59e0b" }}>{net}</span>;
+                                if (diff === -1) return <span style={{ ...base, borderRadius: "50%", border: "1.5px solid #22c55e", color: "#22c55e" }}>{net}</span>;
+                                if (diff === 0) return <span style={{ ...base, color: "#e2e8f0" }}>{net}</span>;
+                                if (diff === 1) return <span style={{ ...base, border: "1.5px solid #ef4444", color: "#ef4444", borderRadius: 2 }}>{net}</span>;
+                                return <span style={{ ...base, border: "1.5px solid #7f1d1d", color: "#fca5a5", borderRadius: 2, boxShadow: "0 0 0 1.5px #7f1d1d" }}>{net}</span>;
+                              })() : <span style={{ color: "#334155" }}>—</span>}
                             </div>
                           )}
                           {(round.game_type === "stableford" || round.game_type === "matchplay") && (
