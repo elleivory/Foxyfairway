@@ -960,7 +960,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onAdminLogin, onRejoin, lastRo
 
   return (
     <div style={S.screen}>
-      <div style={{ position: "absolute", top: 12, left: 16, fontSize: 10, color: "#334155", fontWeight: 600 }}>v1.1.1</div>
+      <div style={{ position: "absolute", top: 12, left: 16, fontSize: 10, color: "#334155", fontWeight: 600 }}>v1.1.3</div>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 56, paddingBottom: 28 }}>
         <img src="/logo.png" alt="Foxy Fairways"
           style={{ width: 110, height: 110, borderRadius: 24, boxShadow: "0 8px 40px rgba(0,0,0,0.5)", marginBottom: 18 }}
@@ -1779,6 +1779,12 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
           <div style={S.stepWrap}>
             <h3 style={S.stepTitle}>Where are you playing?</h3>
 
+            <div style={{ position: "sticky", top: 0, backgroundColor: "#0f172a", paddingBottom: 10, paddingTop: 4, zIndex: 10 }}>
+              <button style={course ? S.btnPrimary : S.btnDisabled} disabled={!course} onClick={() => setStep(2)}>
+                {course ? `Next → ${course.name}` : "Select a course to continue"}
+              </button>
+            </div>
+
             {!showAddCourse && !courseEditing && (
               <button onClick={() => setShowAddCourse(true)} style={{ width: "100%", backgroundColor: "#1e293b", border: "1px dashed #334155", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 700, color: "#64748b", cursor: "pointer", fontFamily: "inherit", marginBottom: 12 }}>
                 + Add a Course
@@ -1890,12 +1896,6 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
                   </div>
                 </button>
               ))}
-            </div>
-            <div style={{ position: "sticky", bottom: 0, backgroundColor: "#0f172a", paddingTop: 12, paddingBottom: 8, marginTop: 8 }}>
-              <button style={course ? S.btnPrimary : S.btnDisabled} disabled={!course} onClick={() => setStep(2)}>
-                {course ? `Next → ${course.name}` : "Select a course to continue"}
-              </button>
-            </div>
           </div>
         )}
         {step === 2 && (
@@ -3395,7 +3395,12 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                         }
                       } else if (round.game_type === "banker") {
                         const hd = bankerHoleMap[h.hole_number];
-                        if (hd) { thirdValue = (hd.holeChange !== 0 ? (hd.holeChange > 0 ? "+$" : "-$") + Math.abs(hd.holeChange) : "T") + (hd.doubled ? " 🔥" : ""); thirdColor = hd.holeChange > 0 ? "#22c55e" : hd.holeChange < 0 ? "#ef4444" : "#94a3b8"; }
+                        if (hd) {
+                          const icons = (hd.iAmBanker ? "🏦" : "") + (hd.doubled ? "🔥" : "");
+                          const amt = hd.holeChange !== 0 ? (hd.holeChange > 0 ? "+$" : "-$") + Math.abs(hd.holeChange) : "T";
+                          thirdValue = icons ? icons + " " + amt : amt;
+                          thirdColor = hd.holeChange > 0 ? "#22c55e" : hd.holeChange < 0 ? "#ef4444" : "#94a3b8";
+                        }
                       }
                     }
                     return (
@@ -3406,11 +3411,11 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                           {g ? (() => {
                             const diff = g - h.par;
                             const base = { fontSize: 10, fontWeight: 800, width: 20, height: 20, display: "inline-flex", alignItems: "center", justifyContent: "center" };
-                            if (diff <= -2) return <span style={{ ...base, borderRadius: "50%", border: "1.5px solid #f59e0b", color: "#f59e0b", boxShadow: "0 0 0 1.5px #f59e0b" }}>{g}</span>;
-                            if (diff === -1) return <span style={{ ...base, borderRadius: "50%", border: "1.5px solid #22c55e", color: "#22c55e" }}>{g}</span>;
+                            if (diff <= -2) return <span style={{ ...base, borderRadius: "50%", border: "1.5px solid #94a3b8", color: "#e2e8f0", boxShadow: "0 0 0 1.5px #475569" }}>{g}</span>;
+                            if (diff === -1) return <span style={{ ...base, borderRadius: "50%", border: "1.5px solid #94a3b8", color: "#e2e8f0" }}>{g}</span>;
                             if (diff === 0) return <span style={{ ...base, color: "#e2e8f0" }}>{g}</span>;
-                            if (diff === 1) return <span style={{ ...base, border: "1.5px solid #ef4444", color: "#ef4444", borderRadius: 2 }}>{g}</span>;
-                            return <span style={{ ...base, border: "1.5px solid #7f1d1d", color: "#fca5a5", borderRadius: 2, boxShadow: "0 0 0 1.5px #7f1d1d" }}>{g}</span>;
+                            if (diff === 1) return <span style={{ ...base, border: "1.5px solid #94a3b8", color: "#e2e8f0", borderRadius: 2 }}>{g}</span>;
+                            return <span style={{ ...base, border: "1.5px solid #64748b", color: "#e2e8f0", borderRadius: 2, boxShadow: "0 0 0 1.5px #475569" }}>{g}</span>;
                           })() : <span style={{ color: "#334155" }}>—</span>}
                         </div>
                         {isHandicap && <div style={{ height: 28, display: "flex", alignItems: "center", justifyContent: "center", overflow: "visible" }}>
@@ -3418,11 +3423,11 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                             const net = g - hs;
                             const diff = net - h.par;
                             const base = { fontSize: 10, fontWeight: 800, width: 20, height: 20, display: "inline-flex", alignItems: "center", justifyContent: "center" };
-                            if (diff <= -2) return <span style={{ ...base, borderRadius: "50%", border: "1.5px solid #f59e0b", color: "#f59e0b", boxShadow: "0 0 0 1.5px #f59e0b" }}>{net}</span>;
-                            if (diff === -1) return <span style={{ ...base, borderRadius: "50%", border: "1.5px solid #22c55e", color: "#22c55e" }}>{net}</span>;
+                            if (diff <= -2) return <span style={{ ...base, borderRadius: "50%", border: "1.5px solid #94a3b8", color: "#e2e8f0", boxShadow: "0 0 0 1.5px #475569" }}>{net}</span>;
+                            if (diff === -1) return <span style={{ ...base, borderRadius: "50%", border: "1.5px solid #94a3b8", color: "#e2e8f0" }}>{net}</span>;
                             if (diff === 0) return <span style={{ ...base, color: "#e2e8f0" }}>{net}</span>;
-                            if (diff === 1) return <span style={{ ...base, border: "1.5px solid #ef4444", color: "#ef4444", borderRadius: 2 }}>{net}</span>;
-                            return <span style={{ ...base, border: "1.5px solid #7f1d1d", color: "#fca5a5", borderRadius: 2, boxShadow: "0 0 0 1.5px #7f1d1d" }}>{net}</span>;
+                            if (diff === 1) return <span style={{ ...base, border: "1.5px solid #94a3b8", color: "#e2e8f0", borderRadius: 2 }}>{net}</span>;
+                            return <span style={{ ...base, border: "1.5px solid #64748b", color: "#e2e8f0", borderRadius: 2, boxShadow: "0 0 0 1.5px #475569" }}>{net}</span>;
                           })() : <span style={{ color: "#334155" }}>—</span>}
                         </div>}
                         {(round.game_type === "stableford" || round.game_type === "matchplay" || round.game_type === "banker") && (
@@ -3509,11 +3514,11 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                             {g ? (() => {
                               const diff = g - h.par;
                               const base = { fontSize: 10, fontWeight: 800, width: 20, height: 20, display: "inline-flex", alignItems: "center", justifyContent: "center" };
-                              if (diff <= -2) return <span style={{ ...base, borderRadius: "50%", border: "1.5px solid #f59e0b", color: "#f59e0b", boxShadow: "0 0 0 1.5px #f59e0b" }}>{g}</span>;
-                              if (diff === -1) return <span style={{ ...base, borderRadius: "50%", border: "1.5px solid #22c55e", color: "#22c55e" }}>{g}</span>;
+                              if (diff <= -2) return <span style={{ ...base, borderRadius: "50%", border: "1.5px solid #94a3b8", color: "#e2e8f0", boxShadow: "0 0 0 1.5px #475569" }}>{g}</span>;
+                              if (diff === -1) return <span style={{ ...base, borderRadius: "50%", border: "1.5px solid #94a3b8", color: "#e2e8f0" }}>{g}</span>;
                               if (diff === 0) return <span style={{ ...base, color: "#e2e8f0" }}>{g}</span>;
-                              if (diff === 1) return <span style={{ ...base, border: "1.5px solid #ef4444", color: "#ef4444", borderRadius: 2 }}>{g}</span>;
-                              return <span style={{ ...base, border: "1.5px solid #7f1d1d", color: "#fca5a5", borderRadius: 2, boxShadow: "0 0 0 1.5px #7f1d1d" }}>{g}</span>;
+                              if (diff === 1) return <span style={{ ...base, border: "1.5px solid #94a3b8", color: "#e2e8f0", borderRadius: 2 }}>{g}</span>;
+                              return <span style={{ ...base, border: "1.5px solid #64748b", color: "#e2e8f0", borderRadius: 2, boxShadow: "0 0 0 1.5px #475569" }}>{g}</span>;
                             })() : <span style={{ color: "#334155" }}>—</span>}
                           </div>
                           {isHandicap && (
@@ -3522,11 +3527,11 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                                 const net = g - hs;
                                 const diff = net - h.par;
                                 const base = { fontSize: 10, fontWeight: 800, width: 20, height: 20, display: "inline-flex", alignItems: "center", justifyContent: "center" };
-                                if (diff <= -2) return <span style={{ ...base, borderRadius: "50%", border: "1.5px solid #f59e0b", color: "#f59e0b", boxShadow: "0 0 0 1.5px #f59e0b" }}>{net}</span>;
-                                if (diff === -1) return <span style={{ ...base, borderRadius: "50%", border: "1.5px solid #22c55e", color: "#22c55e" }}>{net}</span>;
+                                if (diff <= -2) return <span style={{ ...base, borderRadius: "50%", border: "1.5px solid #94a3b8", color: "#e2e8f0", boxShadow: "0 0 0 1.5px #475569" }}>{net}</span>;
+                                if (diff === -1) return <span style={{ ...base, borderRadius: "50%", border: "1.5px solid #94a3b8", color: "#e2e8f0" }}>{net}</span>;
                                 if (diff === 0) return <span style={{ ...base, color: "#e2e8f0" }}>{net}</span>;
-                                if (diff === 1) return <span style={{ ...base, border: "1.5px solid #ef4444", color: "#ef4444", borderRadius: 2 }}>{net}</span>;
-                                return <span style={{ ...base, border: "1.5px solid #7f1d1d", color: "#fca5a5", borderRadius: 2, boxShadow: "0 0 0 1.5px #7f1d1d" }}>{net}</span>;
+                                if (diff === 1) return <span style={{ ...base, border: "1.5px solid #94a3b8", color: "#e2e8f0", borderRadius: 2 }}>{net}</span>;
+                                return <span style={{ ...base, border: "1.5px solid #64748b", color: "#e2e8f0", borderRadius: 2, boxShadow: "0 0 0 1.5px #475569" }}>{net}</span>;
                               })() : <span style={{ color: "#334155" }}>—</span>}
                             </div>
                           )}
