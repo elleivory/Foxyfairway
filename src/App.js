@@ -957,12 +957,12 @@ function exportScorecardImage(round, players, scores, holes) {
 function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, onRejoin, lastRound, savedRounds, onViewHistory, onViewTournaments }) {
   return (
     <div style={{ ...S.screen, position: "relative" }}>
-      {/* Version + Admin */}
-      <div style={{ position: "absolute", top: 14, left: 16, fontSize: 10, color: "#334155", fontWeight: 600 }}>v1.1.9</div>
-      <button onClick={onAdminLogin} style={{ position: "absolute", top: 10, right: 16, background: "none", border: "1px solid #1e293b", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", textTransform: "uppercase" }}>Admin</button>
+      {/* Version + Admin - positioned below status bar */}
+      <div style={{ position: "absolute", top: "calc(env(safe-area-inset-top, 44px) + 10px)", left: 16, fontSize: 10, color: "#475569", fontWeight: 600 }}>v1.1.9</div>
+      <button onClick={onAdminLogin} style={{ position: "absolute", top: "calc(env(safe-area-inset-top, 44px) + 6px)", right: 16, background: "none", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", textTransform: "uppercase" }}>Admin</button>
 
       {/* Header */}
-      <div style={{ padding: "calc(env(safe-area-inset-top, 44px) + 24px) 24px 32px", textAlign: "center" }}>
+      <div style={{ padding: "calc(env(safe-area-inset-top, 44px) + 56px) 24px 28px", textAlign: "center" }}>
         <img src="/logo.png" alt="Foxy Fairways" style={{ width: 80, height: 80, borderRadius: 20, boxShadow: "0 8px 40px rgba(0,0,0,0.5)", marginBottom: 14, display: "block", margin: "0 auto 14px" }} onError={(e) => { e.target.style.display = "none"; }} />
         <div style={{ fontSize: 34, fontWeight: 900, color: "#f8fafc", letterSpacing: "-1px", lineHeight: 1 }}>Foxy Fairways</div>
         <div style={{ fontSize: 11, color: "#334155", marginTop: 8, fontWeight: 600, letterSpacing: "2px", textTransform: "uppercase" }}>Golf Scoring</div>
