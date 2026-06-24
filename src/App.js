@@ -1781,7 +1781,7 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
 
             <div style={{ position: "sticky", top: 0, backgroundColor: "#0f172a", paddingBottom: 10, paddingTop: 4, zIndex: 10 }}>
               <button style={course ? S.btnPrimary : S.btnDisabled} disabled={!course} onClick={() => setStep(2)}>
-                {course ? `Next → ${course.name}` : "Select a course to continue"}
+                {course ? "Next \u2192 " + course.name : "Select a course to continue"}
               </button>
             </div>
 
