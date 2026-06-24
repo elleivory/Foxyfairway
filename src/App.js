@@ -14,7 +14,7 @@ const GAME_TYPES = {
   stroke:          { label: "Stroke Play",     description: "Lowest total score wins" },
   stableford:      { label: "Stableford",       description: "Points per hole, most points wins" },
   matchplay:       { label: "Match Play",        description: "Win holes, most wins" },
-  matchplay_teams: { label: "Match Play Teams",  description: "Teams compete, best net per team wins hole" },
+  matchplay_teams: { label: "Team Best Ball",  description: "Teams compete, best net score per team wins each hole" },
   banker:          { label: "Banker",           description: "Bet against the banker, lowest net wins" },
 };
 
@@ -960,7 +960,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onAdminLogin, onRejoin, lastRo
 
   return (
     <div style={S.screen}>
-      <div style={{ position: "absolute", top: 12, left: 16, fontSize: 10, color: "#334155", fontWeight: 600 }}>v1.1.5</div>
+      <div style={{ position: "absolute", top: 12, left: 16, fontSize: 10, color: "#334155", fontWeight: 600 }}>v1.1.6</div>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 56, paddingBottom: 28 }}>
         <img src="/logo.png" alt="Foxy Fairways"
           style={{ width: 110, height: 110, borderRadius: 24, boxShadow: "0 8px 40px rgba(0,0,0,0.5)", marginBottom: 18 }}
@@ -2123,7 +2123,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
         </div>
         <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
           <button style={{ ...S.btnPrimary, flex: 1, fontSize: 17, marginBottom: 0 }} onClick={onViewScorecard}>⛳ Live Scoring</button>
-          <button onClick={() => setShowAddGuest(true)} style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, color: "#94a3b8", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", padding: "0 14px", flexShrink: 0 }}>+ Guest</button>
+          {me?.name === round.created_by && <button onClick={() => setShowAddGuest(true)} style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, color: "#94a3b8", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", padding: "0 14px", flexShrink: 0 }}>+ Guest</button>}
         </div>
 
         {showAddGuest && (
@@ -2160,23 +2160,74 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
           </div>
         </div>
         {lb.length === 0 ? <div style={S.empty}>Waiting for players...</div>
-        : round.game_type === "matchplay_teams" ? (
-          ["A", "B"].map((tl) => {
-            const tp = lb.filter((p) => p.team === tl), tt = tp[0]?.total || 0;
-            return (
-              <div key={"t" + tl} style={{ marginBottom: 20 }}>
-                <div style={{ ...S.lbRow, backgroundColor: tl === "A" ? "rgba(34,197,94,0.1)" : "rgba(59,130,246,0.1)" }}>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: tl === "A" ? "#22c55e" : "#3b82f6", width: 40 }}>Team {tl}</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: "#f8fafc", marginBottom: 4 }}>{tt === 0 ? "All Sq" : tt > 0 ? "+" + tt + " pts" : tt + " pts"}</div>
-                    <div style={{ fontSize: 12, color: "#94a3b8" }}>{tp.map((p) => p.name + " (HCP " + p.handicap + ")").join(" & ")}</div>
+        : round.game_type === "matchplay_teams" ? (() => {
+          const allPlayers = [...players];
+          const teamAPts = lb.filter((p) => p.team === "A")[0]?.total || 0;
+          const teamBPts = lb.filter((p) => p.team === "B")[0]?.total || 0;
+          const diff = teamAPts - teamBPts;
+          const statusLabel = diff === 0 ? "All Square" : diff > 0 ? `Team A leads by ${diff}` : `Team B leads by ${Math.abs(diff)}`;
+          return (
+            <div>
+              {["A", "B"].map((tl, ti) => {
+                const tc = tl === "A" ? "#22c55e" : "#3b82f6";
+                const tp = lb.filter((p) => p.team === tl);
+                const tt = tp[0]?.total || 0;
+                // Per-hole team result pills
+                const holePills = holes.map((hole) => {
+                  const teamPlayers = allPlayers.filter((p) => p.team === tl);
+                  const oppPlayers = allPlayers.filter((p) => p.team !== tl);
+                  const bestNet = (grp) => grp.reduce((best, pl) => {
+                    const s = scores.find((x) => x.player_id === pl.id && x.hole_number === hole.hole_number);
+                    if (!s || !s.score) return best;
+                    return Math.min(best, s.score - getHcpStrokes(pl.handicap, hole.stroke_index));
+                  }, Infinity);
+                  const myBest = bestNet(teamPlayers), oppBest = bestNet(oppPlayers);
+                  if (myBest === Infinity || oppBest === Infinity) return { h: hole.hole_number, res: null };
+                  if (myBest < oppBest) return { h: hole.hole_number, res: "W" };
+                  if (myBest > oppBest) return { h: hole.hole_number, res: "L" };
+                  return { h: hole.hole_number, res: "T" };
+                });
+                return (
+                  <div key={tl} style={{ backgroundColor: tl === "A" ? "rgba(34,197,94,0.06)" : "rgba(59,130,246,0.06)", border: `1.5px solid ${tl === "A" ? "rgba(34,197,94,0.25)" : "rgba(59,130,246,0.25)"}`, borderRadius: 14, padding: 14, marginBottom: ti === 0 ? 4 : 0 }}>
+                    {/* Team header */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, paddingBottom: 10, borderBottom: "1px solid #1e293b", marginBottom: 10 }}>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: tc, width: 28, flexShrink: 0 }}>{tl}</div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 16, fontWeight: 700, color: "#f8fafc", marginBottom: 3 }}>{tt === 0 ? "0 pts" : tt + (tt === 1 ? " pt" : " pts")} won</div>
+                        <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 5 }}>{tp.map((p) => p.name.replace(" (Guest)", "") + " (HCP " + p.handicap + ")").join(" & ")}</div>
+                        <div style={{ display: "flex", gap: 3, overflowX: "auto", scrollbarWidth: "none" }}>
+                          {holePills.map(({ h, res }) => (
+                            <div key={h} style={{ minWidth: 26, background: "#0f172a", borderRadius: 5, padding: "2px 4px", textAlign: "center", border: "1px solid #1e293b", flexShrink: 0 }}>
+                              <div style={{ fontSize: 7, color: "#475569" }}>H{h}</div>
+                              <div style={{ fontSize: 10, fontWeight: 800, color: res === "W" ? "#22c55e" : res === "L" ? "#ef4444" : res === "T" ? "#94a3b8" : "#334155" }}>{res || "—"}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: tc }}>{tt} {tt === 1 ? "pt" : "pts"}</div>
+                        <div style={{ fontSize: 11, color: "#475569" }}>{(tp[0]?.holesPlayed || 0)}/18</div>
+                      </div>
+                    </div>
+                    {/* Individual players */}
+                    {tp.map((p, pi) => (
+                      <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "7px 0", borderBottom: pi < tp.length - 1 ? "1px solid #0f172a" : "none" }}>
+                        <div style={{ flex: 1, fontSize: 14, fontWeight: 600, color: "#f8fafc" }}>{p.name.replace(" (Guest)", "")}{p.name.endsWith("(Guest)") ? <span style={{ fontSize: 10, color: "#475569", marginLeft: 4 }}>(Guest)</span> : ""}<span style={{ fontSize: 11, color: "#475569", fontWeight: 400, marginLeft: 6 }}>HCP {p.handicap}</span></div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: p.total > 0 ? tc : "#94a3b8" }}>{p.total} {p.total === 1 ? "pt" : "pts"}</div>
+                      </div>
+                    ))}
                   </div>
-                  <div style={S.lbHoles}>{(tp[0]?.holesPlayed || 0) + "/18"}</div>
-                </div>
+                );
+              })}
+              {/* VS status badge */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "10px 0" }}>
+                <div style={{ flex: 1, height: 1, background: "#1e293b" }} />
+                <div style={{ fontSize: 11, fontWeight: 700, color: diff === 0 ? "#94a3b8" : "#f59e0b", background: diff === 0 ? "#1e293b" : "#1a1200", border: `1px solid ${diff === 0 ? "#334155" : "#f59e0b44"}`, borderRadius: 6, padding: "3px 10px" }}>{statusLabel}</div>
+                <div style={{ flex: 1, height: 1, background: "#1e293b" }} />
               </div>
-            );
-          })
-        ) : (
+            </div>
+          );
+        })() : (
           lb.map((p, i) => (
             <div key={p.id}>
               <div style={{ ...S.lbRow, ...(p.id === me?.id ? S.lbRowMe : {}) }}>
@@ -3356,9 +3407,120 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
         );
       })()}
 
-      {/* All players section - my card first then others, all same style */}
+      {/* All players section - grouped by team for matchplay_teams, otherwise my card first */}
       <div style={S.otherPlayersSection}>
         <div style={S.otherPlayersTitle}>Players</div>
+
+        {round.game_type === "matchplay_teams" ? (() => {
+          const allP = [me, ...others];
+          return ["A", "B"].map((tl, ti) => {
+            const tc = tl === "A" ? "#22c55e" : "#3b82f6";
+            const teamPlayers = allP.filter((p) => p.team === tl);
+            const oppPlayers = allP.filter((p) => p.team !== tl);
+            // Per-hole team W/L/T pills
+            const teamHolePills = holes.map((hole) => {
+              const bestNet = (grp) => grp.reduce((best, pl) => {
+                const s = allScores.find((x) => x.player_id === pl.id && x.hole_number === hole.hole_number);
+                if (!s || !s.score) return best;
+                return Math.min(best, s.score - getHcpStrokes(pl.handicap, hole.stroke_index));
+              }, Infinity);
+              const myBest = bestNet(teamPlayers), oppBest = bestNet(oppPlayers);
+              if (myBest === Infinity || oppBest === Infinity) return { h: hole.hole_number, res: null };
+              if (myBest < oppBest) return { h: hole.hole_number, res: "W" };
+              if (myBest > oppBest) return { h: hole.hole_number, res: "L" };
+              return { h: hole.hole_number, res: "T" };
+            });
+            return (
+              <div key={tl} style={{ backgroundColor: tl === "A" ? "rgba(34,197,94,0.06)" : "rgba(59,130,246,0.06)", border: `1.5px solid ${tl === "A" ? "rgba(34,197,94,0.25)" : "rgba(59,130,246,0.25)"}`, borderRadius: 14, padding: 12, marginBottom: ti === 0 ? 10 : 0 }}>
+                {/* Team header with hole pills */}
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid #1e293b" }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: tc }}>Team {tl}</div>
+                  <div style={{ display: "flex", gap: 3, overflowX: "auto", scrollbarWidth: "none", flex: 1 }}>
+                    {teamHolePills.map(({ h, res }) => (
+                      <div key={h} style={{ minWidth: 24, background: "#0f172a", borderRadius: 4, padding: "2px 3px", textAlign: "center", border: "1px solid #1e293b", flexShrink: 0 }}>
+                        <div style={{ fontSize: 7, color: "#475569" }}>H{h}</div>
+                        <div style={{ fontSize: 9, fontWeight: 800, color: res === "W" ? "#22c55e" : res === "L" ? "#ef4444" : res === "T" ? "#94a3b8" : "#334155" }}>{res || "—"}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {/* Player cards inside team */}
+                {teamPlayers.map((player) => {
+                  const isMe = player.id === me.id;
+                  const ps = isMe ? [] : allScores.filter((s) => s.player_id === player.id);
+                  const myGrossTotal2 = isMe ? holes.reduce((sum, h) => sum + (myScores[h.hole_number] ? myScores[h.hole_number] - h.par : 0), 0) : holes.reduce((sum, h) => { const s = ps.find((x) => x.hole_number === h.hole_number); return sum + (s ? s.score - h.par : 0); }, 0);
+                  const myNetTotal2 = isMe ? holes.reduce((sum, h) => { const g = myScores[h.hole_number]; if (!g) return sum; return sum + (g - getHcpStrokes(me.handicap, h.stroke_index) - h.par); }, 0) : holes.reduce((sum, h) => { const s = ps.find((x) => x.hole_number === h.hole_number); if (!s) return sum; return sum + (s.score - getHcpStrokes(player.handicap, h.stroke_index) - h.par); }, 0);
+                  return (
+                    <div key={player.id} style={{ ...S.playerCard, marginBottom: 8, ...(isMe ? { border: "1px solid #22c55e33" } : {}) }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                        <div style={{ ...S.playerCardName, color: isMe ? "#22c55e" : "#f8fafc" }}>{player.name} (HCP {player.handicap}) {isMe && <span style={{ fontSize: 9, color: "#22c55e", fontWeight: 600 }}>YOU</span>}</div>
+                        <div style={{ fontSize: 11, color: "#64748b" }}>
+                          G: <span style={{ color: myGrossTotal2 === 0 ? "#94a3b8" : myGrossTotal2 > 0 ? "#ef4444" : "#22c55e", fontWeight: 700 }}>{formatToPar(myGrossTotal2)}</span>
+                          {isHandicap && <>{" "}N: <span style={{ color: myNetTotal2 === 0 ? "#94a3b8" : myNetTotal2 > 0 ? "#ef4444" : "#22c55e", fontWeight: 700 }}>{formatToPar(myNetTotal2)}</span></>}
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "flex-start" }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 2, paddingTop: 14, marginRight: 4, flexShrink: 0 }}>
+                          <div style={{ fontSize: 9, color: "#94a3b8", fontWeight: 700, height: 28, display: "flex", alignItems: "center" }}>G</div>
+                          {isHandicap && <div style={{ fontSize: 9, color: "#94a3b8", fontWeight: 700, height: 28, display: "flex", alignItems: "center" }}>N</div>}
+                        </div>
+                        <div className="ff-slave-scroll" style={{ ...S.playerScoresRow, flex: 1 }} onScroll={(e) => { document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { if (el !== e.target) el.scrollLeft = e.target.scrollLeft; }); }}>
+                          {holes.map((h) => {
+                            const g = isMe ? myScores[h.hole_number] : (ps.find((s) => s.hole_number === h.hole_number)?.score || null);
+                            const hs = getHcpStrokes(player.handicap, h.stroke_index);
+                            // Highlight if this player's score is the team best for this hole
+                            const teamBestNet = teamPlayers.reduce((best, pl) => {
+                              const sc = pl.id === me.id ? myScores[h.hole_number] : allScores.find((s) => s.player_id === pl.id && s.hole_number === h.hole_number)?.score;
+                              if (!sc) return best;
+                              return Math.min(best, sc - getHcpStrokes(pl.handicap, h.stroke_index));
+                            }, Infinity);
+                            const myNet = g ? g - hs : null;
+                            const isBestBall = myNet !== null && myNet === teamBestNet && teamBestNet !== Infinity;
+                            return (
+                              <div key={player.id + h.hole_number} style={{ minWidth: 44, flex: "0 0 auto", display: "flex", flexDirection: "column", alignItems: "center", overflow: "visible" }}>
+                                <div style={{ fontSize: 8, color: "#94a3b8", height: 10, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>{h.hole_number}</div>
+                                <div style={{ fontSize: 7, color: "#475569", height: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>P{h.par}</div>
+                                <div style={{ height: 28, display: "flex", alignItems: "center", justifyContent: "center", overflow: "visible" }}>
+                                  {g ? (() => {
+                                    const diff = g - h.par;
+                                    const base = { fontSize: 10, fontWeight: 800, width: 20, height: 20, display: "inline-flex", alignItems: "center", justifyContent: "center" };
+                                    const highlight = isBestBall ? { backgroundColor: "#22c55e22", outline: "1.5px solid #22c55e66" } : {};
+                                    if (diff <= -2) return <span style={{ ...base, ...highlight, borderRadius: "50%", border: "1.5px solid #94a3b8", color: "#e2e8f0", boxShadow: "0 0 0 1.5px #475569" }}>{g}</span>;
+                                    if (diff === -1) return <span style={{ ...base, ...highlight, borderRadius: "50%", border: "1.5px solid #94a3b8", color: "#e2e8f0" }}>{g}</span>;
+                                    if (diff === 0) return <span style={{ ...base, ...highlight, color: "#e2e8f0" }}>{g}</span>;
+                                    if (diff === 1) return <span style={{ ...base, ...highlight, border: "1.5px solid #94a3b8", color: "#e2e8f0", borderRadius: 2 }}>{g}</span>;
+                                    return <span style={{ ...base, ...highlight, border: "1.5px solid #64748b", color: "#e2e8f0", borderRadius: 2, boxShadow: "0 0 0 1.5px #475569" }}>{g}</span>;
+                                  })() : <span style={{ color: "#334155" }}>—</span>}
+                                </div>
+                                {isHandicap && <div style={{ height: 28, display: "flex", alignItems: "center", justifyContent: "center", overflow: "visible" }}>
+                                  {g ? (() => {
+                                    const net = g - hs;
+                                    const diff = net - h.par;
+                                    const base = { fontSize: 10, fontWeight: 800, width: 20, height: 20, display: "inline-flex", alignItems: "center", justifyContent: "center" };
+                                    const highlight = isBestBall ? { backgroundColor: "#22c55e22", outline: "1.5px solid #22c55e66" } : {};
+                                    if (diff <= -2) return <span style={{ ...base, ...highlight, borderRadius: "50%", border: "1.5px solid #94a3b8", color: "#e2e8f0", boxShadow: "0 0 0 1.5px #475569" }}>{net}</span>;
+                                    if (diff === -1) return <span style={{ ...base, ...highlight, borderRadius: "50%", border: "1.5px solid #94a3b8", color: "#e2e8f0" }}>{net}</span>;
+                                    if (diff === 0) return <span style={{ ...base, ...highlight, color: "#e2e8f0" }}>{net}</span>;
+                                    if (diff === 1) return <span style={{ ...base, ...highlight, border: "1.5px solid #94a3b8", color: "#e2e8f0", borderRadius: 2 }}>{net}</span>;
+                                    return <span style={{ ...base, ...highlight, border: "1.5px solid #64748b", color: "#e2e8f0", borderRadius: 2, boxShadow: "0 0 0 1.5px #475569" }}>{net}</span>;
+                                  })() : <span style={{ color: "#334155" }}>—</span>}
+                                </div>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", paddingTop: 14, marginLeft: 6, paddingLeft: 6, borderLeft: "1px solid #334155", flexShrink: 0 }}>
+                          <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800, color: myGrossTotal2 === 0 ? "#94a3b8" : myGrossTotal2 > 0 ? "#ef4444" : "#22c55e" }}>{formatToPar(myGrossTotal2)}</div>
+                          {isHandicap && <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800, color: myNetTotal2 === 0 ? "#94a3b8" : myNetTotal2 > 0 ? "#ef4444" : "#22c55e" }}>{formatToPar(myNetTotal2)}</div>}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          });
+        })() : (<>
 
         {/* MY card - same style as other players */}
         {(() => {
@@ -3641,6 +3803,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
               </div>
             );
           })}
+        </>)}
         </div>
 
       {showChat && <ChatPanel round={round} me={me} onClose={() => { setShowChat(false); setUnreadChat(0); }} />}
