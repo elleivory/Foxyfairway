@@ -1896,6 +1896,7 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
                   </div>
                 </button>
               ))}
+            </div>
           </div>
         )}
         {step === 2 && (
