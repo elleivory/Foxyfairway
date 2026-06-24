@@ -1177,7 +1177,7 @@ function AdminDashboardScreen({ onLogout }) {
     setSaving(false);
   };
 
-  const updateHole = (i, field, val) => { const h = [...holes]; h[i] = { ...h[i], [field]: parseInt(val) || 0 }; setHoles(h); };
+  const updateHole = (i, field, val) => { const h = [...holes]; h[i] = { ...h[i], [field]: val === "" ? null : parseInt(val) }; setHoles(h); };
 
   return (
     <div style={S.screen}>
@@ -1735,7 +1735,7 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
 
   const updateCourseHole = (i, field, val) => {
     const h = [...courseHoles];
-    h[i] = { ...h[i], [field]: parseInt(val) || 0 };
+    h[i] = { ...h[i], [field]: val === "" ? null : parseInt(val) };
     setCourseHoles(h);
   };
 
