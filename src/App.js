@@ -960,7 +960,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onAdminLogin, onRejoin, lastRo
 
   return (
     <div style={S.screen}>
-      <div style={{ position: "absolute", top: 12, left: 16, fontSize: 10, color: "#334155", fontWeight: 600 }}>v1.1.4</div>
+      <div style={{ position: "absolute", top: 12, left: 16, fontSize: 10, color: "#334155", fontWeight: 600 }}>v1.1.5</div>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 56, paddingBottom: 28 }}>
         <img src="/logo.png" alt="Foxy Fairways"
           style={{ width: 110, height: 110, borderRadius: 24, boxShadow: "0 8px 40px rgba(0,0,0,0.5)", marginBottom: 18 }}
@@ -1156,7 +1156,7 @@ function CourseSearch({ onSelect }) {
 function AdminDashboardScreen({ onLogout }) {
   const [courses, setCourses] = useState([]);
   const [newName, setNewName] = useState(""), [editing, setEditing] = useState(null), [holes, setHoles] = useState([]);
-  const [saving, setSaving] = useState(false), [msg, setMsg] = useState("");
+  const [saving, setSaving] = useState(false), [msg, setMsg] = useState(""), [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -1205,10 +1205,9 @@ function AdminDashboardScreen({ onLogout }) {
             {courses.map((c) => (
               <div key={c.id} style={S.courseItem}>
                 <div><div style={S.courseName}>{c.name}</div><div style={S.courseAddr}>18 holes</div></div>
-                <div style={{ display: "flex", gap: 6 }}>
-                  <button style={S.smallBtn} onClick={() => { setEditing(c); setHoles(c.holes || []); }}>Edit</button>
-                  <button style={{ ...S.smallBtn, color: "#ef4444", borderColor: "#ef4444" }} onClick={async () => {
-                    if (window.confirm("Delete " + c.name + "? This cannot be undone.")) {
+                {confirmDeleteId === c.id ? (
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button style={{ ...S.smallBtn, color: "#ef4444", borderColor: "#ef4444" }} onClick={async () => {
                       try {
                         await dbDeleteCourse(c.id);
                         markCourseDeleted(c.id);
@@ -1216,9 +1215,16 @@ function AdminDashboardScreen({ onLogout }) {
                         setMsg("Course deleted.");
                         setTimeout(() => setMsg(""), 2000);
                       } catch { setMsg("Delete failed."); }
-                    }
-                  }}>Delete</button>
-                </div>
+                      setConfirmDeleteId(null);
+                    }}>Confirm</button>
+                    <button style={S.smallBtn} onClick={() => setConfirmDeleteId(null)}>Cancel</button>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button style={S.smallBtn} onClick={() => { setEditing(c); setHoles(c.holes || []); }}>Edit</button>
+                    <button style={{ ...S.smallBtn, color: "#ef4444", borderColor: "#ef4444" }} onClick={() => setConfirmDeleteId(c.id)}>Delete</button>
+                  </div>
+                )}
               </div>
             ))}
             <div style={{ ...S.stepWrap, marginTop: 24 }}>
@@ -2055,7 +2061,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
   const [players, setPlayers] = useState([]), [scores, setScores] = useState([]), [showShare, setShowShare] = useState(false);
   const [showComplete, setShowComplete] = useState(false);
   const [showAddGuest, setShowAddGuest] = useState(false);
-  const [guestName, setGuestName] = useState(""), [guestHcp, setGuestHcp] = useState(""), [addingGuest, setAddingGuest] = useState(false);
+  const [guestName, setGuestName] = useState(""), [guestHcp, setGuestHcp] = useState(""), [guestTeam, setGuestTeam] = useState("A"), [addingGuest, setAddingGuest] = useState(false);
   const [editingPlayerId, setEditingPlayerId] = useState(null);
   const [editPlayerName, setEditPlayerName] = useState("");
   const [editPlayerHcp, setEditPlayerHcp] = useState("");
@@ -2066,8 +2072,8 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
     if (!guestName.trim()) return;
     setAddingGuest(true);
     try {
-      await dbCreatePlayer({ name: guestName.trim() + " (Guest)", handicap: round.use_handicap === false ? 0 : (parseFloat(guestHcp) || 0), round_id: round.id, is_placeholder: false });
-      setGuestName(""); setGuestHcp(""); setShowAddGuest(false);
+      await dbCreatePlayer({ name: guestName.trim() + " (Guest)", handicap: round.use_handicap === false ? 0 : (parseFloat(guestHcp) || 0), round_id: round.id, team: round.game_type === "matchplay_teams" ? guestTeam : null, is_placeholder: false });
+      setGuestName(""); setGuestHcp(""); setGuestTeam("A"); setShowAddGuest(false);
       const p = await dbGetPlayers(round.id); setPlayers(p);
     } catch(e) { console.error(e); }
     setAddingGuest(false);
@@ -2129,6 +2135,16 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
               <label style={S.label}>Handicap</label>
               <input style={{ ...S.input, marginBottom: 10 }} type="number" step="0.1" placeholder="0" value={guestHcp} onChange={(e) => setGuestHcp(e.target.value)} />
             </>}
+            {round.game_type === "matchplay_teams" && (
+              <div style={{ marginBottom: 10 }}>
+                <label style={S.label}>Team</label>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {["A", "B"].map((t) => (
+                    <button key={t} onClick={() => setGuestTeam(t)} style={{ flex: 1, backgroundColor: guestTeam === t ? "#22c55e" : "#0f172a", color: guestTeam === t ? "#0f172a" : "#94a3b8", border: "1px solid " + (guestTeam === t ? "#22c55e" : "#334155"), borderRadius: 10, padding: "10px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Team {t}</button>
+                  ))}
+                </div>
+              </div>
+            )}
             <div style={{ display: "flex", gap: 8 }}>
               <button onClick={addGuest} disabled={!guestName.trim() || addingGuest} style={{ flex: 1, backgroundColor: guestName.trim() ? "#22c55e" : "#334155", color: guestName.trim() ? "#0f172a" : "#64748b", border: "none", borderRadius: 10, padding: "12px", fontSize: 14, fontWeight: 700, cursor: guestName.trim() ? "pointer" : "not-allowed", fontFamily: "inherit" }}>{addingGuest ? "Adding..." : "Add Guest"}</button>
               <button onClick={() => { setShowAddGuest(false); setGuestName(""); setGuestHcp(""); }} style={{ flex: 1, backgroundColor: "transparent", color: "#64748b", border: "1px solid #334155", borderRadius: 10, padding: "12px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
@@ -2676,22 +2692,20 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
     
     if (holeNum < 18) {
       if (round.game_type !== "banker") {
-        // Build updated scores including the one just saved
-        const updatedScores = [...allScores.filter((s) => !(s.player_id === me.id && s.hole_number === holeNum)), obj];
-        const guests = others.filter((p) => p.name?.endsWith("(Guest)"));
-        const allGuestsScored = guests.every((g) =>
-          updatedScores.some((s) => s.player_id === g.id && s.hole_number === holeNum && s.score > 0)
+        // Auto-advance based on local device scores only - don't wait for other devices
+        const myGuests = others.filter((p) => p.name?.endsWith("(Guest)"));
+        const allLocalGuestsScored = myGuests.every((g) =>
+          (guestScores[g.id]?.[holeNum] > 0)
         );
-        if (guests.length === 0 || allGuestsScored) {
+        if (myGuests.length === 0 || allLocalGuestsScored) {
           const next = holeNum + 1;
           setActiveHole(next);
           setTimeout(() => {
             const pos = Math.max(0, (next - 1) * 48 - 120);
             document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { el.scrollLeft = pos; });
           }, 50);
-        } else {
-          // guests exist but not all scored yet - tryAdvance will fire when guest scores in
         }
+        // else guests on this device haven't all scored yet - tryAdvance will fire when they do
       }
       // Banker: hole advance happens via Supabase sync in 2s refresh
     } else {
@@ -2699,17 +2713,14 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
     }
   };
 
-  const tryAdvanceHole = async (holeNum) => {
+  const tryAdvanceHole = (holeNum, updatedGuestScores) => {
     if (round.game_type === "banker" || holeNum >= 18) return;
-    const freshScores = await dbGetScores(round.id);
-    setAllScores(freshScores);
-    const guests = others.filter((p) => p.name?.endsWith("(Guest)"));
-    const myScored = freshScores.some((s) => s.player_id === me.id && s.hole_number === holeNum && s.score > 0);
+    const myGuests = others.filter((p) => p.name?.endsWith("(Guest)"));
+    const myScored = myScores[holeNum] > 0;
     if (!myScored) return;
-    const allGuestsScored = guests.every((g) =>
-      freshScores.some((s) => s.player_id === g.id && s.hole_number === holeNum && s.score > 0)
-    );
-    if (allGuestsScored) {
+    const scores = updatedGuestScores || guestScores;
+    const allLocalGuestsScored = myGuests.every((g) => scores[g.id]?.[holeNum] > 0);
+    if (allLocalGuestsScored) {
       const next = holeNum + 1;
       setActiveHole(next);
       setTimeout(() => {
@@ -2728,6 +2739,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
       if (!betsOpen) return;
     }
     setGuestScores((prev) => ({ ...prev, [player.id]: { ...(prev[player.id] || {}), [holeNum]: score } }));
+    const updatedGuestScores = { ...guestScores, [player.id]: { ...(guestScores[player.id] || {}), [holeNum]: score } };
     const obj = { player_id: player.id, hole_number: holeNum, score, round_id: round.id };
     const updatedScores = [...allScores.filter((s) => !(s.player_id === player.id && s.hole_number === holeNum)), obj];
     setAllScores(updatedScores);
@@ -2765,7 +2777,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
         setAllScores(freshScores);
       }
     } else {
-      tryAdvanceHole(holeNum);
+      tryAdvanceHole(holeNum, updatedGuestScores);
     }
   };
 
@@ -3330,7 +3342,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                 {row.map((player) => {
                   const { val, color } = getScore(player);
                   const isMe = player.id === me.id;
-                  const shortName = player.name.replace(" (Guest)", "").split(" ")[0];
+                  const shortName = ((isMe && !player.name) ? round.created_by : player.name || "").replace(" (Guest)", "").split(" ")[0];
                   return (
                     <div key={player.id} style={{ flex: 1, backgroundColor: isMe ? "#022c22" : "#1e293b", border: "1px solid " + (isMe ? "#22c55e44" : "#334155"), borderRadius: 10, padding: "7px 8px", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, minWidth: 0 }}>
                       <div style={{ fontSize: 10, fontWeight: 600, color: isMe ? "#22c55e" : "#94a3b8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", width: "100%", textAlign: "center" }}>{shortName}</div>
