@@ -960,7 +960,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onAdminLogin, onRejoin, lastRo
 
   return (
     <div style={S.screen}>
-      <div style={{ position: "absolute", top: 12, left: 16, fontSize: 10, color: "#334155", fontWeight: 600 }}>v1.1.7</div>
+      <div style={{ position: "absolute", top: 12, left: 16, fontSize: 10, color: "#334155", fontWeight: 600 }}>v1.1.8</div>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 56, paddingBottom: 28 }}>
         <img src="/logo.png" alt="Foxy Fairways"
           style={{ width: 110, height: 110, borderRadius: 24, boxShadow: "0 8px 40px rgba(0,0,0,0.5)", marginBottom: 18 }}
@@ -2202,7 +2202,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
                   return { h: hole.hole_number, res: "T" };
                 });
                 return (
-                  <div key={tl} style={{ backgroundColor: tl === "A" ? "rgba(34,197,94,0.06)" : "rgba(59,130,246,0.06)", border: `1.5px solid ${tl === "A" ? "rgba(34,197,94,0.25)" : "rgba(59,130,246,0.25)"}`, borderRadius: 14, padding: 14, marginBottom: ti === 0 ? 4 : 0 }}>
+                  <div key={tl} style={{ backgroundColor: tl === "A" ? "rgba(34,197,94,0.06)" : "rgba(59,130,246,0.06)", border: `1.5px solid ${tl === "A" ? "rgba(34,197,94,0.25)" : "rgba(59,130,246,0.25)"}`, borderRadius: 14, padding: 14, marginBottom: ti === 0 ? 4 : 0, overflow: "hidden" }}>
                     {/* Team header */}
                     <div style={{ display: "flex", alignItems: "center", gap: 12, paddingBottom: 10, borderBottom: "1px solid #1e293b", marginBottom: 10 }}>
                       <div style={{ fontSize: 18, fontWeight: 800, color: tc, width: 28, flexShrink: 0 }}>{tl}</div>
@@ -2527,7 +2527,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
   const [allScores, setAllScores] = useState([]), [others, setOthers] = useState([]);
   const [guestScores, setGuestScores] = useState({}); // { [playerId]: { [holeNum]: score } }
   const [guestCustomScores, setGuestCustomScores] = useState({}); // { [playerId]: string } for custom input
-  const [overridePlayer, setOverridePlayer] = useState(null); // player id being overridden
+  
   const [activeHole, setActiveHole] = useState(1);
   const [showChat, setShowChat] = useState(false);
   const [unreadChat, setUnreadChat] = useState(0);
@@ -3179,40 +3179,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
             );
           })()}
 
-          {/* Override row - shows temporarily when creator taps edit on a joined player */}
-          {overridePlayer && (() => {
-            const op = others.find((p) => p.id === overridePlayer);
-            if (!op) return null;
-            if (round.game_type === "banker") {
-              const thisBankerNow = activeHole === 1 ? initialBankerId : currentBankerId;
-              const betsOpen = betsAcceptedRef.current[activeHole] || allScores.some((s) => s.player_id === thisBankerNow && s.hole_number === activeHole && s.hole_pot > 0);
-              if (!betsOpen) return null;
-            }
-            const opHcpS = curHole ? getHcpStrokes(op.handicap, curHole.stroke_index) : 0;
-            const opScore = allScores.find((s) => s.player_id === op.id && s.hole_number === activeHole)?.score;
-            return (
-              <div style={{ backgroundColor: "#2a1a00", border: "1.5px solid #f59e0b", borderRadius: 12, padding: "10px 12px", marginBottom: 10 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ fontSize: 11, color: "#f59e0b", fontWeight: 700 }}>⚡ Override</span>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: "#e2e8f0" }}>{op.name}</span>
-                  </div>
-                  <button onClick={() => setOverridePlayer(null)} style={{ background: "none", border: "none", color: "#64748b", fontSize: 14, cursor: "pointer", fontFamily: "inherit", fontWeight: 700 }}>✕ Done</button>
-                </div>
-                <div style={{ display: "flex", gap: 6, overflowX: "auto", scrollbarWidth: "none" }}>
-                  {curHole && [curHole.par - 1, curHole.par, curHole.par + 1, curHole.par + 2, curHole.par + 3].map((s) => (
-                    <button key={s} onClick={() => saveGuestScore(op, activeHole, s)}
-                      style={{ minWidth: 46, height: 46, borderRadius: 10, border: "none", flexShrink: 0, fontFamily: "inherit", cursor: "pointer",
-                        backgroundColor: opScore === s ? "#22c55e" : "#ffffff",
-                        color: "#0f172a", fontSize: 15, fontWeight: 700, boxShadow: "0 2px 4px rgba(0,0,0,0.3)" }}>
-                      <div style={{ fontSize: 16, fontWeight: 800, lineHeight: 1 }}>{s}</div>
-                      <div style={{ fontSize: 8, fontWeight: 600, marginTop: 1, color: opScore === s ? "#065f46" : "#475569" }}>{scoreLabel(s, curHole.par)}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
+          
 
                     <div style={{ position: "relative" }}>
           {round.game_type === "banker" && (() => {
@@ -3450,7 +3417,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
               return { h: hole.hole_number, res: "T" };
             });
             return (
-              <div key={tl} style={{ backgroundColor: tl === "A" ? "rgba(34,197,94,0.06)" : "rgba(59,130,246,0.06)", border: `1.5px solid ${tl === "A" ? "rgba(34,197,94,0.25)" : "rgba(59,130,246,0.25)"}`, borderRadius: 14, padding: 12, marginBottom: ti === 0 ? 10 : 0 }}>
+              <div key={tl} style={{ backgroundColor: tl === "A" ? "rgba(34,197,94,0.06)" : "rgba(59,130,246,0.06)", border: `1.5px solid ${tl === "A" ? "rgba(34,197,94,0.25)" : "rgba(59,130,246,0.25)"}`, borderRadius: 14, padding: 12, marginBottom: ti === 0 ? 10 : 0, overflow: "hidden" }}>
                 {/* Team header with hole pills */}
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, paddingBottom: 8, borderBottom: "1px solid #1e293b" }}>
                   <div style={{ fontSize: 13, fontWeight: 800, color: tc }}>Team {tl}</div>
@@ -3651,10 +3618,6 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <div style={S.playerCardName}>{player.name} (HCP {player.handicap})</div>
-                    {round.created_by === me.name && !player.name?.endsWith("(Guest)") && (
-                      <button onClick={() => setOverridePlayer(overridePlayer === player.id ? null : player.id)}
-                        title="Override score" style={{ background: "none", border: "none", color: overridePlayer === player.id ? "#f59e0b" : "#334155", fontSize: 13, cursor: "pointer", padding: "2px 4px", fontFamily: "inherit" }}>✏️</button>
-                    )}
                   </div>
                   <div style={{ fontSize: 11, color: "#64748b" }}>
                     G: <span style={{ color: pGrossTotal === 0 ? "#94a3b8" : pGrossTotal > 0 ? "#ef4444" : "#22c55e", fontWeight: 700 }}>{formatToPar(pGrossTotal)}</span>
