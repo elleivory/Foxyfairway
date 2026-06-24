@@ -960,7 +960,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onAdminLogin, onRejoin, lastRo
 
   return (
     <div style={S.screen}>
-      <div style={{ position: "absolute", top: 12, left: 16, fontSize: 10, color: "#334155", fontWeight: 600 }}>v1.1.3</div>
+      <div style={{ position: "absolute", top: 12, left: 16, fontSize: 10, color: "#334155", fontWeight: 600 }}>v1.1.4</div>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 56, paddingBottom: 28 }}>
         <img src="/logo.png" alt="Foxy Fairways"
           style={{ width: 110, height: 110, borderRadius: 24, boxShadow: "0 8px 40px rgba(0,0,0,0.5)", marginBottom: 18 }}
@@ -2241,8 +2241,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
                       <div style={{ fontSize: 9, color: "#475569", marginBottom: 2 }}>H{hole.hole_number}</div>
                       <div style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", marginBottom: 1 }}>{bankerPlayer.name.split(" ")[0]}</div>
                       <div style={{ fontSize: 12, fontWeight: 800 }}>{doubled ? "🏦🔥" : "🏦"}</div>
-                      <div style={{ fontSize: 11, fontWeight: 800, color }}>{tied ? "TIE" : bankerWon ? "WIN" : "LOSS"}</div>
-                      <div style={{ fontSize: 10, color, fontWeight: 700 }}>{tied ? "" : (bankerWon ? "+" : "-") + "$" + bankerBets}</div>
+                      <div style={{ fontSize: 11, fontWeight: 800, color }}>{tied ? "$0" : (bankerWon ? "+" : "-") + "$" + bankerBets}</div>
                     </div>
                   );
                 })}
