@@ -960,7 +960,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onAdminLogin, onRejoin, lastRo
 
   return (
     <div style={S.screen}>
-      <div style={{ position: "absolute", top: 12, left: 16, fontSize: 10, color: "#334155", fontWeight: 600 }}>v1.1.6</div>
+      <div style={{ position: "absolute", top: 12, left: 16, fontSize: 10, color: "#334155", fontWeight: 600 }}>v1.1.7</div>
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 56, paddingBottom: 28 }}>
         <img src="/logo.png" alt="Foxy Fairways"
           style={{ width: 110, height: 110, borderRadius: 24, boxShadow: "0 8px 40px rgba(0,0,0,0.5)", marginBottom: 18 }}
@@ -2158,6 +2158,15 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
             <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#22c55e", animation: "pulse 1.5s infinite" }} />
             <span style={{ fontSize: 11, color: "#475569" }}>Live</span>
           </div>
+          {round.game_type === "matchplay_teams" && lb.length > 0 && (() => {
+            const teamAPts = lb.filter((p) => p.team === "A")[0]?.total || 0;
+            const teamBPts = lb.filter((p) => p.team === "B")[0]?.total || 0;
+            const diff = teamAPts - teamBPts;
+            const label = diff === 0 ? "All Square" : diff > 0 ? `Team A leads by ${diff}` : `Team B leads by ${Math.abs(diff)}`;
+            return (
+              <div style={{ marginLeft: "auto", fontSize: 13, fontWeight: 800, color: diff === 0 ? "#94a3b8" : "#f59e0b", background: diff === 0 ? "#1e293b" : "#1a1200", border: `1px solid ${diff === 0 ? "#334155" : "#f59e0b66"}`, borderRadius: 8, padding: "4px 12px", whiteSpace: "nowrap" }}>{label}</div>
+            );
+          })()}
         </div>
         {lb.length === 0 ? <div style={S.empty}>Waiting for players...</div>
         : round.game_type === "matchplay_teams" ? (() => {
@@ -2176,6 +2185,11 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
                 const holePills = holes.map((hole) => {
                   const teamPlayers = allPlayers.filter((p) => p.team === tl);
                   const oppPlayers = allPlayers.filter((p) => p.team !== tl);
+                  const allScored = allPlayers.every((pl) => {
+                    const s = scores.find((x) => x.player_id === pl.id && x.hole_number === hole.hole_number);
+                    return s && s.score > 0;
+                  });
+                  if (!allScored) return { h: hole.hole_number, res: null };
                   const bestNet = (grp) => grp.reduce((best, pl) => {
                     const s = scores.find((x) => x.player_id === pl.id && x.hole_number === hole.hole_number);
                     if (!s || !s.score) return best;
@@ -2219,12 +2233,6 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack }) {
                   </div>
                 );
               })}
-              {/* VS status badge */}
-              <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "10px 0" }}>
-                <div style={{ flex: 1, height: 1, background: "#1e293b" }} />
-                <div style={{ fontSize: 11, fontWeight: 700, color: diff === 0 ? "#94a3b8" : "#f59e0b", background: diff === 0 ? "#1e293b" : "#1a1200", border: `1px solid ${diff === 0 ? "#334155" : "#f59e0b44"}`, borderRadius: 6, padding: "3px 10px" }}>{statusLabel}</div>
-                <div style={{ flex: 1, height: 1, background: "#1e293b" }} />
-              </div>
             </div>
           );
         })() : (
@@ -2744,7 +2752,10 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
     if (holeNum < 18) {
       if (round.game_type !== "banker") {
         // Auto-advance based on local device scores only - don't wait for other devices
-        const myGuests = others.filter((p) => p.name?.endsWith("(Guest)"));
+        // Only round creator has guests to score; other devices advance immediately
+        const myGuests = me.name === round.created_by
+          ? others.filter((p) => p.name?.endsWith("(Guest)"))
+          : [];
         const allLocalGuestsScored = myGuests.every((g) =>
           (guestScores[g.id]?.[holeNum] > 0)
         );
@@ -2766,7 +2777,9 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
 
   const tryAdvanceHole = (holeNum, updatedGuestScores) => {
     if (round.game_type === "banker" || holeNum >= 18) return;
-    const myGuests = others.filter((p) => p.name?.endsWith("(Guest)"));
+    const myGuests = me.name === round.created_by
+      ? others.filter((p) => p.name?.endsWith("(Guest)"))
+      : [];
     const myScored = myScores[holeNum] > 0;
     if (!myScored) return;
     const scores = updatedGuestScores || guestScores;
@@ -3419,10 +3432,16 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
             const oppPlayers = allP.filter((p) => p.team !== tl);
             // Per-hole team W/L/T pills
             const teamHolePills = holes.map((hole) => {
+              const allP2 = [me, ...others];
+              const allScored = allP2.every((pl) => {
+                const s = pl.id === me.id ? myScores[hole.hole_number] : allScores.find((x) => x.player_id === pl.id && x.hole_number === hole.hole_number)?.score;
+                return s && s > 0;
+              });
+              if (!allScored) return { h: hole.hole_number, res: null };
               const bestNet = (grp) => grp.reduce((best, pl) => {
-                const s = allScores.find((x) => x.player_id === pl.id && x.hole_number === hole.hole_number);
-                if (!s || !s.score) return best;
-                return Math.min(best, s.score - getHcpStrokes(pl.handicap, hole.stroke_index));
+                const s = pl.id === me.id ? myScores[hole.hole_number] : allScores.find((x) => x.player_id === pl.id && x.hole_number === hole.hole_number)?.score;
+                if (!s) return best;
+                return Math.min(best, s - getHcpStrokes(pl.handicap, hole.stroke_index));
               }, Infinity);
               const myBest = bestNet(teamPlayers), oppBest = bestNet(oppPlayers);
               if (myBest === Infinity || oppBest === Infinity) return { h: hole.hole_number, res: null };
@@ -3451,7 +3470,7 @@ function ScorecardScreen({ round, me, onViewDashboard }) {
                   const myGrossTotal2 = isMe ? holes.reduce((sum, h) => sum + (myScores[h.hole_number] ? myScores[h.hole_number] - h.par : 0), 0) : holes.reduce((sum, h) => { const s = ps.find((x) => x.hole_number === h.hole_number); return sum + (s ? s.score - h.par : 0); }, 0);
                   const myNetTotal2 = isMe ? holes.reduce((sum, h) => { const g = myScores[h.hole_number]; if (!g) return sum; return sum + (g - getHcpStrokes(me.handicap, h.stroke_index) - h.par); }, 0) : holes.reduce((sum, h) => { const s = ps.find((x) => x.hole_number === h.hole_number); if (!s) return sum; return sum + (s.score - getHcpStrokes(player.handicap, h.stroke_index) - h.par); }, 0);
                   return (
-                    <div key={player.id} style={{ ...S.playerCard, marginBottom: 8, ...(isMe ? { border: "1px solid #22c55e33" } : {}) }}>
+                    <div key={player.id} style={{ ...S.playerCard, marginBottom: 8, overflow: "hidden", ...(isMe ? { border: "1px solid #22c55e33" } : {}) }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                         <div style={{ ...S.playerCardName, color: isMe ? "#22c55e" : "#f8fafc" }}>{player.name} (HCP {player.handicap}) {isMe && <span style={{ fontSize: 9, color: "#22c55e", fontWeight: 600 }}>YOU</span>}</div>
                         <div style={{ fontSize: 11, color: "#64748b" }}>
