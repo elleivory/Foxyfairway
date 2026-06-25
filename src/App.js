@@ -1046,10 +1046,10 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
             const t = new Date(lastRound.savedAt).toLocaleString("en-NZ", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true });
             return (
               <div style={{ backgroundColor: "rgba(2,44,34,0.7)", border: "1px solid #22c55e22", borderRadius: 14, padding: "14px 16px", marginBottom: 16, backdropFilter: "blur(8px)" }}>
-                <div style={{ fontSize: 9, color: "#22c55e", fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 6 }}>\u21A9 Last Round</div>
+                <div style={{ fontSize: 9, color: "#22c55e", fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 6 }}>↩ Last Round</div>
                 <div style={{ fontSize: 15, fontWeight: 700, color: "#f8fafc", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{lastRound.round.course_name}</div>
-                <div style={{ fontSize: 11, color: "#475569", marginTop: 2, marginBottom: 10 }}>{lastRound.me.name} \u00B7 {GAME_TYPES[lastRound.round.game_type]?.label} \u00B7 {t}</div>
-                <button onClick={onRejoin} style={{ backgroundColor: "#22c55e", color: "#0f172a", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 700, width: "100%", cursor: "pointer", fontFamily: "inherit" }}>Continue \u2192</button>
+                <div style={{ fontSize: 11, color: "#475569", marginTop: 2, marginBottom: 10 }}>{lastRound.me.name} · {GAME_TYPES[lastRound.round.game_type]?.label} · {t}</div>
+                <button onClick={onRejoin} style={{ backgroundColor: "#22c55e", color: "#0f172a", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 700, width: "100%", cursor: "pointer", fontFamily: "inherit" }}>Continue →</button>
               </div>
             );
           })()}
