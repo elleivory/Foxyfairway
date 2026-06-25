@@ -1023,7 +1023,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.20</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.21</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={shareApp} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", backdropFilter: "blur(4px)" }}>SHARE</button>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
@@ -1405,15 +1405,33 @@ function SuperAdminScreen({ onLogout }) {
   const [blockName, setBlockName] = useState("");
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(true);
+  const [tournaments, setTournaments] = useState([]);
+  const [editingTournamentId, setEditingTournamentId] = useState(null);
+  const [editingTournamentName, setEditingTournamentName] = useState("");
 
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const [r, b] = await Promise.all([dbGetAllRounds(), dbGetBlockedPlayers()]);
+      const [r, b, t] = await Promise.all([dbGetAllRounds(), dbGetBlockedPlayers(), dbGetTournaments()]);
       const { data: pd } = await supabase.from("players").select("*").eq("is_placeholder", false).order("created_at", { ascending: false });
-      setRounds(r); setBlocked(b); setAllPlayers(pd || []); setLoading(false);
+      setRounds(r); setBlocked(b); setAllPlayers(pd || []); setTournaments(t); setLoading(false);
     })();
   }, []);
+
+  const handleDeleteTournament = async (t) => {
+    if (!window.confirm("Delete tournament "" + t.name + ""? This cannot be undone.")) return;
+    await dbDeleteTournament(t.id);
+    setTournaments((prev) => prev.filter((x) => x.id !== t.id));
+    setMsg("Tournament deleted."); setTimeout(() => setMsg(""), 2000);
+  };
+
+  const handleRenameTournament = async (t) => {
+    if (!editingTournamentName.trim()) return;
+    await supabase.from("tournaments").update({ name: editingTournamentName.trim() }).eq("id", t.id);
+    setTournaments((prev) => prev.map((x) => x.id === t.id ? { ...x, name: editingTournamentName.trim() } : x));
+    setEditingTournamentId(null); setEditingTournamentName("");
+    setMsg("Tournament renamed."); setTimeout(() => setMsg(""), 2000);
+  };
 
   const handleDeleteRound = async (r) => {
     if (!window.confirm("Delete round " + r.code + " at " + r.course_name + "? Cannot be undone.")) return;
@@ -1446,7 +1464,7 @@ function SuperAdminScreen({ onLogout }) {
         <div style={{ ...S.adminBadge, backgroundColor: "#ef4444" }}>SUPER</div>
       </div>
       <div style={{ display: "flex", borderBottom: "1px solid #334155" }}>
-        {["rounds", "players", "blocked", "stats"].map((t) => (
+        {["rounds", "players", "blocked", "tournaments", "stats"].map((t) => (
           <button key={t} style={{ flex: 1, padding: "12px 0", background: "none", border: "none", color: tab === t ? "#22c55e" : "#64748b", fontWeight: tab === t ? 700 : 400, fontSize: 13, cursor: "pointer", borderBottom: tab === t ? "2px solid #22c55e" : "none", fontFamily: "inherit", textTransform: "capitalize" }} onClick={() => setTab(t)}>{t}</button>
         ))}
       </div>
@@ -1504,6 +1522,35 @@ function SuperAdminScreen({ onLogout }) {
           </div>
         )}
 
+        {tab === "tournaments" && !loading && (
+          <div>
+            {tournaments.length === 0 && <div style={S.empty}>No tournaments yet.</div>}
+            {tournaments.map((t) => (
+              <div key={t.id} style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 10, padding: "12px 14px", marginBottom: 8 }}>
+                {editingTournamentId === t.id ? (
+                  <div>
+                    <input style={{ ...S.input, marginBottom: 8 }} value={editingTournamentName} onChange={(e) => setEditingTournamentName(e.target.value)} autoFocus />
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button style={{ ...S.lbBtn, flex: 1 }} onClick={() => handleRenameTournament(t)}>Save</button>
+                      <button style={{ ...S.btnSecondary, marginTop: 0, flex: 1, padding: "8px" }} onClick={() => { setEditingTournamentId(null); setEditingTournamentName(""); }}>Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: "#f8fafc" }}>{t.name}</div>
+                      <div style={{ fontSize: 11, color: "#64748b" }}>{t.rounds?.length || 0} rounds</div>
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button onClick={() => { setEditingTournamentId(t.id); setEditingTournamentName(t.name); }} style={{ background: "none", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 11, fontWeight: 600, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit" }}>Rename</button>
+                      <button onClick={() => handleDeleteTournament(t)} style={{ background: "none", border: "1px solid #ef4444", borderRadius: 6, color: "#ef4444", fontSize: 11, fontWeight: 600, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit" }}>Delete</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
         {tab === "stats" && !loading && (
           <div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
