@@ -1023,7 +1023,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.18</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.19</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={shareApp} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", backdropFilter: "blur(4px)" }}>SHARE</button>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
@@ -4558,8 +4558,8 @@ const S = {
   headerGame: { fontSize: 12, color: "#64748b" },
   headerTitle: { fontSize: 18, fontWeight: 700, margin: 0, color: "#f8fafc" },
   adminBadge: { backgroundColor: "#f59e0b", color: "#0f172a", fontSize: 11, fontWeight: 800, padding: "4px 10px", borderRadius: 6, letterSpacing: 1 },
-  backBtn: { background: "none", border: "1px solid #334155", borderRadius: 8, color: "#22c55e", fontSize: 14, cursor: "pointer", padding: "8px 12px", fontFamily: "inherit" },
-  lbBtn: { backgroundColor: "#22c55e", color: "#0f172a", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },
+  backBtn: { background: "none", border: "1px solid #334155", borderRadius: 8, color: "#22c55e", fontSize: 14, cursor: "pointer", padding: "8px 12px", fontFamily: "inherit", outline: "none", WebkitTapHighlightColor: "transparent" },
+  lbBtn: { backgroundColor: "#22c55e", color: "#0f172a", border: "none", borderRadius: 8, padding: "8px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", outline: "none", WebkitTapHighlightColor: "transparent" },
   smallIconBtn: { backgroundColor: "#1e293b", color: "#e2e8f0", border: "1px solid #334155", borderRadius: 8, padding: "8px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" },
   content: { flex: 1, padding: "20px 20px 40px", overflowY: "auto" },
   stepWrap: { display: "flex", flexDirection: "column", gap: 16 },
@@ -4569,10 +4569,10 @@ const S = {
   codeInput: { fontSize: 28, fontWeight: 800, textAlign: "center", letterSpacing: 6 },
   hint: { fontSize: 13, color: "#475569", margin: 0 },
   error: { fontSize: 13, color: "#ef4444", margin: 0 },
-  btnPrimary: { backgroundColor: "#22c55e", color: "#0f172a", border: "none", borderRadius: 14, padding: "16px", fontSize: 16, fontWeight: 700, cursor: "pointer", width: "100%", fontFamily: "inherit", WebkitAppearance: "none" },
-  btnSecondary: { backgroundColor: "transparent", color: "#e2e8f0", border: "1px solid #334155", borderRadius: 14, padding: "16px", fontSize: 16, fontWeight: 600, cursor: "pointer", width: "100%", marginTop: 8, fontFamily: "inherit", WebkitAppearance: "none" },
+  btnPrimary: { backgroundColor: "#22c55e", color: "#0f172a", border: "none", borderRadius: 14, padding: "16px", fontSize: 16, fontWeight: 700, cursor: "pointer", width: "100%", fontFamily: "inherit", WebkitAppearance: "none", outline: "none", WebkitTapHighlightColor: "transparent" },
+  btnSecondary: { backgroundColor: "transparent", color: "#e2e8f0", border: "1px solid #334155", borderRadius: 14, padding: "16px", fontSize: 16, fontWeight: 600, cursor: "pointer", width: "100%", marginTop: 8, fontFamily: "inherit", WebkitAppearance: "none", outline: "none", WebkitTapHighlightColor: "transparent" },
   btnShare: { backgroundColor: "#1e293b", color: "#f59e0b", border: "1px solid #f59e0b", borderRadius: 14, padding: "16px", fontSize: 16, fontWeight: 600, cursor: "pointer", width: "100%", fontFamily: "inherit", WebkitAppearance: "none" },
-  btnDisabled: { backgroundColor: "#1e293b", color: "#475569", border: "none", borderRadius: 14, padding: "16px", fontSize: 16, fontWeight: 700, cursor: "not-allowed", width: "100%", fontFamily: "inherit", WebkitAppearance: "none" },
+  btnDisabled: { backgroundColor: "#1e293b", color: "#475569", border: "none", borderRadius: 14, padding: "16px", fontSize: 16, fontWeight: 700, cursor: "not-allowed", width: "100%", fontFamily: "inherit", WebkitAppearance: "none", outline: "none", WebkitTapHighlightColor: "transparent" },
   courseList: { display: "flex", flexDirection: "column", gap: 8 },
   courseCard: { display: "flex", alignItems: "center", gap: 12, backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "12px 16px", cursor: "pointer", textAlign: "left", width: "100%", fontFamily: "inherit", WebkitAppearance: "none", outline: "none", WebkitTapHighlightColor: "transparent" },
   courseCardSelected: { border: "2px solid #22c55e", backgroundColor: "#022c22", outline: "none", WebkitTapHighlightColor: "transparent" },
