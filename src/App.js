@@ -1419,7 +1419,7 @@ function SuperAdminScreen({ onLogout }) {
   }, []);
 
   const handleDeleteTournament = async (t) => {
-    if (!window.confirm("Delete tournament "" + t.name + ""? This cannot be undone.")) return;
+    if (!window.confirm('Delete tournament ' + t.name + '? Cannot be undone.')) return;
     await dbDeleteTournament(t.id);
     setTournaments((prev) => prev.filter((x) => x.id !== t.id));
     setMsg("Tournament deleted."); setTimeout(() => setMsg(""), 2000);
