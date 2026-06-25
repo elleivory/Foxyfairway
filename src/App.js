@@ -1005,9 +1005,9 @@ function exportScorecardImage(round, players, scores, holes) {
 function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, onRejoin, lastRound, savedRounds, onViewHistory, onViewTournaments }) {
   const shareApp = () => {
     if (navigator.share) {
-      navigator.share({ title: "Foxy Fairways", text: "Golf scoring app", url: "https://foxyfairways.netlify.app" }).catch(() => {});
+      navigator.share({ title: "Foxy Fairways", text: "Golf scoring app", url: "https://foxyfairway.netlify.app" }).catch(() => {});
     } else {
-      navigator.clipboard.writeText("https://foxyfairways.netlify.app");
+      navigator.clipboard.writeText("https://foxyfairway.netlify.app");
       alert("Link copied!");
     }
   };
@@ -1024,7 +1024,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#475569", fontWeight: 600 }}>v1.1.14</span>
+          <span style={{ fontSize: 10, color: "#475569", fontWeight: 600 }}>v1.1.15</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={shareApp} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", backdropFilter: "blur(4px)" }}>SHARE</button>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
@@ -1098,7 +1098,7 @@ function AdminLoginScreen({ onBack, onLoginSuccess }) { // onLoginSuccess("super
     else { setErr("Wrong code"); setCode(""); }
   };
   return (
-    <div style={S.screen}>
+    <BgScreen bg={BG_OTHER}>
       <div style={S.header}>
         <button style={S.backBtn} onClick={onBack}>← Back</button>
         <h2 style={S.headerTitle}>Admin Login</h2><div />
@@ -1110,7 +1110,7 @@ function AdminLoginScreen({ onBack, onLoginSuccess }) { // onLoginSuccess("super
         {err && <p style={S.error}>{err}</p>}
         <button style={S.btnPrimary} onClick={login}>Login</button>
       </div></div>
-    </div>
+    </BgScreen>
   );
 }
 
@@ -1267,7 +1267,7 @@ function AdminDashboardScreen({ onLogout }) {
   const updateHole = (i, field, val) => { const h = [...holes]; h[i] = { ...h[i], [field]: val === "" ? null : parseInt(val) }; setHoles(h); };
 
   return (
-    <div style={S.screen}>
+    <BgScreen bg={BG_OTHER}>
       <div style={S.header}>
         <button style={S.backBtn} onClick={onLogout}>← Logout</button>
         <h2 style={S.headerTitle}>Admin Panel</h2>
@@ -1390,7 +1390,7 @@ function AdminDashboardScreen({ onLogout }) {
           </div>
         )}
       </div>
-    </div>
+    </BgScreen>
   );
 }
 
@@ -1440,7 +1440,7 @@ function SuperAdminScreen({ onLogout }) {
   };
 
   return (
-    <div style={S.screen}>
+    <BgScreen bg={BG_OTHER}>
       <div style={S.header}>
         <button style={S.backBtn} onClick={onLogout}>← Logout</button>
         <h2 style={S.headerTitle}>Super Admin</h2>
@@ -1530,7 +1530,7 @@ function SuperAdminScreen({ onLogout }) {
           </div>
         )}
       </div>
-    </div>
+    </BgScreen>
   );
 }
 
@@ -1686,17 +1686,17 @@ function RoundDetailScreen({ roundStub, onBack }) {
   }, [roundStub.code]);
 
   if (loading) return (
-    <div style={S.screen}>
+    <BgScreen bg={BG_GAME}>
       <div style={S.header}><button style={S.backBtn} onClick={onBack}>← Back</button><h2 style={S.headerTitle}>{roundStub.course_name}</h2><div /></div>
       <div style={S.content}><div style={S.empty}>Loading round data...</div></div>
-    </div>
+    </BgScreen>
   );
 
   if (err || !round) return (
-    <div style={S.screen}>
+    <BgScreen bg={BG_GAME}>
       <div style={S.header}><button style={S.backBtn} onClick={onBack}>← Back</button><h2 style={S.headerTitle}>{roundStub.course_name}</h2><div /></div>
       <div style={S.content}><div style={S.empty}>{err || "Round not found."}</div></div>
-    </div>
+    </BgScreen>
   );
 
   if (viewingScorecard) {
@@ -1816,7 +1816,7 @@ function TournamentScreen({ onBack }) {
     };
 
     return (
-      <div style={S.screen}>
+      <BgScreen bg={BG_OTHER}>
         <div style={S.header}>
           <button style={S.backBtn} onClick={() => setViewing(null)}>← Back</button>
           <h2 style={S.headerTitle}>{viewing.name}</h2>
@@ -1884,12 +1884,12 @@ function TournamentScreen({ onBack }) {
             );
           })}
         </div>
-      </div>
+      </BgScreen>
     );
   }
 
   return (
-    <div style={S.screen}>
+    <BgScreen bg={BG_OTHER}>
       <div style={S.header}>
         <button style={S.backBtn} onClick={onBack}>← Back</button>
         <h2 style={S.headerTitle}>Tournaments</h2>
@@ -1920,7 +1920,7 @@ function TournamentScreen({ onBack }) {
           ))
         )}
       </div>
-    </div>
+    </BgScreen>
   );
 }
 
@@ -2026,7 +2026,7 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
   };
 
   return (
-    <div style={S.screen}>
+    <BgScreen bg={BG_HOME}>
       <div style={S.header}>
         <button style={S.backBtn} onClick={onBack}>← Back</button>
         <h2 style={S.headerTitle}>New Round</h2><div />
@@ -2219,7 +2219,7 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
           </div>
         )}
       </div>
-    </div>
+    </BgScreen>
   );
 }
 
@@ -2231,6 +2231,7 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
 function WatchRoundScreen({ onBack, onWatch, prefillCode }) {
   const [code, setCode] = useState(prefillCode || "");
   const [err, setErr] = useState(""), [loading, setLoading] = useState(false);
+
 
   useEffect(() => {
     if (prefillCode) {
@@ -2254,7 +2255,7 @@ function WatchRoundScreen({ onBack, onWatch, prefillCode }) {
   };
 
   return (
-    <div style={S.screen}>
+    <BgScreen bg={BG_HOME}>
       <div style={S.header}>
         <button style={S.backBtn} onClick={onBack}>← Back</button>
         <h2 style={S.headerTitle}>Watch a Round</h2><div />
@@ -2269,7 +2270,7 @@ function WatchRoundScreen({ onBack, onWatch, prefillCode }) {
           <button style={code.length >= 4 ? S.btnPrimary : S.btnDisabled} disabled={code.length < 4 || loading} onClick={findAndWatch}>{loading ? "Finding round..." : "👀 Watch Round"}</button>
         </div>
       </div>
-    </div>
+    </BgScreen>
   );
 }
 
@@ -2313,10 +2314,10 @@ function JoinRoundScreen({ onBack, onJoined, prefillCode }) {
     setLoading(false);
   };
 
-  if (loading && step === 0) return <div style={S.screen}><div style={S.content}><div style={S.empty}>Loading round...</div></div></div>;
+  if (loading && step === 0) return <BgScreen bg={BG_HOME}><div style={S.content}><div style={S.empty}>Loading round...</div></div></BgScreen>;
 
   return (
-    <div style={S.screen}>
+    <BgScreen bg={BG_HOME}>
       <div style={S.header}>
         <button style={S.backBtn} onClick={onBack}>← Back</button>
         <h2 style={S.headerTitle}>Join a Round</h2><div />
@@ -2355,7 +2356,7 @@ function JoinRoundScreen({ onBack, onJoined, prefillCode }) {
           </div>
         )}
       </div>
-    </div>
+    </BgScreen>
   );
 }
 
@@ -2407,7 +2408,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
   if (lb.length === 0 && players.length > 0) { lb = players.map((p) => ({ ...p, total: 0, toPar: 0, grossTotal: 0, holesPlayed: 0 })); }
 
   return (
-    <div style={S.screen}>
+    <BgScreen bg={BG_GAME}>
       <div style={{ backgroundColor: "#1e293b", borderBottom: "1px solid #334155", position: "sticky", top: 0, zIndex: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 8px" }}>
           <button style={S.backBtn} onClick={() => { if (isSpectator || window.confirm("Exit round? It stays saved.")) onBack(); }}>← Back</button>
@@ -2879,7 +2880,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
       </div>
 
       {showShare && <ShareModal round={round} onClose={() => setShowShare(false)} />}
-    </div>
+    </BgScreen>
   );
 }
 
@@ -3248,7 +3249,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
   );
 
   return (
-    <div style={S.screen}>
+    <BgScreen bg={BG_OTHER}>
       <div style={S.header}>
         <button style={S.backBtn} onClick={onViewDashboard}>← Back</button>
         <h2 style={S.headerTitle}>Enter Score</h2>
@@ -4150,7 +4151,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
         </div>
 
       {showChat && <ChatPanel round={round} me={me} onClose={() => { setShowChat(false); setUnreadChat(0); }} />}
-    </div>
+    </BgScreen>
   );
 }
 
@@ -4178,10 +4179,10 @@ function PastRoundDetailScreen({ round, onBack }) {
 
   if (!holes.length || !players.length) {
     return (
-      <div style={S.screen}>
+      <BgScreen bg={BG_OTHER}>
         <div style={S.header}><button style={S.backBtn} onClick={onBack}>← Back</button><h2 style={S.headerTitle}>{round.course_name}</h2><div /></div>
         <div style={S.content}><div style={S.empty}>{loading ? "Loading..." : "No scorecard data available for this round."}</div></div>
-      </div>
+      </BgScreen>
     );
   }
 
@@ -4207,7 +4208,7 @@ function PastRoundDetailScreen({ round, onBack }) {
   const lblW = 34; const totW = 22;
 
   return (
-    <div style={S.screen}>
+    <BgScreen bg={BG_OTHER}>
       <div style={S.header}>
         <button style={S.backBtn} onClick={onBack}>← Back</button>
         <h2 style={S.headerTitle}>{round.course_name}</h2>
@@ -4387,7 +4388,7 @@ function PastRoundDetailScreen({ round, onBack }) {
           </>
         )}
       </div>
-    </div>
+    </BgScreen>
   );
 }
 
@@ -4413,7 +4414,7 @@ function PastRoundsScreen({ onBack, onViewRound }) {
   };
 
   return (
-    <div style={S.screen}>
+    <BgScreen bg={BG_OTHER}>
       <div style={S.header}>
         <button style={S.backBtn} onClick={onBack}>← Back</button>
         <h2 style={S.headerTitle}>Past Rounds</h2>
@@ -4459,7 +4460,7 @@ function PastRoundsScreen({ onBack, onViewRound }) {
           })
         )}
       </div>
-    </div>
+    </BgScreen>
   );
 }
 
@@ -4519,6 +4520,31 @@ export default function GolfApp() {
 // =============================================================================
 // STYLES
 // =============================================================================
+// Background image helpers
+const BG_HOME = {
+  backgroundImage: "url('/IMG_8877.jpeg')",
+  backgroundSize: "cover", backgroundPosition: "center top", position: "relative", minHeight: "100vh"
+};
+const BG_GAME = {
+  backgroundImage: "url('/IMG_8887.jpeg')",
+  backgroundSize: "cover", backgroundPosition: "center center", position: "relative", minHeight: "100vh"
+};
+const BG_OTHER = {
+  backgroundImage: "url('/IMG_8886.jpeg')",
+  backgroundSize: "cover", backgroundPosition: "center center", position: "relative", minHeight: "100vh"
+};
+const BG_OVERLAY_DARK = "linear-gradient(to bottom, rgba(10,18,35,0.6) 0%, rgba(10,18,35,0.55) 40%, rgba(10,18,35,0.82) 70%, rgba(10,18,35,0.97) 100%)";
+const BG_OVERLAY_MED = "linear-gradient(to bottom, rgba(10,18,35,0.65) 0%, rgba(10,18,35,0.6) 40%, rgba(10,18,35,0.85) 70%, rgba(10,18,35,0.97) 100%)";
+
+const BgScreen = ({ bg, overlay, children, style }) => (
+  <div style={{ ...bg, display: "flex", flexDirection: "column", ...style }}>
+    <div style={{ position: "fixed", inset: 0, background: overlay || BG_OVERLAY_DARK, zIndex: 0, pointerEvents: "none" }} />
+    <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", flex: 1, minHeight: "100vh" }}>
+      {children}
+    </div>
+  </div>
+);
+
 const S = {
   app: { minHeight: "100vh", backgroundColor: "#0f172a", color: "#e2e8f0", fontFamily: "'Inter', system-ui, -apple-system, sans-serif", maxWidth: 480, margin: "0 auto", position: "relative" },
   screen: { minHeight: "100vh", display: "flex", flexDirection: "column" },
