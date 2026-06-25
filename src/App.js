@@ -40,22 +40,62 @@ function savePlayerProfile(name, handicap) {
 // =============================================================================
 // TOURNAMENT HELPERS (localStorage)
 // =============================================================================
-function getTournaments() {
+// =============================================================================
+// TOURNAMENT DB FUNCTIONS (Supabase)
+// =============================================================================
+async function dbGetTournaments() {
+  const { data, error } = await supabase.from("tournaments").select("*").order("created_at", { ascending: false });
+  if (error) { console.error("dbGetTournaments error:", error); return []; }
+  // For each tournament, fetch its rounds
+  const tournaments = data || [];
+  await Promise.all(tournaments.map(async (t) => {
+    const { data: rounds } = await supabase.from("tournament_rounds").select("*").eq("tournament_id", t.id).order("added_at", { ascending: true });
+    t.rounds = (rounds || []).map((r) => ({ id: r.round_id, code: r.round_code, course_name: r.course_name, game_type: r.game_type, holes: r.holes, date: r.date, createdBy: r.created_by }));
+  }));
+  return tournaments;
+}
+
+async function dbCreateTournament(name, createdBy) {
+  const id = genId();
+  const { error } = await supabase.from("tournaments").insert([{ id, name, created_by: createdBy, created_at: new Date().toISOString() }]);
+  if (error) throw error;
+  return { id, name, created_by: createdBy, rounds: [] };
+}
+
+async function dbDeleteTournament(id) {
+  await supabase.from("tournament_rounds").delete().eq("tournament_id", id);
+  await supabase.from("tournaments").delete().eq("id", id);
+}
+
+async function dbAddRoundToTournament(tournamentId, roundSummary) {
+  const row = {
+    id: genId(),
+    tournament_id: tournamentId,
+    round_id: roundSummary.id,
+    round_code: roundSummary.code,
+    course_name: roundSummary.course_name,
+    game_type: roundSummary.game_type,
+    holes: roundSummary.holes,
+    date: roundSummary.date,
+    created_by: roundSummary.createdBy || null,
+    added_at: new Date().toISOString(),
+  };
+  // Upsert by round_id + tournament_id to avoid duplicates
+  const { data: existing } = await supabase.from("tournament_rounds").select("id").eq("tournament_id", tournamentId).eq("round_id", roundSummary.id);
+  if (existing?.length > 0) {
+    await supabase.from("tournament_rounds").update({ course_name: row.course_name, game_type: row.game_type, holes: row.holes, date: row.date }).eq("tournament_id", tournamentId).eq("round_id", roundSummary.id);
+  } else {
+    await supabase.from("tournament_rounds").insert([row]);
+  }
+}
+
+// Legacy localStorage helpers kept for migration only
+function getLegacyTournaments() {
   try { return JSON.parse(localStorage.getItem("ff_tournaments") || "[]"); } catch { return []; }
 }
-function saveTournament(t) {
-  const all = getTournaments().filter((x) => x.id !== t.id);
-  localStorage.setItem("ff_tournaments", JSON.stringify([t, ...all]));
-}
-function deleteTournament(id) {
-  localStorage.setItem("ff_tournaments", JSON.stringify(getTournaments().filter((x) => x.id !== id)));
-}
+// Stub - no longer used for writes
 function addRoundToTournament(tournamentId, roundSummary) {
-  const all = getTournaments();
-  const t = all.find((x) => x.id === tournamentId);
-  if (!t) return;
-  t.rounds = [...(t.rounds || []).filter((r) => r.id !== roundSummary.id), roundSummary];
-  saveTournament(t);
+  dbAddRoundToTournament(tournamentId, roundSummary).catch((e) => console.error("addRoundToTournament error:", e));
 }
 
 // =============================================================================
@@ -663,12 +703,14 @@ async function saveRoundToHistory(round, players, scores, holes) {
   const updated = [entry, ...filtered].slice(0, 20); // keep last 20
   localStorage.setItem("ff_saved_rounds", JSON.stringify(updated));
   try { await dbSaveRoundHistory(entry); } catch(e) { console.log("Remote save failed", e); }
-  // Also refresh this round's data in any tournament it belongs to
-  const allTourneys = getTournaments();
-  allTourneys.forEach((t) => {
-    const existingR = t.rounds?.find((r) => r.id === round.id);
-    if (existingR) { addRoundToTournament(t.id, { ...existingR, players, scores, holes }); }
-  });
+  // Also refresh this round's data in any Supabase tournament it belongs to
+  try {
+    const allTourneys = await dbGetTournaments();
+    await Promise.all(allTourneys.map(async (t) => {
+      const existingR = t.rounds?.find((r) => r.id === round.id);
+      if (existingR) { await dbAddRoundToTournament(t.id, { ...existingR, players, scores, holes }); }
+    }));
+  } catch(e) { console.log("Tournament refresh failed", e); }
 }
 
 function deleteSavedRound(roundId) {
@@ -964,7 +1006,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
   return (
     <div style={{ ...S.screen, position: "relative" }}>
       {/* Version + Admin - positioned below status bar */}
-      <div style={{ position: "absolute", top: "calc(env(safe-area-inset-top, 44px) + 10px)", left: 16, fontSize: 10, color: "#475569", fontWeight: 600 }}>v1.1.9</div>
+      <div style={{ position: "absolute", top: "calc(env(safe-area-inset-top, 44px) + 10px)", left: 16, fontSize: 10, color: "#475569", fontWeight: 600 }}>v1.1.11</div>
       <button onClick={onAdminLogin} style={{ position: "absolute", top: "calc(env(safe-area-inset-top, 44px) + 6px)", right: 16, background: "none", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", textTransform: "uppercase" }}>Admin</button>
 
       {/* Header */}
@@ -1638,13 +1680,26 @@ function RoundDetailScreen({ roundStub, onBack }) {
 }
 
 function TournamentScreen({ onBack }) {
-  const [tournaments, setTournaments] = useState(getTournaments());
+  const [tournaments, setTournaments] = useState([]);
+  const [loadingTournaments, setLoadingTournaments] = useState(true);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
   const [viewing, setViewing] = useState(null);
   const [viewingRound, setViewingRound] = useState(null);
   const [viewingScorecardFromTournament, setViewingScorecardFromTournament] = useState(false);
   const [liveRoundData, setLiveRoundData] = useState({}); // { [roundId]: { players, scores } }
+
+  // Load tournaments from Supabase on mount
+  const loadTournaments = useCallback(async () => {
+    setLoadingTournaments(true);
+    try {
+      const t = await dbGetTournaments();
+      setTournaments(t);
+    } catch(e) { console.error("loadTournaments error:", e); }
+    setLoadingTournaments(false);
+  }, []);
+
+  useEffect(() => { loadTournaments(); }, [loadTournaments]);
 
   // When a tournament is opened, fetch live player+score data for all its rounds from Supabase
   useEffect(() => {
@@ -1663,12 +1718,13 @@ function TournamentScreen({ onBack }) {
     return () => { cancelled = true; };
   }, [viewing?.id]);
 
-  const create = () => {
+  const create = async () => {
     if (!newName.trim()) return;
-    const t = { id: genId(), name: newName.trim(), createdAt: Date.now(), rounds: [] };
-    saveTournament(t);
-    setTournaments(getTournaments());
-    setNewName(""); setCreating(false);
+    try {
+      const t = await dbCreateTournament(newName.trim(), null);
+      await loadTournaments();
+      setNewName(""); setCreating(false);
+    } catch(e) { console.error("create tournament error:", e); alert("Could not create tournament. Check your connection."); }
   };
 
   if (viewingRound) {
@@ -1821,7 +1877,9 @@ function TournamentScreen({ onBack }) {
             <button style={S.btnSecondary} onClick={() => setCreating(false)}>Cancel</button>
           </div>
         )}
-        {tournaments.length === 0 && !creating ? (
+        {loadingTournaments ? (
+          <div style={S.empty}>Loading tournaments...</div>
+        ) : tournaments.length === 0 && !creating ? (
           <div style={S.empty}>No tournaments yet. Create one to track a season!</div>
         ) : (
           tournaments.map((t) => (
@@ -1829,7 +1887,7 @@ function TournamentScreen({ onBack }) {
               <span style={S.courseIcon}>🏆</span>
               <div style={{ flex: 1, textAlign: "left" }}>
                 <div style={S.courseName}>{t.name}</div>
-                <div style={S.courseAddr}>{t.rounds?.length || 0} rounds · Started {new Date(t.createdAt).toLocaleDateString("en-NZ")}</div>
+                <div style={S.courseAddr}>{t.rounds?.length || 0} rounds · Started {new Date(t.created_at).toLocaleDateString("en-NZ")}</div>
               </div>
             </button>
           ))
@@ -1877,6 +1935,8 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
   const [name, setName] = useState(profile.name || ""), [hcp, setHcp] = useState(profile.handicap || ""), [team, setTeam] = useState("A");
   const [selectedTournament, setSelectedTournament] = useState("");
   const [showTournamentPicker, setShowTournamentPicker] = useState(false);
+  const [availableTournaments, setAvailableTournaments] = useState([]);
+  const [loadingAvailableTournaments, setLoadingAvailableTournaments] = useState(false);
   const [useHandicap, setUseHandicap] = useState(true);
   const [loading, setLoading] = useState(false), [err, setErr] = useState("");
   const [showAddCourse, setShowAddCourse] = useState(false);
@@ -2108,15 +2168,21 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
                 {showTournamentPicker ? "Remove tournament link" : "+ Link to a tournament (optional)"}
               </button>
               {showTournamentPicker && (() => {
-                const tournaments = getTournaments();
+                // Load tournaments from Supabase when picker opens
+                if (availableTournaments.length === 0 && !loadingAvailableTournaments) {
+                  setLoadingAvailableTournaments(true);
+                  dbGetTournaments().then((t) => { setAvailableTournaments(t); setLoadingAvailableTournaments(false); }).catch(() => { setLoadingAvailableTournaments(false); });
+                }
                 return (
                   <div style={{ marginTop: 10 }}>
-                    {tournaments.length === 0
-                      ? <p style={{ ...S.hint, color: "#475569" }}>No tournaments yet. Create one from the home screen first.</p>
-                      : <select style={S.input} value={selectedTournament} onChange={(e) => setSelectedTournament(e.target.value)}>
-                          <option value="">Select tournament...</option>
-                          {tournaments.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                        </select>
+                    {loadingAvailableTournaments
+                      ? <p style={{ ...S.hint, color: "#475569" }}>Loading tournaments...</p>
+                      : availableTournaments.length === 0
+                        ? <p style={{ ...S.hint, color: "#475569" }}>No tournaments yet. Create one from the Tournaments screen first.</p>
+                        : <select style={S.input} value={selectedTournament} onChange={(e) => setSelectedTournament(e.target.value)}>
+                            <option value="">Select tournament...</option>
+                            {availableTournaments.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                          </select>
                     }
                   </div>
                 );
@@ -2312,7 +2378,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
     <div style={S.screen}>
       <div style={{ backgroundColor: "#1e293b", borderBottom: "1px solid #334155", position: "sticky", top: 0, zIndex: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 8px" }}>
-          <button style={S.backBtn} onClick={() => { if (window.confirm("Exit round? It stays saved.")) onBack(); }}>← Back</button>
+          <button style={S.backBtn} onClick={() => { if (isSpectator || window.confirm("Exit round? It stays saved.")) onBack(); }}>← Back</button>
           <div style={{ flex: 1, textAlign: "center" }}>
             <div style={{ fontSize: 15, fontWeight: 700, color: "#f8fafc" }}>{round.course_name}</div>
             <div style={{ fontSize: 11, color: "#64748b" }}>{GAME_TYPES[round.game_type]?.label}{round.use_handicap === false ? " · Scratch" : ""} · {me?.name} (HCP {me?.handicap})</div>
