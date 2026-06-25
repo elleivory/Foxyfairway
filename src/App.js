@@ -1013,18 +1013,17 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
   };
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column",
-      backgroundImage: "url('/IMG_8877.jpeg')",
-      backgroundSize: "cover", backgroundPosition: "center top", position: "relative", fontFamily: "'Inter', system-ui, sans-serif"
-    }}>
-      {/* Dark overlay */}
-      <div style={{ position: "fixed", inset: 0, background: "linear-gradient(to bottom, rgba(10,18,35,0.55) 0%, rgba(10,18,35,0.45) 40%, rgba(10,18,35,0.75) 70%, rgba(10,18,35,0.97) 100%)", zIndex: 0, pointerEvents: "none" }} />
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", position: "relative", fontFamily: "'Inter', system-ui, sans-serif" }}>
+      {/* Fixed background - iOS Safari compatible */}
+      <div style={{ position: "fixed", inset: 0, backgroundImage: "url('/IMG_8877.jpeg')", backgroundSize: "cover", backgroundPosition: "center top", zIndex: 0 }} />
+      {/* Lighter overlay */}
+      <div style={{ position: "fixed", inset: 0, background: "linear-gradient(to bottom, rgba(10,18,35,0.4) 0%, rgba(10,18,35,0.35) 40%, rgba(10,18,35,0.65) 70%, rgba(10,18,35,0.92) 100%)", zIndex: 1, pointerEvents: "none" }} />
 
-      <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", flex: 1, maxWidth: 480, width: "100%", margin: "0 auto" }}>
+      <div style={{ position: "relative", zIndex: 2, display: "flex", flexDirection: "column", flex: 1, maxWidth: 480, width: "100%", margin: "0 auto" }}>
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#475569", fontWeight: 600 }}>v1.1.15</span>
+          <span style={{ fontSize: 10, color: "#475569", fontWeight: 600 }}>v1.1.16</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={shareApp} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", backdropFilter: "blur(4px)" }}>SHARE</button>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
@@ -4220,7 +4219,7 @@ function PastRoundDetailScreen({ round, onBack }) {
         {/* Leaderboard */}
         <div style={{ fontSize: 10, fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Leaderboard</div>
         {lb.map((p, i) => (
-          <div key={p.id} style={{ ...S.lbRow, ...(i === 0 ? { backgroundColor: "#022c22", borderRadius: 10, padding: "14px 12px", margin: "0 -4px 4px" } : { marginBottom: 4 }) }}>
+          <div key={p.id} style={{ ...S.lbRow }}>
             <div style={{ ...S.lbPos, color: i === 0 ? "#f59e0b" : i === 1 ? "#94a3b8" : i === 2 ? "#cd7c2f" : "#475569" }}>{i + 1}</div>
             <div style={S.lbName}>{p.name}<span style={S.lbHcp}>HCP {p.handicap}</span></div>
             <div style={{ fontSize: 14, fontWeight: 700, color: metricColor(p) }}>{metricValue(p)}</div>
@@ -4521,29 +4520,27 @@ export default function GolfApp() {
 // STYLES
 // =============================================================================
 // Background image helpers
-const BG_HOME = {
-  backgroundImage: "url('/IMG_8877.jpeg')",
-  backgroundSize: "cover", backgroundPosition: "center top", position: "relative", minHeight: "100vh"
-};
-const BG_GAME = {
-  backgroundImage: "url('/IMG_8887.jpeg')",
-  backgroundSize: "cover", backgroundPosition: "center center", position: "relative", minHeight: "100vh"
-};
-const BG_OTHER = {
-  backgroundImage: "url('/IMG_8886.jpeg')",
-  backgroundSize: "cover", backgroundPosition: "center center", position: "relative", minHeight: "100vh"
-};
-const BG_OVERLAY_DARK = "linear-gradient(to bottom, rgba(10,18,35,0.6) 0%, rgba(10,18,35,0.55) 40%, rgba(10,18,35,0.82) 70%, rgba(10,18,35,0.97) 100%)";
-const BG_OVERLAY_MED = "linear-gradient(to bottom, rgba(10,18,35,0.65) 0%, rgba(10,18,35,0.6) 40%, rgba(10,18,35,0.85) 70%, rgba(10,18,35,0.97) 100%)";
+const BG_HOME = "url('/IMG_8877.jpeg')";
+const BG_GAME = "url('/IMG_8887.jpeg')";
+const BG_OTHER = "url('/IMG_8886.jpeg')";
+const BG_POS = { HOME: "center top", GAME: "center center", OTHER: "center center" };
 
-const BgScreen = ({ bg, overlay, children, style }) => (
-  <div style={{ ...bg, display: "flex", flexDirection: "column", ...style }}>
-    <div style={{ position: "fixed", inset: 0, background: overlay || BG_OVERLAY_DARK, zIndex: 0, pointerEvents: "none" }} />
-    <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", flex: 1, minHeight: "100vh" }}>
-      {children}
+// Lighter overlay so backgrounds show through more
+const BG_OVERLAY = "linear-gradient(to bottom, rgba(10,18,35,0.4) 0%, rgba(10,18,35,0.35) 40%, rgba(10,18,35,0.65) 70%, rgba(10,18,35,0.92) 100%)";
+
+// iOS Safari fix: use a fixed-position div as background instead of background-attachment:fixed
+const BgScreen = ({ bg, children, style }) => {
+  const pos = bg === BG_HOME ? "center top" : "center center";
+  return (
+    <div style={{ position: "relative", minHeight: "100vh", display: "flex", flexDirection: "column", ...style }}>
+      <div style={{ position: "fixed", inset: 0, backgroundImage: bg, backgroundSize: "cover", backgroundPosition: pos, zIndex: 0 }} />
+      <div style={{ position: "fixed", inset: 0, background: BG_OVERLAY, zIndex: 1, pointerEvents: "none" }} />
+      <div style={{ position: "relative", zIndex: 2, display: "flex", flexDirection: "column", flex: 1, minHeight: "100vh" }}>
+        {children}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const S = {
   app: { minHeight: "100vh", backgroundColor: "#0f172a", color: "#e2e8f0", fontFamily: "'Inter', system-ui, -apple-system, sans-serif", maxWidth: 480, margin: "0 auto", position: "relative" },
@@ -4622,8 +4619,8 @@ const S = {
   scoreInfoCell: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minWidth: 48, width: 48, flex: "0 0 auto", padding: "4px 0", overflow: "visible" },
   scoreInfoCellNumber: { fontSize: 9, color: "#64748b", fontWeight: 700, marginBottom: 2 },
   scoreInfoCellValue: { fontSize: 14, fontWeight: 800, color: "#22c55e" },
-  lbRow: { display: "flex", alignItems: "center", gap: 12, padding: "14px 0", borderBottom: "1px solid #1e293b" },
-  lbRowMe: { backgroundColor: "#022c22", borderRadius: 10, padding: "14px 12px", margin: "0 -12px" },
+  lbRow: { display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 10, border: "1px solid rgba(51,65,85,0.5)", marginBottom: 6 },
+  lbRowMe: { border: "1px solid rgba(34,197,94,0.4)", borderRadius: 10, padding: "12px 14px", marginBottom: 6 },
   lbPos: { fontSize: 18, fontWeight: 800, color: "#475569", width: 28, flexShrink: 0 },
   lbName: { flex: 1, fontSize: 16, fontWeight: 600, color: "#f8fafc" },
   lbHcp: { fontSize: 11, color: "#475569", fontWeight: 400, marginLeft: 8 },
