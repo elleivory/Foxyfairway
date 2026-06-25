@@ -1023,7 +1023,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.19</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.20</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={shareApp} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", backdropFilter: "blur(4px)" }}>SHARE</button>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
@@ -2032,14 +2032,14 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
       </div>
       <div style={S.content}>
         {step === 1 && (
-          <div style={S.stepWrap}>
-            <h3 style={S.stepTitle}>Where are you playing?</h3>
-
-            <div style={{ position: "sticky", top: 0, backgroundColor: "#0f172a", paddingBottom: 10, paddingTop: 4, zIndex: 10 }}>
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            <div style={{ padding: "0 0 8px" }}>
+              <h3 style={S.stepTitle}>Where are you playing?</h3>
               <button style={course ? S.btnPrimary : S.btnDisabled} disabled={!course} onClick={() => setStep(2)}>
-                {course ? "Next \u2192 " + course.name : "Select a course to continue"}
+                {course ? "Next → " + course.name : "Select a course to continue"}
               </button>
             </div>
+            <div style={{ maxHeight: "calc(100vh - 280px)", overflowY: "auto" }}>
 
             {!showAddCourse && !courseEditing && (
               <button onClick={() => setShowAddCourse(true)} style={{ width: "100%", backgroundColor: "#1e293b", border: "1px dashed #334155", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 700, color: "#64748b", cursor: "pointer", fontFamily: "inherit", marginBottom: 12 }}>
@@ -2152,6 +2152,7 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
                   </div>
                 </button>
               ))}
+            </div>
             </div>
           </div>
         )}
