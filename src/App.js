@@ -1003,57 +1003,84 @@ function exportScorecardImage(round, players, scores, holes) {
 // HOME SCREEN
 // =============================================================================
 function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, onRejoin, lastRound, savedRounds, onViewHistory, onViewTournaments }) {
+  const shareApp = () => {
+    if (navigator.share) {
+      navigator.share({ title: "Foxy Fairways", text: "Golf scoring app", url: "https://foxyfairways.netlify.app" }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText("https://foxyfairways.netlify.app");
+      alert("Link copied!");
+    }
+  };
+
   return (
-    <div style={{ ...S.screen, position: "relative" }}>
-      {/* Version + Admin - positioned below status bar */}
-      <div style={{ position: "absolute", top: "calc(env(safe-area-inset-top, 44px) + 10px)", left: 16, fontSize: 10, color: "#475569", fontWeight: 600 }}>v1.1.13</div>
-      <button onClick={onAdminLogin} style={{ position: "absolute", top: "calc(env(safe-area-inset-top, 44px) + 6px)", right: 16, background: "none", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", textTransform: "uppercase" }}>Admin</button>
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column",
+      backgroundImage: "url('/IMG_8877.jpeg')",
+      backgroundSize: "cover", backgroundPosition: "center top", position: "relative", fontFamily: "'Inter', system-ui, sans-serif"
+    }}>
+      {/* Dark overlay */}
+      <div style={{ position: "fixed", inset: 0, background: "linear-gradient(to bottom, rgba(10,18,35,0.55) 0%, rgba(10,18,35,0.45) 40%, rgba(10,18,35,0.75) 70%, rgba(10,18,35,0.97) 100%)", zIndex: 0, pointerEvents: "none" }} />
 
-      {/* Header */}
-      <div style={{ padding: "calc(env(safe-area-inset-top, 44px) + 56px) 24px 28px", textAlign: "center" }}>
-        <img src="/logo.png" alt="Foxy Fairways" style={{ width: 80, height: 80, borderRadius: 20, boxShadow: "0 8px 40px rgba(0,0,0,0.5)", marginBottom: 14, display: "block", margin: "0 auto 14px" }} onError={(e) => { e.target.style.display = "none"; }} />
-        <div style={{ fontSize: 34, fontWeight: 900, color: "#f8fafc", letterSpacing: "-1px", lineHeight: 1 }}>Foxy Fairways</div>
-        <div style={{ fontSize: 11, color: "#334155", marginTop: 8, fontWeight: 600, letterSpacing: "2px", textTransform: "uppercase" }}>Golf Scoring</div>
-      </div>
+      <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", flex: 1, maxWidth: 480, width: "100%", margin: "0 auto" }}>
 
-      {/* Content */}
-      <div style={{ flex: 1, padding: "0 20px 32px", display: "flex", flexDirection: "column" }}>
-
-        {/* Last round */}
-        {lastRound && (() => {
-          const t = new Date(lastRound.savedAt).toLocaleString("en-NZ", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true });
-          return (
-            <div style={{ backgroundColor: "#022c22", border: "1px solid #22c55e22", borderRadius: 14, padding: "14px 16px", marginBottom: 20 }}>
-              <div style={{ fontSize: 9, color: "#22c55e", fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 6 }}>↩ Last Round</div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: "#f8fafc", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{lastRound.round.course_name}</div>
-              <div style={{ fontSize: 11, color: "#475569", marginTop: 2, marginBottom: 10 }}>{lastRound.me.name} · {GAME_TYPES[lastRound.round.game_type]?.label} · {t}</div>
-              <button onClick={onRejoin} style={{ backgroundColor: "#22c55e", color: "#0f172a", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 700, width: "100%", cursor: "pointer", fontFamily: "inherit" }}>Continue →</button>
-            </div>
-          );
-        })()}
-
-        {/* Divider */}
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-          <div style={{ flex: 1, height: 1, background: "#1e293b" }} />
-          <div style={{ fontSize: 10, color: "#334155", fontWeight: 600, textTransform: "uppercase", letterSpacing: "1px" }}>New Round</div>
-          <div style={{ flex: 1, height: 1, background: "#1e293b" }} />
+        {/* Top bar */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
+          <span style={{ fontSize: 10, color: "#475569", fontWeight: 600 }}>v1.1.14</span>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={shareApp} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", backdropFilter: "blur(4px)" }}>SHARE</button>
+            <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
+          </div>
         </div>
 
-        {/* Main buttons */}
-        <button style={{ ...S.btnPrimary, marginBottom: 10 }} onClick={onCreateRound}>Create a Round</button>
-        <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
-          <button onClick={onJoinRound} style={{ flex: 1, backgroundColor: "#1e293b", color: "#f8fafc", border: "1px solid #334155", borderRadius: 14, padding: "16px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Join</button>
-          <button onClick={onWatchRound} style={{ flex: 1, backgroundColor: "#1e293b", color: "#f8fafc", border: "1px solid #334155", borderRadius: 14, padding: "16px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Watch</button>
+        {/* Header */}
+        <div style={{ padding: "20px 24px 20px", textAlign: "center" }}>
+          <img src="/logo.png" alt="Foxy Fairways" style={{ width: 80, height: 80, borderRadius: 20, boxShadow: "0 8px 40px rgba(0,0,0,0.5)", display: "block", margin: "0 auto 14px" }} onError={(e) => { e.target.style.display = "none"; }} />
+          <div style={{ fontSize: 34, fontWeight: 900, color: "#f8fafc", letterSpacing: "-1px", lineHeight: 1, textShadow: "0 2px 12px rgba(0,0,0,0.5)" }}>Foxy Fairways</div>
+          <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 8, fontWeight: 600, letterSpacing: "2px", textTransform: "uppercase" }}>Live Golf Scoring</div>
         </div>
 
-        {/* Secondary buttons */}
-        <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={onViewHistory} style={{ flex: 1, backgroundColor: "transparent", color: "#475569", border: "none", borderRadius: 12, padding: "10px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-            Past Rounds{savedRounds.length > 0 ? " (" + savedRounds.length + ")" : ""}
-          </button>
-          <button onClick={onViewTournaments} style={{ flex: 1, backgroundColor: "transparent", color: "#475569", border: "none", borderRadius: 12, padding: "10px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-            Tournaments
-          </button>
+        {/* Content */}
+        <div style={{ flex: 1, padding: "0 20px", display: "flex", flexDirection: "column" }}>
+
+          {/* Last round */}
+          {lastRound && (() => {
+            const t = new Date(lastRound.savedAt).toLocaleString("en-NZ", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true });
+            return (
+              <div style={{ backgroundColor: "rgba(2,44,34,0.7)", border: "1px solid #22c55e22", borderRadius: 14, padding: "14px 16px", marginBottom: 16, backdropFilter: "blur(8px)" }}>
+                <div style={{ fontSize: 9, color: "#22c55e", fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 6 }}>\u21A9 Last Round</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#f8fafc", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{lastRound.round.course_name}</div>
+                <div style={{ fontSize: 11, color: "#475569", marginTop: 2, marginBottom: 10 }}>{lastRound.me.name} \u00B7 {GAME_TYPES[lastRound.round.game_type]?.label} \u00B7 {t}</div>
+                <button onClick={onRejoin} style={{ backgroundColor: "#22c55e", color: "#0f172a", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 700, width: "100%", cursor: "pointer", fontFamily: "inherit" }}>Continue \u2192</button>
+              </div>
+            );
+          })()}
+
+          {/* Divider */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+            <div style={{ flex: 1, height: 1, background: "rgba(30,41,59,0.6)" }} />
+            <div style={{ fontSize: 10, color: "#475569", fontWeight: 600, textTransform: "uppercase", letterSpacing: "1px" }}>New Round</div>
+            <div style={{ flex: 1, height: 1, background: "rgba(30,41,59,0.6)" }} />
+          </div>
+
+          {/* Create button */}
+          <button style={{ ...S.btnPrimary, marginBottom: 10 }} onClick={onCreateRound}>Create a Round</button>
+
+          {/* Spacer */}
+          <div style={{ flex: 1, minHeight: 20 }} />
+
+          {/* Four small bottom buttons */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
+            {[
+              { label: "Join", icon: "\uD83E\uDD1D", action: onJoinRound },
+              { label: "Watch", icon: "\uD83D\uDC40", action: onWatchRound },
+              { label: "Past Rounds", icon: "\uD83D\uDCCB", action: onViewHistory },
+              { label: "Tournaments", icon: "\uD83C\uDFC6", action: onViewTournaments },
+            ].map((btn) => (
+              <button key={btn.label} onClick={btn.action} style={{ background: "rgba(30,41,59,0.7)", border: "1px solid rgba(51,65,85,0.8)", borderRadius: 10, color: "#94a3b8", fontSize: 10, fontWeight: 600, padding: "10px 4px 8px", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, fontFamily: "inherit", backdropFilter: "blur(8px)" }}>
+                <span style={{ fontSize: 16 }}>{btn.icon}</span>
+                <span style={{ fontSize: 9, textAlign: "center", lineHeight: 1.2 }}>{btn.label}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>
@@ -2756,10 +2783,24 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
               {players.filter((player) => player.id !== "spectator").map((player, pi) => (
                 <div key={player.id} style={{ marginBottom: 12 }}>
                   {/* Header */}
-                  <div style={{ background: "#1e3a5f", borderRadius: "6px 6px 0 0", padding: "5px 8px", border: "1px solid #334155", borderBottom: "none", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontSize: 10, fontWeight: 800, color: "#f8fafc" }}>{player.name}</span>
-                    <span style={{ fontSize: 8, color: "#94a3b8" }}>{GAME_TYPES[round.game_type]?.label} · {round.course_name}</span>
-                  </div>
+                  {(() => {
+                    const psc = scores.filter((s) => s.player_id === player.id);
+                    const pGross = psc.reduce((sum, s) => sum + s.score, 0);
+                    const pGrossPar = holes.reduce((sum, h) => { const s = psc.find((x) => x.hole_number === h.hole_number); return s ? sum + h.par : sum; }, 0);
+                    const pGrossToPar = pGross - pGrossPar;
+                    const pNet = holes.reduce((sum, h) => { const s = psc.find((x) => x.hole_number === h.hole_number); if (!s) return sum; return sum + (s.score - getHcpStrokes(player.handicap, h.stroke_index)); }, 0);
+                    const pNetPar = pGrossPar;
+                    const pNetToPar = pNet - pNetPar;
+                    const fmtPar = (v) => v === 0 ? "E" : v > 0 ? "+" + v : "" + v;
+                    return (
+                      <div style={{ background: "#1e3a5f", borderRadius: "6px 6px 0 0", padding: "5px 8px", border: "1px solid #334155", borderBottom: "none", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontSize: 10, fontWeight: 800, color: "#f8fafc" }}>{player.name}</span>
+                        <span style={{ fontSize: 9, color: "#94a3b8", fontWeight: 600 }}>
+                          {pGross > 0 ? pGross : "—"}{pGross > 0 ? <span style={{ color: "#64748b" }}> {fmtPar(pGrossToPar)}</span> : null}{pGross > 0 && <span style={{ color: "#64748b" }}> · N {fmtPar(pNetToPar)}</span>}
+                        </span>
+                      </div>
+                    );
+                  })()}
                   {/* Front 9 */}
                   <div style={{ background: "#fff", borderLeft: "1px solid #334155", borderRight: "1px solid #334155", overflowX: "hidden" }}>
                     <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
@@ -3840,9 +3881,8 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
             <div style={{ ...S.playerCard, border: "1px solid #22c55e33", marginBottom: 10 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                 <div style={{ ...S.playerCardName, color: "#22c55e" }}>{me.name} (HCP {me.handicap}) <span style={{ fontSize: 9, color: "#22c55e", fontWeight: 600 }}>YOU</span></div>
-                <div style={{ fontSize: 11, color: "#64748b" }}>
-                  G: <span style={{ color: myGrossTotal2 === 0 ? "#94a3b8" : myGrossTotal2 > 0 ? "#ef4444" : "#22c55e", fontWeight: 700 }}>{formatToPar(myGrossTotal2)}</span>
-                  {isHandicap && <>{" "}N: <span style={{ color: myNetTotal2 === 0 ? "#94a3b8" : myNetTotal2 > 0 ? "#ef4444" : "#22c55e", fontWeight: 700 }}>{formatToPar(myNetTotal2)}</span></>}
+                <div style={{ fontSize: 10, color: "#64748b", fontWeight: 600 }}>
+                  {(() => { const gross = holes.reduce((sum, h) => sum + (myScores[h.hole_number] || 0), 0); const grossPar = holes.reduce((sum, h) => myScores[h.hole_number] ? sum + h.par : sum, 0); const gtp = gross - grossPar; const net = holes.reduce((sum, h) => { const g = myScores[h.hole_number]; if (!g) return sum; return sum + (g - getHcpStrokes(me.handicap, h.stroke_index)); }, 0); const ntp = net - grossPar; const f = (v) => v === 0 ? "E" : v > 0 ? "+" + v : "" + v; return gross > 0 ? <>{gross} · {f(gtp)}{isHandicap ? <> · N {f(ntp)}</> : null}</> : "—"; })()}
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "flex-start" }}>
@@ -3940,12 +3980,9 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
             return (
               <div key={player.id} style={S.playerCard}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <div style={S.playerCardName}>{player.name} (HCP {player.handicap})</div>
-                  </div>
-                  <div style={{ fontSize: 11, color: "#64748b" }}>
-                    G: <span style={{ color: pGrossTotal === 0 ? "#94a3b8" : pGrossTotal > 0 ? "#ef4444" : "#22c55e", fontWeight: 700 }}>{formatToPar(pGrossTotal)}</span>
-                    {isHandicap && <>{" "}N: <span style={{ color: pNetTotal === 0 ? "#94a3b8" : pNetTotal > 0 ? "#ef4444" : "#22c55e", fontWeight: 700 }}>{formatToPar(pNetTotal)}</span></>}
+                  <div style={S.playerCardName}>{player.name} (HCP {player.handicap})</div>
+                  <div style={{ fontSize: 10, color: "#64748b", fontWeight: 600 }}>
+                    {(() => { const gross = ps.reduce((sum, s) => sum + s.score, 0); const grossPar = holes.reduce((sum, h) => { const s = ps.find((x) => x.hole_number === h.hole_number); return s ? sum + h.par : sum; }, 0); const gtp = gross - grossPar; const net = holes.reduce((sum, h) => { const s = ps.find((x) => x.hole_number === h.hole_number); if (!s) return sum; return sum + (s.score - getHcpStrokes(player.handicap, h.stroke_index)); }, 0); const ntp = net - grossPar; const f = (v) => v === 0 ? "E" : v > 0 ? "+" + v : "" + v; return gross > 0 ? <>{gross} · {f(gtp)}{isHandicap ? <> · N {f(ntp)}</> : null}</> : "—"; })()}
                   </div>
                 </div>
                 <div style={{ display: "flex", alignItems: "flex-start" }}>
@@ -4199,9 +4236,17 @@ function PastRoundDetailScreen({ round, onBack }) {
             <div key={player.id} style={{ marginBottom: 16 }}>
               <div style={{ background: "#1e3a5f", borderRadius: "6px 6px 0 0", padding: "5px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ fontSize: 11, fontWeight: 800, color: "#f8fafc" }}>{player.name}</span>
-                <span style={{ fontSize: 10, color: "#94a3b8" }}>
-                  HCP {player.handicap}
-                  {lbPlayer && round.game_type === "stroke" && ` · Gross: ${lbPlayer.grossTotal} · Net: ${lbPlayer.netTotal ?? lbPlayer.grossTotal - player.handicap}`}
+                <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>
+                  {(() => {
+                    const ps2 = scores.filter((s) => s.player_id === player.id);
+                    const gross = ps2.reduce((sum, s) => sum + s.score, 0);
+                    const grossPar = holes.reduce((sum, h) => { const s = ps2.find((x) => x.hole_number === h.hole_number); return s ? sum + h.par : sum; }, 0);
+                    const gtp = gross - grossPar;
+                    const net = holes.reduce((sum, h) => { const s = ps2.find((x) => x.hole_number === h.hole_number); if (!s) return sum; return sum + (s.score - getHcpStrokes(player.handicap, h.stroke_index)); }, 0);
+                    const ntp = net - grossPar;
+                    const f = (v) => v === 0 ? "E" : v > 0 ? "+" + v : "" + v;
+                    return gross > 0 ? `${gross} · ${f(gtp)} · N ${f(ntp)}` : `HCP ${player.handicap}`;
+                  })()}
                 </span>
               </div>
               {[front9, back9].map((nineHoles, ni) => {
