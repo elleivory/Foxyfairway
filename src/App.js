@@ -1006,7 +1006,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
   return (
     <div style={{ ...S.screen, position: "relative" }}>
       {/* Version + Admin - positioned below status bar */}
-      <div style={{ position: "absolute", top: "calc(env(safe-area-inset-top, 44px) + 10px)", left: 16, fontSize: 10, color: "#475569", fontWeight: 600 }}>v1.1.12</div>
+      <div style={{ position: "absolute", top: "calc(env(safe-area-inset-top, 44px) + 10px)", left: 16, fontSize: 10, color: "#475569", fontWeight: 600 }}>v1.1.13</div>
       <button onClick={onAdminLogin} style={{ position: "absolute", top: "calc(env(safe-area-inset-top, 44px) + 6px)", right: 16, background: "none", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", textTransform: "uppercase" }}>Admin</button>
 
       {/* Header */}
@@ -4120,6 +4120,232 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
 // =============================================================================
 // PAST ROUNDS SCREEN
 // =============================================================================
+function PastRoundDetailScreen({ round, onBack }) {
+  const [players, setPlayers] = useState(round.players || []);
+  const [scores, setScores] = useState(round.scores || []);
+  const [loading, setLoading] = useState(false);
+  const holes = round.holes || [];
+  const front9 = holes.filter((h) => h.hole_number <= 9);
+  const back9 = holes.filter((h) => h.hole_number > 9);
+  const isHandicap = round.use_handicap !== false;
+
+  useEffect(() => {
+    // Always fetch fresh from Supabase if we have a round ID
+    if (!round.id) return;
+    setLoading(true);
+    Promise.all([dbGetPlayers(round.id), dbGetScores(round.id)])
+      .then(([p, s]) => { if (p.length) setPlayers(p); if (s.length) setScores(s); })
+      .catch((e) => console.log("Past round fetch failed", e))
+      .finally(() => setLoading(false));
+  }, [round.id]);
+
+  if (!holes.length || !players.length) {
+    return (
+      <div style={S.screen}>
+        <div style={S.header}><button style={S.backBtn} onClick={onBack}>← Back</button><h2 style={S.headerTitle}>{round.course_name}</h2><div /></div>
+        <div style={S.content}><div style={S.empty}>{loading ? "Loading..." : "No scorecard data available for this round."}</div></div>
+      </div>
+    );
+  }
+
+  let lb = [];
+  try { lb = calcLeaderboard(players, scores, holes, round.game_type); } catch(e) { console.log("lb error", e); }
+
+  const metricColor = (p) => {
+    if (round.game_type === "banker") return p.total > 0 ? "#22c55e" : p.total < 0 ? "#ef4444" : "#94a3b8";
+    if (round.game_type === "stableford" || round.game_type === "matchplay" || round.game_type === "matchplay_teams") return "#22c55e";
+    return p.toPar < 0 ? "#22c55e" : p.toPar > 0 ? "#ef4444" : "#3b82f6";
+  };
+  const metricValue = (p) => {
+    if (round.game_type === "banker") return (p.total >= 0 ? "+$" : "-$") + Math.abs(p.total);
+    if (round.game_type === "stableford") return p.total + " pts";
+    if (round.game_type === "matchplay" || round.game_type === "matchplay_teams") return p.total + " holes";
+    return "Gross: " + p.grossTotal + "  " + formatToPar(p.toPar);
+  };
+
+  const cellStyle = { textAlign: "center", padding: "2px 0", borderRight: "1px solid #e8edf2", fontSize: 8, overflow: "hidden", whiteSpace: "nowrap" };
+  const hdrStyle = { ...cellStyle, background: "#f1f5f9", fontWeight: 700, color: "#475569", fontSize: 7, textTransform: "uppercase" };
+  const parStyle = { ...cellStyle, color: "#64748b", background: "#f8fafc", fontSize: 7 };
+  const totStyle = { ...cellStyle, background: "#f1f5f9", fontWeight: 800, color: "#1e293b", fontSize: 8, width: 22 };
+  const lblW = 34; const totW = 22;
+
+  return (
+    <div style={S.screen}>
+      <div style={S.header}>
+        <button style={S.backBtn} onClick={onBack}>← Back</button>
+        <h2 style={S.headerTitle}>{round.course_name}</h2>
+        <button style={{ ...S.smallIconBtn, fontSize: 11, padding: "5px 8px" }} onClick={() => exportScorecardPDF(round, players, scores, holes)}>PDF</button>
+      </div>
+      <div style={S.content}>
+        <div style={{ fontSize: 11, color: "#64748b", marginBottom: 16 }}>{GAME_TYPES[round.game_type]?.label} · {round.date} · {round.createdBy || ""}</div>
+
+        {/* Leaderboard */}
+        <div style={{ fontSize: 10, fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Leaderboard</div>
+        {lb.map((p, i) => (
+          <div key={p.id} style={{ ...S.lbRow, ...(i === 0 ? { backgroundColor: "#022c22", borderRadius: 10, padding: "14px 12px", margin: "0 -4px 4px" } : { marginBottom: 4 }) }}>
+            <div style={{ ...S.lbPos, color: i === 0 ? "#f59e0b" : i === 1 ? "#94a3b8" : i === 2 ? "#cd7c2f" : "#475569" }}>{i + 1}</div>
+            <div style={S.lbName}>{p.name}<span style={S.lbHcp}>HCP {p.handicap}</span></div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: metricColor(p) }}>{metricValue(p)}</div>
+          </div>
+        ))}
+
+        {/* Scorecards */}
+        <div style={{ fontSize: 10, fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: 1, margin: "20px 0 8px" }}>Scorecards</div>
+        {players.map((player) => {
+          const playerScores = scores.filter((s) => s.player_id === player.id);
+          const lbPlayer = lb.find((p) => p.id === player.id);
+
+          return (
+            <div key={player.id} style={{ marginBottom: 16 }}>
+              <div style={{ background: "#1e3a5f", borderRadius: "6px 6px 0 0", padding: "5px 10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 11, fontWeight: 800, color: "#f8fafc" }}>{player.name}</span>
+                <span style={{ fontSize: 10, color: "#94a3b8" }}>
+                  HCP {player.handicap}
+                  {lbPlayer && round.game_type === "stroke" && ` · Gross: ${lbPlayer.grossTotal} · Net: ${lbPlayer.netTotal ?? lbPlayer.grossTotal - player.handicap}`}
+                </span>
+              </div>
+              {[front9, back9].map((nineHoles, ni) => {
+                const label = ni === 0 ? "OUT" : "IN";
+                const nineScores = playerScores.filter((s) => nineHoles.some((h) => h.hole_number === s.hole_number));
+                const nineGross = nineScores.reduce((sum, s) => sum + s.score, 0);
+
+                return (
+                  <div key={ni} style={{ background: "#fff", borderLeft: "1px solid #e2e8f0", borderRight: "1px solid #e2e8f0", ...(ni === 1 ? { borderBottom: "1px solid #e2e8f0", borderRadius: "0 0 6px 6px" } : {}), overflowX: "auto" }}>
+                    <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 300 }}>
+                      <thead>
+                        <tr>
+                          <th style={{ ...hdrStyle, width: lblW, textAlign: "left", paddingLeft: 4 }}></th>
+                          {nineHoles.map((h) => <th key={h.hole_number} style={{ ...hdrStyle, minWidth: 20 }}>{h.hole_number}</th>)}
+                          <th style={{ ...hdrStyle, width: totW }}>{label}</th>
+                        </tr>
+                        <tr>
+                          <td style={{ ...parStyle, textAlign: "left", paddingLeft: 4, fontWeight: 700 }}>Par</td>
+                          {nineHoles.map((h) => <td key={h.hole_number} style={parStyle}>{h.par}</td>)}
+                          <td style={{ ...parStyle, ...totStyle }}>{nineHoles.reduce((s, h) => s + (h.par || 0), 0)}</td>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {/* Gross row */}
+                        <tr>
+                          <td style={{ ...cellStyle, textAlign: "left", paddingLeft: 4, fontWeight: 700, color: "#475569", background: "#fff" }}>G</td>
+                          {nineHoles.map((h) => {
+                            const s = playerScores.find((sc) => sc.hole_number === h.hole_number);
+                            const g = s?.score;
+                            const hs = isHandicap ? getHcpStrokes(player.handicap, h.stroke_index) : 0;
+                            const { shape } = g ? getScoreShape(g, h.par) : { shape: "none" };
+                            const shapeStyle = shape === "eagle" ? { borderRadius: "50%", border: "1.5px solid #1e293b", outline: "1.5px solid #1e293b", outlineOffset: 2 }
+                              : shape === "birdie" ? { borderRadius: "50%", border: "1.5px solid #1e293b" }
+                              : shape === "bogey" ? { border: "1.5px solid #1e293b", borderRadius: 3 }
+                              : shape === "double" ? { border: "1.5px solid #1e293b", borderRadius: 3, outline: "1.5px solid #1e293b", outlineOffset: 2 }
+                              : {};
+                            return (
+                              <td key={h.hole_number} style={{ ...cellStyle, background: "#fff", padding: "2px 1px" }}>
+                                {g ? <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 18, height: 18, fontSize: 8, fontWeight: 800, color: "#1e293b", ...shapeStyle }}>{g}</span>
+                                  : <span style={{ color: "#cbd5e1", fontSize: 9 }}>—</span>}
+                              </td>
+                            );
+                          })}
+                          <td style={{ ...totStyle, background: "#f1f5f9" }}>{nineGross || "—"}</td>
+                        </tr>
+                        {/* Net row */}
+                        {isHandicap && (
+                          <tr>
+                            <td style={{ ...cellStyle, textAlign: "left", paddingLeft: 4, fontWeight: 700, color: "#475569", background: "#fff" }}>N</td>
+                            {nineHoles.map((h) => {
+                              const s = playerScores.find((sc) => sc.hole_number === h.hole_number);
+                              const g = s?.score;
+                              const hs = getHcpStrokes(player.handicap, h.stroke_index);
+                              const net = g ? g - hs : null;
+                              const { shape } = net ? getScoreShape(net, h.par) : { shape: "none" };
+                              const shapeStyle = shape === "eagle" ? { borderRadius: "50%", border: "1.5px solid #1e293b", outline: "1.5px solid #1e293b", outlineOffset: 2 }
+                                : shape === "birdie" ? { borderRadius: "50%", border: "1.5px solid #1e293b" }
+                                : shape === "bogey" ? { border: "1.5px solid #1e293b", borderRadius: 3 }
+                                : shape === "double" ? { border: "1.5px solid #1e293b", borderRadius: 3, outline: "1.5px solid #1e293b", outlineOffset: 2 }
+                                : {};
+                              return (
+                                <td key={h.hole_number} style={{ ...cellStyle, background: "#fff", padding: "2px 1px" }}>
+                                  {net ? <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 18, height: 18, fontSize: 8, fontWeight: 800, color: "#1e293b", ...shapeStyle }}>{net}</span>
+                                    : <span style={{ color: "#cbd5e1", fontSize: 9 }}>—</span>}
+                                </td>
+                              );
+                            })}
+                            <td style={{ ...totStyle, background: "#f1f5f9" }}>{nineScores.reduce((sum, s) => { const h = nineHoles.find((hh) => hh.hole_number === s.hole_number); return sum + (h ? s.score - getHcpStrokes(player.handicap, h.stroke_index) : 0); }, 0) || "—"}</td>
+                          </tr>
+                        )}
+                        {/* $ row for banker / pts for stableford / W/L for matchplay */}
+                        {(round.game_type === "banker" || round.game_type === "stableford" || round.game_type === "matchplay" || round.game_type === "matchplay_teams") && (
+                          <tr>
+                            <td style={{ ...cellStyle, textAlign: "left", paddingLeft: 4, fontWeight: 700, color: "#475569", background: "#fff" }}>
+                              {round.game_type === "banker" ? "$" : round.game_type === "stableford" ? "Pts" : "W"}
+                            </td>
+                            {nineHoles.map((h) => {
+                              const s = playerScores.find((sc) => sc.hole_number === h.hole_number);
+                              const g = s?.score;
+                              let val = "—"; let col = "#94a3b8";
+                              if (g && round.game_type === "stableford") {
+                                const hs = getHcpStrokes(player.handicap, h.stroke_index);
+                                const pts = stablefordPoints(g, h.par, hs);
+                                val = pts; col = pts > 0 ? "#22c55e" : "#94a3b8";
+                              } else if (g && (round.game_type === "matchplay" || round.game_type === "matchplay_teams" || round.game_type === "banker")) {
+                                const holeScores = scores.filter((sc) => sc.hole_number === h.hole_number);
+                                const allP = players;
+                                if (allP.every((p) => holeScores.some((sc) => sc.player_id === p.id))) {
+                                  if (round.game_type === "banker") {
+                                    const bankerId = lbPlayer?.bankerHoles?.[h.hole_number];
+                                    const myNet = g - getHcpStrokes(player.handicap, h.stroke_index);
+                                    const bankerScore = holeScores.find((sc) => { const bp = players.find((p) => p.id === sc.player_id); return bp && sc.player_id !== player.id; });
+                                    if (bankerScore) {
+                                      const bankerNet = bankerScore.score - getHcpStrokes(players.find((p) => p.id === bankerScore.player_id)?.handicap || 0, h.stroke_index);
+                                      val = myNet < bankerNet ? "W" : myNet > bankerNet ? "L" : "T";
+                                      col = val === "W" ? "#22c55e" : val === "L" ? "#ef4444" : "#94a3b8";
+                                    }
+                                  } else {
+                                    const nets = allP.map((p) => { const sc = holeScores.find((x) => x.player_id === p.id); return sc ? sc.score - getHcpStrokes(p.handicap, h.stroke_index) : Infinity; });
+                                    const minNet = Math.min(...nets);
+                                    const myNet = g - getHcpStrokes(player.handicap, h.stroke_index);
+                                    val = myNet === minNet ? "W" : "L";
+                                    col = val === "W" ? "#22c55e" : "#ef4444";
+                                  }
+                                } else { val = ""; }
+                              }
+                              return <td key={h.hole_number} style={{ ...cellStyle, background: "#fff", fontSize: 7, fontWeight: 700, color: col }}>{val}</td>;
+                            })}
+                            <td style={{ ...totStyle, background: "#f1f5f9", color: "#1e293b" }}> </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+
+        {/* Settlement for banker */}
+        {round.game_type === "banker" && lb.some((p) => p.total !== 0) && (
+          <>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: 1, margin: "8px 0 8px" }}>Settlement</div>
+            <div style={{ backgroundColor: "#1e293b", borderRadius: 12, padding: 14, marginBottom: 16 }}>
+              <div style={{ fontSize: 11, color: "#64748b", marginBottom: 10 }}>Who owes who to square up</div>
+              {lb.filter((p) => p.total < 0).map((debtor) => {
+                const creditor = lb.find((p) => p.total > 0);
+                if (!creditor) return null;
+                return (
+                  <div key={debtor.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid #334155" }}>
+                    <span style={{ fontSize: 13, color: "#f8fafc" }}>{debtor.name} owes <strong>{creditor.name}</strong></span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "#f59e0b" }}>${Math.abs(debtor.total)}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function PastRoundsScreen({ onBack, onViewRound }) {
   const [rounds, setRounds] = useState(getSavedRounds());
   const profile = getPlayerProfile();
@@ -4233,96 +4459,8 @@ export default function GolfApp() {
       {screen === "watch" && <WatchRoundScreen onBack={() => setScreen("home")} onWatch={(r) => { setSpectatorRound(r); setRound(r); setMe({ id: "spectator", name: "Spectator", handicap: 0 }); setScreen("dashboard_spectator"); }} prefillCode={joinCode} />}
       {screen === "dashboard_spectator" && round && <PlayerDashboardScreen round={round} me={{ id: "spectator", name: "Spectator", handicap: 0 }} onViewScorecard={() => setScreen("scorecard_spectator")} onBack={() => { setScreen("home"); setRound(null); setSpectatorRound(null); }} isSpectator={true} />}
       {screen === "scorecard_spectator" && round && <ScorecardScreen round={round} me={{ id: "spectator", name: "Spectator", handicap: 0 }} onViewDashboard={() => setScreen("dashboard_spectator")} isSpectator={true} />}
-      {screen === "view_round" && viewingRound && (
-        <div style={S.screen}>
-          <div style={S.header}>
-            <button style={S.backBtn} onClick={() => setScreen("history")}>← Back</button>
-            <h2 style={S.headerTitle}>{viewingRound.course_name}</h2>
-            <button style={{ ...S.smallIconBtn, fontSize: 11, padding: "5px 8px" }} onClick={() => exportScorecardPDF(viewingRound, viewingRound.players, viewingRound.scores, viewingRound.holes)}>PDF</button>
-          </div>
-          <div style={S.content}>
-            <div style={{ fontSize: 13, color: "#64748b", marginBottom: 16 }}>{GAME_TYPES[viewingRound.game_type]?.label} · {viewingRound.date} · Created by {viewingRound.createdBy || "Unknown"}</div>
-            <div style={{ overflowX: "auto", marginBottom: 20 }}>
-              <table style={{ borderCollapse: "collapse", fontSize: 11, minWidth: "100%" }}>
-                <thead>
-                  <tr>
-                    <td style={{ padding: "6px 8px", backgroundColor: "#1e293b", color: "#64748b", fontWeight: 700, whiteSpace: "nowrap", minWidth: 100 }}>Player</td>
-                    {viewingRound.holes?.map((h) => <td key={h.hole_number} style={{ padding: "5px 3px", backgroundColor: "#1e293b", color: "#64748b", textAlign: "center", minWidth: 24 }}>{h.hole_number}</td>)}
-                    <td style={{ padding: "5px 6px", backgroundColor: "#1e293b", color: "#94a3b8", fontWeight: 700, textAlign: "center" }}>Tot</td>
-                  </tr>
-                  <tr>
-                    <td style={{ padding: "4px 8px", backgroundColor: "#0f172a", color: "#475569" }}>Par</td>
-                    {viewingRound.holes?.map((h) => <td key={h.hole_number} style={{ padding: "4px 3px", backgroundColor: "#0f172a", color: "#475569", textAlign: "center" }}>{h.par}</td>)}
-                    <td style={{ padding: "4px 6px", backgroundColor: "#0f172a", color: "#475569", textAlign: "center" }}>{viewingRound.holes?.reduce((s, h) => s + h.par, 0)}</td>
-                  </tr>
-                </thead>
-                <tbody>
-                  {calcLeaderboard(viewingRound.players, viewingRound.scores, viewingRound.holes, viewingRound.game_type).map((p, i) => (
-                    <tr key={p.id} style={{ backgroundColor: i % 2 === 0 ? "#0f172a" : "#111827" }}>
-                      <td style={{ padding: "5px 8px", color: "#f8fafc", fontWeight: 600, whiteSpace: "nowrap" }}>{i+1}. {p.name}</td>
-                      {viewingRound.holes?.map((h) => {
-                        const s = viewingRound.scores?.find((sc) => sc.player_id === p.id && sc.hole_number === h.hole_number);
-                        const score = s?.score; const diff = score ? score - h.par : null;
-                        let bg = "transparent";
-                        if (diff !== null) { if (diff <= -1) bg = "#991b1b"; else if (diff === 1) bg = "#7f1d1d"; else if (diff >= 2) bg = "#4c0519"; }
-                        return <td key={h.hole_number} style={{ padding: "4px 3px", textAlign: "center", backgroundColor: bg, color: "#fff", fontWeight: score ? 700 : 400, fontSize: 11 }}>{score || "—"}</td>;
-                      })}
-                      <td style={{ padding: "5px 6px", textAlign: "center", color: "#22c55e", fontWeight: 800 }}>
-                        {viewingRound.game_type === "stableford" ? p.total + "pt" : viewingRound.game_type === "banker" ? (p.total >= 0 ? "+$" : "-$") + Math.abs(p.total) : formatToPar(p.toPar)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <h3 style={S.stepTitle}>Final Standings</h3>
-            {calcLeaderboard(viewingRound.players, viewingRound.scores, viewingRound.holes, viewingRound.game_type).map((p, i) => (
-              <div key={p.id} style={{ ...S.lbRow }}>
-                <div style={{ ...S.lbPos, color: i === 0 ? "#f59e0b" : i === 1 ? "#94a3b8" : i === 2 ? "#cd7c2f" : "#475569" }}>{i + 1}</div>
-                <div style={S.lbName}>{p.name}<span style={S.lbHcp}>HCP {p.handicap}</span></div>
-                <div style={S.lbRight}>
-                  <div style={S.lbScore}>
-                    {viewingRound.game_type === "stableford" ? p.total + " pts"
-                      : viewingRound.game_type === "banker" ? (p.total >= 0 ? "+$" : "-$") + Math.abs(p.total)
-                      : viewingRound.game_type === "matchplay" ? (p.total === 0 ? "0 pts" : p.total + (p.total === 1 ? " pt" : " pts"))
-                      : <><div style={{ fontSize: 13, color: "#94a3b8" }}>Gross: {p.grossTotal}</div><div style={{ fontSize: 14, fontWeight: 700 }}>{formatToPar(p.toPar)}</div></>}
-                  </div>
-                  <div style={S.lbHoles}>{p.holesPlayed}/18</div>
-                  {/* Front 9 / Back 9 stats */}
-                  {(() => {
-                    const f9 = holes.filter((h) => h.hole_number <= 9);
-                    const b9 = holes.filter((h) => h.hole_number > 9);
-                    const calcNine = (nineHoles) => {
-                      const playerScores = scores.filter((s) => s.player_id === p.id && nineHoles.some((h) => h.hole_number === s.hole_number));
-                      if (playerScores.length === 0) return null;
-                      const gross = playerScores.reduce((sum, s) => sum + s.score, 0);
-                      const par = playerScores.reduce((sum, s) => sum + (nineHoles.find((h) => h.hole_number === s.hole_number)?.par || 0), 0);
-                      return { gross, diff: gross - par, played: playerScores.length };
-                    };
-                    const f = calcNine(f9); const b = calcNine(b9);
-                    if (!f) return null;
-                    return (
-                      <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
-                        {f && <div style={{ flex: 1, backgroundColor: "#0f172a", borderRadius: 6, padding: "4px 8px", textAlign: "center" }}>
-                          <div style={{ fontSize: 9, color: "#475569", textTransform: "uppercase" }}>Front {f.played < 9 ? f.played + "/9" : "9"}</div>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: "#f8fafc" }}>{f.gross}</div>
-                          <div style={{ fontSize: 10, fontWeight: 700, color: f.diff < 0 ? "#22c55e" : f.diff > 0 ? "#ef4444" : "#94a3b8" }}>{f.diff === 0 ? "E" : (f.diff > 0 ? "+" : "") + f.diff}</div>
-                        </div>}
-                        {b && <div style={{ flex: 1, backgroundColor: "#0f172a", borderRadius: 6, padding: "4px 8px", textAlign: "center" }}>
-                          <div style={{ fontSize: 9, color: "#475569", textTransform: "uppercase" }}>Back {b.played < 9 ? b.played + "/9" : "9"}</div>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: "#f8fafc" }}>{b.gross}</div>
-                          <div style={{ fontSize: 10, fontWeight: 700, color: b.diff < 0 ? "#22c55e" : b.diff > 0 ? "#ef4444" : "#94a3b8" }}>{b.diff === 0 ? "E" : (b.diff > 0 ? "+" : "") + b.diff}</div>
-                        </div>}
-                      </div>
-                    );
-                  })()}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      {screen === "admin_login" && <AdminLoginScreen onBack={() => setScreen("home")} onLoginSuccess={(level) => { setAdminLevel(level); setScreen("admin"); }} />}
+      {screen === "view_round" && viewingRound && <PastRoundDetailScreen round={viewingRound} onBack={() => setScreen("history")} />}
+            {screen === "admin_login" && <AdminLoginScreen onBack={() => setScreen("home")} onLoginSuccess={(level) => { setAdminLevel(level); setScreen("admin"); }} />}
       {screen === "admin" && adminLevel === "super" && <SuperAdminScreen onLogout={() => { localStorage.removeItem("ff_admin"); setScreen("home"); }} />}
       {screen === "admin" && adminLevel !== "super" && <AdminDashboardScreen onLogout={() => { localStorage.removeItem("ff_admin"); setScreen("home"); }} />}
       {screen === "create" && <CreateRoundScreen onBack={() => setScreen("home")} onRoundCreated={(r, p) => { setRound(r); setMe(p); setScreen("dashboard"); }} />}
