@@ -225,15 +225,15 @@ const DEFAULT_COURSES = [
     {hole_number:17,par:4,stroke_index:12},{hole_number:18,par:4,stroke_index:2},
   ]},
   { id: "tanah-merah-tampines", name: "Tanah Merah CC (Tampines)", par: 72, holes: [
-    {hole_number:1,par:4,stroke_index:9},{hole_number:2,par:4,stroke_index:3},
-    {hole_number:3,par:4,stroke_index:7},{hole_number:4,par:3,stroke_index:15},
-    {hole_number:5,par:5,stroke_index:1},{hole_number:6,par:3,stroke_index:17},
-    {hole_number:7,par:4,stroke_index:5},{hole_number:8,par:5,stroke_index:11},
-    {hole_number:9,par:4,stroke_index:13},{hole_number:10,par:5,stroke_index:2},
-    {hole_number:11,par:4,stroke_index:8},{hole_number:12,par:4,stroke_index:4},
+    {hole_number:1,par:4,stroke_index:11},{hole_number:2,par:4,stroke_index:1},
+    {hole_number:3,par:4,stroke_index:5},{hole_number:4,par:3,stroke_index:7},
+    {hole_number:5,par:5,stroke_index:3},{hole_number:6,par:3,stroke_index:15},
+    {hole_number:7,par:4,stroke_index:9},{hole_number:8,par:5,stroke_index:13},
+    {hole_number:9,par:4,stroke_index:17},{hole_number:10,par:5,stroke_index:8},
+    {hole_number:11,par:4,stroke_index:14},{hole_number:12,par:4,stroke_index:12},
     {hole_number:13,par:4,stroke_index:10},{hole_number:14,par:3,stroke_index:18},
-    {hole_number:15,par:4,stroke_index:6},{hole_number:16,par:3,stroke_index:16},
-    {hole_number:17,par:4,stroke_index:12},{hole_number:18,par:5,stroke_index:14},
+    {hole_number:15,par:4,stroke_index:4},{hole_number:16,par:3,stroke_index:16},
+    {hole_number:17,par:4,stroke_index:2},{hole_number:18,par:5,stroke_index:6},
   ]},
   { id: "tanah-merah-garden", name: "Tanah Merah CC (Garden)", par: 71, holes: [
     {hole_number:1,par:4,stroke_index:9},{hole_number:2,par:4,stroke_index:3},
@@ -1023,7 +1023,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.17</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.18</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={shareApp} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", backdropFilter: "blur(4px)" }}>SHARE</button>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
@@ -2190,7 +2190,7 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
             {err && <p style={S.error}>{err}</p>}
             <div style={{ marginBottom: 12 }}>
               <button onClick={() => { setShowTournamentPicker(!showTournamentPicker); if (showTournamentPicker) setSelectedTournament(""); }}
-                style={{ background: "none", border: "none", color: showTournamentPicker ? "#22c55e" : "#64748b", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", padding: 0, textDecoration: "underline" }}>
+                style={{ background: "none", border: "none", color: showTournamentPicker ? "#22c55e" : "#f8fafc", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", padding: 0, textDecoration: "underline" }}>
                 {showTournamentPicker ? "Remove tournament link" : "+ Link to a tournament (optional)"}
               </button>
               {showTournamentPicker && (() => {
@@ -4574,8 +4574,8 @@ const S = {
   btnShare: { backgroundColor: "#1e293b", color: "#f59e0b", border: "1px solid #f59e0b", borderRadius: 14, padding: "16px", fontSize: 16, fontWeight: 600, cursor: "pointer", width: "100%", fontFamily: "inherit", WebkitAppearance: "none" },
   btnDisabled: { backgroundColor: "#1e293b", color: "#475569", border: "none", borderRadius: 14, padding: "16px", fontSize: 16, fontWeight: 700, cursor: "not-allowed", width: "100%", fontFamily: "inherit", WebkitAppearance: "none" },
   courseList: { display: "flex", flexDirection: "column", gap: 8 },
-  courseCard: { display: "flex", alignItems: "center", gap: 12, backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "12px 16px", cursor: "pointer", textAlign: "left", width: "100%", fontFamily: "inherit", WebkitAppearance: "none", outline: "none" },
-  courseCardSelected: { border: "2px solid #22c55e", backgroundColor: "#022c22", outline: "none" },
+  courseCard: { display: "flex", alignItems: "center", gap: 12, backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "12px 16px", cursor: "pointer", textAlign: "left", width: "100%", fontFamily: "inherit", WebkitAppearance: "none", outline: "none", WebkitTapHighlightColor: "transparent" },
+  courseCardSelected: { border: "2px solid #22c55e", backgroundColor: "#022c22", outline: "none", WebkitTapHighlightColor: "transparent" },
   courseIcon: { fontSize: 24 },
   courseName: { fontSize: 15, fontWeight: 600, color: "#f8fafc" },
   courseAddr: { fontSize: 12, color: "#64748b", marginTop: 2 },
