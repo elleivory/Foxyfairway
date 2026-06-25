@@ -1023,7 +1023,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#475569", fontWeight: 600 }}>v1.1.16</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.17</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={shareApp} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", backdropFilter: "blur(4px)" }}>SHARE</button>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
@@ -2577,7 +2577,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
                     {/* Individual players */}
                     {tp.map((p, pi) => (
                       <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "7px 0", borderBottom: pi < tp.length - 1 ? "1px solid #0f172a" : "none" }}>
-                        <div style={{ flex: 1, fontSize: 14, fontWeight: 600, color: "#f8fafc" }}>{p.name.replace(" (Guest)", "")}{p.name.endsWith("(Guest)") ? <span style={{ fontSize: 10, color: "#475569", marginLeft: 4 }}>(Guest)</span> : ""}<span style={{ fontSize: 11, color: "#475569", fontWeight: 400, marginLeft: 6 }}>HCP {p.handicap}</span></div>
+                        <div style={{ flex: 1, fontSize: 14, fontWeight: 600, color: "#f8fafc" }}>{p.name.replace(" (Guest)", "")}{p.name.endsWith("(Guest)") ? <span style={{ fontSize: 10, color: "#475569", marginLeft: 4 }}>(Guest)</span> : ""}<span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 400, marginLeft: 6 }}>HCP {p.handicap}</span></div>
                         <div style={{ fontSize: 14, fontWeight: 700, color: p.total > 0 ? tc : "#94a3b8" }}>{p.total} {p.total === 1 ? "pt" : "pts"}</div>
                       </div>
                     ))}
@@ -4574,8 +4574,8 @@ const S = {
   btnShare: { backgroundColor: "#1e293b", color: "#f59e0b", border: "1px solid #f59e0b", borderRadius: 14, padding: "16px", fontSize: 16, fontWeight: 600, cursor: "pointer", width: "100%", fontFamily: "inherit", WebkitAppearance: "none" },
   btnDisabled: { backgroundColor: "#1e293b", color: "#475569", border: "none", borderRadius: 14, padding: "16px", fontSize: 16, fontWeight: 700, cursor: "not-allowed", width: "100%", fontFamily: "inherit", WebkitAppearance: "none" },
   courseList: { display: "flex", flexDirection: "column", gap: 8 },
-  courseCard: { display: "flex", alignItems: "center", gap: 12, backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "12px 16px", cursor: "pointer", textAlign: "left", width: "100%", fontFamily: "inherit", WebkitAppearance: "none" },
-  courseCardSelected: { border: "1px solid #22c55e", backgroundColor: "#022c22" },
+  courseCard: { display: "flex", alignItems: "center", gap: 12, backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "12px 16px", cursor: "pointer", textAlign: "left", width: "100%", fontFamily: "inherit", WebkitAppearance: "none", outline: "none" },
+  courseCardSelected: { border: "2px solid #22c55e", backgroundColor: "#022c22", outline: "none" },
   courseIcon: { fontSize: 24 },
   courseName: { fontSize: 15, fontWeight: 600, color: "#f8fafc" },
   courseAddr: { fontSize: 12, color: "#64748b", marginTop: 2 },
@@ -4619,14 +4619,14 @@ const S = {
   scoreInfoCell: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minWidth: 48, width: 48, flex: "0 0 auto", padding: "4px 0", overflow: "visible" },
   scoreInfoCellNumber: { fontSize: 9, color: "#64748b", fontWeight: 700, marginBottom: 2 },
   scoreInfoCellValue: { fontSize: 14, fontWeight: 800, color: "#22c55e" },
-  lbRow: { display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 10, border: "1px solid rgba(51,65,85,0.5)", marginBottom: 6 },
-  lbRowMe: { border: "1px solid rgba(34,197,94,0.4)", borderRadius: 10, padding: "12px 14px", marginBottom: 6 },
+  lbRow: { display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 10, border: "1px solid rgba(34,197,94,0.3)", marginBottom: 6 },
+  lbRowMe: { border: "1px solid rgba(34,197,94,0.6)", borderRadius: 10, padding: "12px 14px", marginBottom: 6 },
   lbPos: { fontSize: 18, fontWeight: 800, color: "#475569", width: 28, flexShrink: 0 },
   lbName: { flex: 1, fontSize: 16, fontWeight: 600, color: "#f8fafc" },
-  lbHcp: { fontSize: 11, color: "#475569", fontWeight: 400, marginLeft: 8 },
+  lbHcp: { fontSize: 11, color: "#94a3b8", fontWeight: 400, marginLeft: 8 },
   lbRight: { textAlign: "right" },
   lbScore: { fontSize: 18, fontWeight: 800, color: "#f8fafc" },
-  lbHoles: { fontSize: 11, color: "#475569" },
+  lbHoles: { fontSize: 11, color: "#94a3b8" },
   empty: { textAlign: "center", color: "#475569", padding: "40px 0", fontSize: 15 },
   modal: { position: "fixed", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.6)", display: "flex", alignItems: "flex-end", zIndex: 100 },
   modalContent: { backgroundColor: "#1e293b", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: "24px 20px 40px", width: "100%", maxHeight: "80vh", overflowY: "auto" },
