@@ -1006,7 +1006,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
   return (
     <div style={{ ...S.screen, position: "relative" }}>
       {/* Version + Admin - positioned below status bar */}
-      <div style={{ position: "absolute", top: "calc(env(safe-area-inset-top, 44px) + 10px)", left: 16, fontSize: 10, color: "#475569", fontWeight: 600 }}>v1.1.11</div>
+      <div style={{ position: "absolute", top: "calc(env(safe-area-inset-top, 44px) + 10px)", left: 16, fontSize: 10, color: "#475569", fontWeight: 600 }}>v1.1.12</div>
       <button onClick={onAdminLogin} style={{ position: "absolute", top: "calc(env(safe-area-inset-top, 44px) + 6px)", right: 16, background: "none", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", textTransform: "uppercase" }}>Admin</button>
 
       {/* Header */}
@@ -1526,7 +1526,7 @@ function ChatPanel({ round, me, onClose, isSpectator }) {
 
   const send = async (text) => {
     if (!text.trim()) return;
-    const msg = { id: genId(), round_id: round.id, player_id: me.id, player_name: me.name, text: text.trim(), created_at: new Date().toISOString() };
+    const msg = { id: genId(), round_id: round.id, player_id: me.id, player_name: isSpectator ? "Spectator" : me.name, text: text.trim(), created_at: new Date().toISOString() };
     setMessages((prev) => [...prev, msg]);
     setInput("");
     await dbSendChat(msg);
@@ -2343,6 +2343,11 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
   const [editingPlayerId, setEditingPlayerId] = useState(null);
   const [editPlayerName, setEditPlayerName] = useState("");
   const [editPlayerHcp, setEditPlayerHcp] = useState("");
+  const [showTournamentLink, setShowTournamentLink] = useState(false);
+  const [linkTournaments, setLinkTournaments] = useState([]);
+  const [linkingTournament, setLinkingTournament] = useState("");
+  const [linkingInProgress, setLinkingInProgress] = useState(false);
+  const [linkSuccess, setLinkSuccess] = useState(false);
   const completeDismissedRef = useRef(false);
   const holes = round.holes || [];
 
@@ -2393,9 +2398,13 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
 
       <div style={S.content}>
         <div style={{ textAlign: "center", marginBottom: 20, padding: 16, backgroundColor: "#1e293b", borderRadius: 12, border: "1px solid #334155" }}>
-          {!isSpectator && <div style={{ display: "inline-block", backgroundColor: "#fff", borderRadius: 10, padding: 12, marginBottom: 8 }}>
-            <QRCodeSVG value={window.location.origin + window.location.pathname + "?join=" + round.code} size={100} bgColor="#ffffff" fgColor="#0f172a" />
-          </div>}
+          {isSpectator
+            ? <div style={{ display: "inline-block", backgroundColor: "#fff", borderRadius: 8, padding: 8, marginBottom: 8 }}>
+                <QRCodeSVG value={window.location.origin + window.location.pathname + "?watch=" + round.code} size={72} bgColor="#ffffff" fgColor="#0f172a" />
+              </div>
+            : <div style={{ display: "inline-block", backgroundColor: "#fff", borderRadius: 10, padding: 12, marginBottom: 8 }}>
+                <QRCodeSVG value={window.location.origin + window.location.pathname + "?join=" + round.code} size={100} bgColor="#ffffff" fgColor="#0f172a" />
+              </div>}
           <div style={{ fontSize: 13, color: "#94a3b8" }}>{isSpectator ? "Round code: " : "Scan to join · Code: "}<span style={{ color: "#22c55e", fontWeight: 700, letterSpacing: 2 }}>{round.code}</span></div>
           {isSpectator
             ? <button onClick={(e) => { navigator.clipboard.writeText(window.location.origin + window.location.pathname + "?watch=" + round.code); const btn = e.target; btn.textContent = "✓ Copied!"; btn.style.color = "#22c55e"; btn.style.borderColor = "#22c55e"; setTimeout(() => { btn.textContent = "👀 Copy Watch Link"; btn.style.color = "#94a3b8"; btn.style.borderColor = "#334155"; }, 1500); }} style={{ marginTop: 10, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 12, fontWeight: 600, cursor: "pointer", padding: "8px 16px", fontFamily: "inherit" }}>👀 Copy Watch Link</button>
@@ -2405,6 +2414,41 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
           <button style={{ ...S.btnPrimary, flex: 1, fontSize: 17, marginBottom: 0 }} onClick={onViewScorecard}>⛳ Live Scoring</button>
           {me?.name === round.created_by && !isSpectator && <button onClick={() => setShowAddGuest(true)} style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, color: "#94a3b8", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", padding: "0 14px", flexShrink: 0 }}>+ Guest</button>}
         </div>
+
+        {/* Link to Tournament - creator only, not spectator */}
+        {me?.name === round.created_by && !isSpectator && (
+          <div style={{ marginBottom: 12 }}>
+            {!showTournamentLink
+              ? <button onClick={async () => { setShowTournamentLink(true); const t = await dbGetTournaments(); setLinkTournaments(t); }} style={{ background: "none", border: "none", color: "#64748b", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", padding: 0, textDecoration: "underline" }}>🏆 Link to Tournament</button>
+              : <div style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: 14 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#f8fafc", marginBottom: 10 }}>Link to Tournament</div>
+                  {linkSuccess
+                    ? <div style={{ fontSize: 13, color: "#22c55e", fontWeight: 600 }}>✓ Round linked to tournament!</div>
+                    : linkTournaments.length === 0
+                      ? <div style={{ fontSize: 12, color: "#475569" }}>No tournaments found. Create one from the home screen first.</div>
+                      : <>
+                          <select style={S.input} value={linkingTournament} onChange={(e) => setLinkingTournament(e.target.value)}>
+                            <option value="">Select tournament...</option>
+                            {linkTournaments.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                          </select>
+                          <button style={linkingTournament ? { ...S.btnPrimary, marginTop: 8, marginBottom: 0 } : { ...S.btnDisabled, marginTop: 8, marginBottom: 0 }} disabled={!linkingTournament || linkingInProgress} onClick={async () => {
+                            if (!linkingTournament) return;
+                            setLinkingInProgress(true);
+                            try {
+                              const [p, s] = await Promise.all([dbGetPlayers(round.id), dbGetScores(round.id)]);
+                              await dbAddRoundToTournament(linkingTournament, { id: round.id, code: round.code, course_name: round.course_name, game_type: round.game_type, holes, players: p, scores: s, date: new Date().toLocaleDateString("en-NZ", { day: "numeric", month: "long", year: "numeric" }), createdBy: me.name });
+                              setLinkSuccess(true);
+                              setTimeout(() => { setShowTournamentLink(false); setLinkSuccess(false); setLinkingTournament(""); }, 2000);
+                            } catch(e) { console.error(e); alert("Could not link round. Check your connection."); }
+                            setLinkingInProgress(false);
+                          }}>{linkingInProgress ? "Linking..." : "Link Round"}</button>
+                        </>
+                  }
+                  {!linkSuccess && <button onClick={() => { setShowTournamentLink(false); setLinkingTournament(""); }} style={{ background: "none", border: "none", color: "#475569", fontSize: 12, cursor: "pointer", fontFamily: "inherit", marginTop: 8, padding: 0 }}>Cancel</button>}
+                </div>
+            }
+          </div>
+        )}
 
         {showAddGuest && !isSpectator && (
           <div style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 14, padding: 16, marginBottom: 16 }}>
@@ -3788,8 +3832,8 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
           });
         })() : (<>
 
-        {/* MY card - same style as other players */}
-        {(() => {
+        {/* MY card - hidden for spectators */}
+        {!isSpectator && (() => {
           const myGrossTotal2 = holes.reduce((sum, h) => sum + (myScores[h.hole_number] ? myScores[h.hole_number] - h.par : 0), 0);
           const myNetTotal2 = holes.reduce((sum, h) => { const g = myScores[h.hole_number]; if (!g) return sum; return sum + (g - getHcpStrokes(me.handicap, h.stroke_index) - h.par); }, 0);
           return (
