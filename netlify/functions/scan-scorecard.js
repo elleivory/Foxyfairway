@@ -33,11 +33,13 @@ exports.handler = async (event) => {
             })),
             {
               type: "text",
-              text: `You are reading a golf scorecard. Extract the course name and hole data.
+              text: `You are reading a golf scorecard. Extract the course name, tee colour, and hole data.
 Return ONLY a JSON object with no other text, no markdown, no explanation.
 The JSON must have this exact structure:
-{"name":"Course Name","holes":[{"hole_number":1,"par":4,"stroke_index":11},{"hole_number":2,"par":3,"stroke_index":7}]}
-Include all 18 holes. Use the official course name from the scorecard header.`
+{"name":"Course Name - Tee Colour","holes":[{"hole_number":1,"par":4,"stroke_index":11},{"hole_number":2,"par":3,"stroke_index":7}]}
+Include all 18 holes. 
+For the name: use the official course name followed by the tee colour/name in brackets (e.g. "Wanaka Golf Club (White Men)", "St Clair Golf Club (Blue)", "Arrowtown Golf Club (Red Women)").
+If no tee colour is visible, just use the course name alone.`
             }
           ]
         }]
@@ -52,7 +54,6 @@ Include all 18 holes. Use the official course name from the scorecard header.`
 
     const text = data.content[0].text || "";
 
-    // Extract JSON from response - find first { to last }
     const start = text.indexOf("{");
     const end = text.lastIndexOf("}");
     if (start === -1 || end === -1) {
