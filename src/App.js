@@ -515,6 +515,13 @@ async function dbGetRound(code) {
   const { data, error } = await supabase.from("rounds").select("*").eq("code", code.toUpperCase()).maybeSingle();
   if (error) { console.error("dbGetRound error:", JSON.stringify(error)); throw error; }
   if (!data) throw new Error("Round not found for code: " + code);
+  // Always fetch fresh course holes from Supabase so fixing a course updates active rounds
+  try {
+    const { data: courseData } = await supabase.from("courses").select("holes").eq("id", data.course_id).maybeSingle();
+    if (courseData?.holes && Array.isArray(courseData.holes) && courseData.holes.length > 0) {
+      return { ...data, holes: courseData.holes };
+    }
+  } catch(e) { console.log("Fresh holes fetch failed, using stored holes", e); }
   return data;
 }
 
@@ -1023,7 +1030,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.21</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.23</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={shareApp} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", backdropFilter: "blur(4px)" }}>SHARE</button>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
@@ -1408,15 +1415,35 @@ function SuperAdminScreen({ onLogout }) {
   const [tournaments, setTournaments] = useState([]);
   const [editingTournamentId, setEditingTournamentId] = useState(null);
   const [editingTournamentName, setEditingTournamentName] = useState("");
+  const [saCourses, setSaCourses] = useState([]);
+  const [saEditingCourse, setSaEditingCourse] = useState(null);
+  const [saEditingHoles, setSaEditingHoles] = useState([]);
+  const [saSaving, setSaSaving] = useState(false);
+  const [saConfirmDeleteCourseId, setSaConfirmDeleteCourseId] = useState(null);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const [r, b, t] = await Promise.all([dbGetAllRounds(), dbGetBlockedPlayers(), dbGetTournaments()]);
+      const [r, b, t, c] = await Promise.all([dbGetAllRounds(), dbGetBlockedPlayers(), dbGetTournaments(), dbGetCourses()]);
       const { data: pd } = await supabase.from("players").select("*").eq("is_placeholder", false).order("created_at", { ascending: false });
-      setRounds(r); setBlocked(b); setAllPlayers(pd || []); setTournaments(t); setLoading(false);
+      setRounds(r); setBlocked(b); setAllPlayers(pd || []); setTournaments(t); setSaCourses(c); setLoading(false);
     })();
   }, []);
+
+  const saUpdateHole = (i, field, val) => { const h = [...saEditingHoles]; h[i] = { ...h[i], [field]: val === "" ? null : parseInt(val) }; setSaEditingHoles(h); };
+
+  const saSaveCourse = async () => {
+    if (!saEditingCourse) return;
+    setSaSaving(true);
+    try {
+      const final = { ...saEditingCourse, holes: saEditingHoles };
+      await dbSaveCourse(final);
+      setSaCourses((prev) => { const idx = prev.findIndex((c) => c.id === final.id); if (idx >= 0) { const u = [...prev]; u[idx] = final; return u; } return [...prev, final]; });
+      setMsg("Course saved."); setTimeout(() => setMsg(""), 2000);
+      setSaEditingCourse(null); setSaEditingHoles([]);
+    } catch(e) { setMsg("Save failed."); }
+    setSaSaving(false);
+  };
 
   const handleDeleteTournament = async (t) => {
     if (!window.confirm('Delete tournament ' + t.name + '? Cannot be undone.')) return;
@@ -1464,7 +1491,7 @@ function SuperAdminScreen({ onLogout }) {
         <div style={{ ...S.adminBadge, backgroundColor: "#ef4444" }}>SUPER</div>
       </div>
       <div style={{ display: "flex", borderBottom: "1px solid #334155" }}>
-        {["rounds", "players", "blocked", "tournaments", "stats"].map((t) => (
+        {["rounds", "players", "blocked", "tournaments", "courses", "stats"].map((t) => (
           <button key={t} style={{ flex: 1, padding: "12px 0", background: "none", border: "none", color: tab === t ? "#22c55e" : "#64748b", fontWeight: tab === t ? 700 : 400, fontSize: 13, cursor: "pointer", borderBottom: tab === t ? "2px solid #22c55e" : "none", fontFamily: "inherit", textTransform: "capitalize" }} onClick={() => setTab(t)}>{t}</button>
         ))}
       </div>
@@ -1546,9 +1573,116 @@ function SuperAdminScreen({ onLogout }) {
                       <button onClick={() => handleDeleteTournament(t)} style={{ background: "none", border: "1px solid #ef4444", borderRadius: 6, color: "#ef4444", fontSize: 11, fontWeight: 600, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit" }}>Delete</button>
                     </div>
                   </div>
+                  {/* Round refresh buttons */}
+                  {t.rounds?.length > 0 && (
+                    <div style={{ marginTop: 10, borderTop: "1px solid #334155", paddingTop: 10 }}>
+                      <div style={{ fontSize: 10, color: "#475569", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>Refresh course data per round</div>
+                      {t.rounds.map((r) => (
+                        <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                          <span style={{ fontSize: 12, color: "#94a3b8" }}>{r.course_name} · {r.code}</span>
+                          <button onClick={async () => {
+                            try {
+                              // Fetch round to get course_id, then fetch fresh holes by ID
+                              const { data: rd } = await supabase.from("rounds").select("course_id, holes").eq("id", r.id).maybeSingle();
+                              const courseId = rd?.course_id;
+                              const { data: cd } = courseId
+                                ? await supabase.from("courses").select("holes").eq("id", courseId).maybeSingle()
+                                : await supabase.from("courses").select("holes").eq("name", r.course_name).maybeSingle();
+                              if (cd?.holes) {
+                                await Promise.all([
+                                  supabase.from("tournament_rounds").update({ holes: cd.holes }).eq("round_id", r.id).eq("tournament_id", t.id),
+                                  supabase.from("rounds").update({ holes: cd.holes }).eq("id", r.id),
+                                ]);
+                                setMsg("Refreshed: " + r.course_name); setTimeout(() => setMsg(""), 3000);
+                              } else { setMsg("Course not found in Supabase. Fix the course in Admin first."); setTimeout(() => setMsg(""), 4000); }
+                            } catch(e) { setMsg("Refresh failed: " + e.message); setTimeout(() => setMsg(""), 3000); }
+                          }} style={{ background: "none", border: "1px solid #22c55e", borderRadius: 6, color: "#22c55e", fontSize: 10, fontWeight: 600, padding: "4px 8px", cursor: "pointer", fontFamily: "inherit" }}>Refresh</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  </div>
                 )}
               </div>
             ))}
+          </div>
+        )}
+        {tab === "courses" && !loading && (
+          <div>
+            {!saEditingCourse ? (
+              <div>
+                {saCourses.map((c) => (
+                  <div key={c.id} style={S.courseItem}>
+                    <div><div style={S.courseName}>{c.name}</div><div style={S.courseAddr}>18 holes</div></div>
+                    {saConfirmDeleteCourseId === c.id ? (
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button style={{ ...S.smallBtn, color: "#ef4444", borderColor: "#ef4444" }} onClick={async () => {
+                          try { await dbDeleteCourse(c.id); markCourseDeleted(c.id); setSaCourses((prev) => prev.filter((x) => x.id !== c.id)); setMsg("Course deleted."); setTimeout(() => setMsg(""), 2000); } catch { setMsg("Delete failed."); }
+                          setSaConfirmDeleteCourseId(null);
+                        }}>Confirm</button>
+                        <button style={S.smallBtn} onClick={() => setSaConfirmDeleteCourseId(null)}>Cancel</button>
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button style={S.smallBtn} onClick={() => { setSaEditingCourse(c); setSaEditingHoles(c.holes || []); }}>Edit</button>
+                        <button style={{ ...S.smallBtn, color: "#ef4444", borderColor: "#ef4444" }} onClick={() => setSaConfirmDeleteCourseId(c.id)}>Delete</button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div>
+                <h3 style={S.stepTitle}>{saEditingCourse.name}</h3>
+                {(() => {
+                  const front = saEditingHoles.slice(0, 9).reduce((s, h) => s + (parseInt(h.par) || 0), 0);
+                  const back = saEditingHoles.slice(9, 18).reduce((s, h) => s + (parseInt(h.par) || 0), 0);
+                  const siVals = saEditingHoles.map((h) => parseInt(h.stroke_index)).filter((v) => v > 0);
+                  const siValid = siVals.length === 18 && new Set(siVals).size === 18 && siVals.reduce((s, v) => s + v, 0) === 171;
+                  return (
+                    <div style={{ backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 10, padding: "10px 14px", marginBottom: 14, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                      <div style={{ flex: 1 }}><div style={{ fontSize: 10, color: "#64748b", marginBottom: 4 }}>Par Totals</div>
+                        <div style={{ display: "flex", gap: 12 }}>
+                          <span style={{ fontSize: 12, color: "#94a3b8" }}>F9: <strong style={{ color: "#f8fafc" }}>{front}</strong></span>
+                          <span style={{ fontSize: 12, color: "#94a3b8" }}>B9: <strong style={{ color: "#f8fafc" }}>{back}</strong></span>
+                          <span style={{ fontSize: 12, color: "#94a3b8" }}>Total: <strong style={{ color: "#22c55e" }}>{front + back}</strong></span>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: siValid ? "#22c55e" : "#ef4444" }}>{siValid ? "✅ SI Balanced" : "❌ Check SI values"}</div>
+                    </div>
+                  );
+                })()}
+                <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
+                  {[saEditingHoles.slice(0, 9), saEditingHoles.slice(9, 18)].map((nineHoles, ni) => (
+                    <div key={ni} style={{ flex: 1, backgroundColor: "#0f172a", border: "2px solid #334155", borderRadius: 10, padding: 12 }}>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: ni === 0 ? "#22c55e" : "#3b82f6", textTransform: "uppercase", letterSpacing: 1, marginBottom: 10, textAlign: "center" }}>{ni === 0 ? "Front 9" : "Back 9"}</div>
+                      {nineHoles.map((hole, idx) => (
+                        <div key={hole.hole_number} style={{ ...S.holeEdit, marginBottom: 8 }}>
+                          <div style={S.holeEditNum}>Hole {hole.hole_number}</div>
+                          <div style={S.holeEditRow}>
+                            <div><label style={S.smallLabel}>Par</label>
+                              <select value={hole.par || ""} onChange={(e) => saUpdateHole(ni * 9 + idx, "par", e.target.value)} style={{ ...S.smallInput, backgroundColor: hole.par ? "#22c55e" : "#1e293b", color: hole.par ? "#0f172a" : "#f8fafc", fontWeight: hole.par ? 700 : 400 }}>
+                                <option value="">-</option><option value="3">3</option><option value="4">4</option><option value="5">5</option>
+                              </select>
+                            </div>
+                            <div><label style={S.smallLabel}>SI</label>
+                              <select value={hole.stroke_index || ""} onChange={(e) => saUpdateHole(ni * 9 + idx, "stroke_index", e.target.value)} style={{ ...S.smallInput, backgroundColor: hole.stroke_index ? "#22c55e" : "#1e293b", color: hole.stroke_index ? "#0f172a" : "#f8fafc", fontWeight: hole.stroke_index ? 700 : 400 }}>
+                                <option value="">-</option>{Array.from({length: 18}, (_, i) => <option key={i+1} value={i+1}>{i+1}</option>)}
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+                <div style={S.courseActions}>
+                  <button style={S.btnPrimary} disabled={saSaving} onClick={saSaveCourse}>{saSaving ? "Saving..." : "Save Course"}</button>
+                  <button style={S.btnSecondary} onClick={() => { setSaEditingCourse(null); setSaEditingHoles([]); }}>Cancel</button>
+                </div>
+              </div>
+            )}
           </div>
         )}
         {tab === "stats" && !loading && (
@@ -1719,7 +1853,7 @@ function RoundDetailScreen({ roundStub, onBack }) {
       setLoading(true);
       try {
         const r = await dbGetRound(roundStub.code);
-        const fullRound = { ...r, holes: roundStub.holes || getHolesForRound(r) };
+        const fullRound = { ...r, holes: r.holes?.length ? r.holes : (roundStub.holes || getHolesForRound(r)) };
         setRound(fullRound);
         const [p, s] = await Promise.all([dbGetPlayers(r.id), dbGetScores(r.id)]);
         setPlayers(p);
@@ -2284,7 +2418,7 @@ function WatchRoundScreen({ onBack, onWatch, prefillCode }) {
     if (prefillCode) {
       (async () => {
         setLoading(true);
-        try { const r = await dbGetRound(prefillCode); onWatch({ ...r, holes: getHolesForRound(r) }); }
+        try { const r = await dbGetRound(prefillCode); onWatch({ ...r, holes: r.holes?.length ? r.holes : getHolesForRound(r) }); }
         catch { setErr("Round not found."); }
         setLoading(false);
       })();
@@ -2296,7 +2430,7 @@ function WatchRoundScreen({ onBack, onWatch, prefillCode }) {
     setLoading(true); setErr("");
     try {
       const r = await dbGetRound(code);
-      onWatch({ ...r, holes: getHolesForRound(r) });
+      onWatch({ ...r, holes: r.holes?.length ? r.holes : getHolesForRound(r) });
     } catch { setErr("Round not found. Check the code and try again."); }
     setLoading(false);
   };
@@ -2354,7 +2488,7 @@ function JoinRoundScreen({ onBack, onJoined, prefillCode }) {
       const existing = await dbFindPlayerByName(round.id, name);
       const me = existing || await dbCreatePlayer({ name, handicap: round.use_handicap === false ? 0 : (parseFloat(hcp) || 0), round_id: round.id, team: round.game_type === "matchplay_teams" ? team : null, is_placeholder: false });
       savePlayerProfile(name, parseFloat(hcp) || 0);
-      const fullRound = { ...round, holes: getHolesForRound(round) };
+      const fullRound = { ...round, holes: round.holes?.length ? round.holes : getHolesForRound(round) };
       saveLastRound(fullRound, me);
       onJoined(fullRound, me);
     } catch (e) { console.error(e); setErr("Failed to join. Please try again."); }
@@ -2411,7 +2545,7 @@ function JoinRoundScreen({ onBack, onJoined, prefillCode }) {
 // PLAYER DASHBOARD
 // =============================================================================
 function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator }) {
-  const [players, setPlayers] = useState([]), [scores, setScores] = useState([]), [showShare, setShowShare] = useState(false);
+  const [players, setPlayers] = useState([]), [scores, setScores] = useState([]), [showShare, setShowShare] = useState(false), [showSpectatorQR, setShowSpectatorQR] = useState(false);
   const [showComplete, setShowComplete] = useState(false);
   const [showAddGuest, setShowAddGuest] = useState(false);
   const [guestName, setGuestName] = useState(""), [guestHcp, setGuestHcp] = useState(""), [guestTeam, setGuestTeam] = useState("A"), [addingGuest, setAddingGuest] = useState(false);
@@ -2483,7 +2617,10 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
           <div style={{ fontSize: 13, color: "#94a3b8" }}>{isSpectator ? "Round code: " : "Scan to join · Code: "}<span style={{ color: "#22c55e", fontWeight: 700, letterSpacing: 2 }}>{round.code}</span></div>
           {isSpectator
             ? <button onClick={(e) => { navigator.clipboard.writeText(window.location.origin + window.location.pathname + "?watch=" + round.code); const btn = e.target; btn.textContent = "✓ Copied!"; btn.style.color = "#22c55e"; btn.style.borderColor = "#22c55e"; setTimeout(() => { btn.textContent = "👀 Copy Watch Link"; btn.style.color = "#94a3b8"; btn.style.borderColor = "#334155"; }, 1500); }} style={{ marginTop: 10, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 12, fontWeight: 600, cursor: "pointer", padding: "8px 16px", fontFamily: "inherit" }}>👀 Copy Watch Link</button>
-            : <button onClick={(e) => { navigator.clipboard.writeText(window.location.origin + window.location.pathname + "?join=" + round.code); const btn = e.target; btn.textContent = "✓ Copied!"; btn.style.color = "#22c55e"; btn.style.borderColor = "#22c55e"; setTimeout(() => { btn.textContent = "🔗 Copy Game Link"; btn.style.color = "#94a3b8"; btn.style.borderColor = "#334155"; }, 1500); }} style={{ marginTop: 10, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 12, fontWeight: 600, cursor: "pointer", padding: "8px 16px", fontFamily: "inherit" }}>🔗 Copy Game Link</button>}
+            : <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                <button onClick={(e) => { navigator.clipboard.writeText(window.location.origin + window.location.pathname + "?join=" + round.code); const btn = e.target; btn.textContent = "✓ Copied!"; btn.style.color = "#22c55e"; btn.style.borderColor = "#22c55e"; setTimeout(() => { btn.textContent = "🏌️ Players Link"; btn.style.color = "#94a3b8"; btn.style.borderColor = "#334155"; }, 1500); }} style={{ flex: 1, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 11, fontWeight: 600, cursor: "pointer", padding: "8px 10px", fontFamily: "inherit" }}>🏌️ Players Link</button>
+                <button onClick={() => setShowSpectatorQR(true)} style={{ flex: 1, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 11, fontWeight: 600, cursor: "pointer", padding: "8px 10px", fontFamily: "inherit" }}>👀 Spectators</button>
+              </div>}
         </div>
         <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
           <button style={{ ...S.btnPrimary, flex: 1, fontSize: 17, marginBottom: 0 }} onClick={onViewScorecard}>⛳ Live Scoring</button>
@@ -2927,6 +3064,18 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
       </div>
 
       {showShare && <ShareModal round={round} onClose={() => setShowShare(false)} />}
+      {showSpectatorQR && (
+        <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.92)", zIndex: 100, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 32 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 1, marginBottom: 20 }}>Spectator Access Only</div>
+          <div style={{ backgroundColor: "#fff", borderRadius: 16, padding: 20, marginBottom: 20 }}>
+            <QRCodeSVG value={window.location.origin + window.location.pathname + "?watch=" + round.code} size={220} bgColor="#ffffff" fgColor="#0f172a" />
+          </div>
+          <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 6 }}>Watch-only link</div>
+          <div style={{ fontSize: 12, color: "#22c55e", fontWeight: 700, marginBottom: 20, letterSpacing: 1 }}>{round.code}</div>
+          <button onClick={(e) => { navigator.clipboard.writeText(window.location.origin + window.location.pathname + "?watch=" + round.code); const btn = e.target; btn.textContent = "✓ Copied!"; btn.style.color = "#22c55e"; setTimeout(() => { btn.textContent = "👀 Copy Watch Link"; btn.style.color = "#94a3b8"; }, 1500); }} style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 10, color: "#94a3b8", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: "12px 24px", fontFamily: "inherit", marginBottom: 12, width: "100%" }}>👀 Copy Watch Link</button>
+          <button onClick={() => setShowSpectatorQR(false)} style={{ backgroundColor: "transparent", border: "1px solid #334155", borderRadius: 10, color: "#475569", fontSize: 13, cursor: "pointer", padding: "12px 24px", fontFamily: "inherit", width: "100%" }}>Close</button>
+        </div>
+      )}
     </BgScreen>
   );
 }
@@ -3624,7 +3773,10 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
               <div>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 2px 6px" }}>
                   <span style={{ fontSize: 11, fontWeight: 700, color: "#22c55e", textTransform: "uppercase", letterSpacing: 0.5 }}>{me.name} (You){hcpS > 0 ? " +" + hcpS : ""}</span>
-                  {myScores[activeHole] && <span style={{ fontSize: 12, fontWeight: 700, color: "#22c55e" }}>{myScores[activeHole]} {scoreLabel(myScores[activeHole], curHole?.par)}</span>}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    {myScores[activeHole] && <span style={{ fontSize: 12, fontWeight: 700, color: "#22c55e" }}>{myScores[activeHole]} {scoreLabel(myScores[activeHole], curHole?.par)}</span>}
+                    {myScores[activeHole] && !isLocked && <button onClick={async () => { setMyScores((prev) => { const n = {...prev}; delete n[activeHole]; return n; }); try { await supabase.from("scores").delete().eq("player_id", me.id).eq("hole_number", activeHole).eq("round_id", round.id); } catch(e) { console.error(e); } }} style={{ fontSize: 10, fontWeight: 700, color: "#ef4444", background: "none", border: "1px solid #ef4444", borderRadius: 6, padding: "2px 7px", cursor: "pointer", fontFamily: "inherit" }}>Clear</button>}
+                  </div>
                 </div>
                 <div style={S.scoreRow}>
                   {[curHole.par - 1, curHole.par, curHole.par + 1, curHole.par + 2, curHole.par + 3].map((s) => (
@@ -3665,7 +3817,10 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
               <div key={guest.id} style={{ marginBottom: 12, backgroundColor: "#0f2233", border: "1px solid #1e3a5f", borderRadius: 12, padding: "10px 12px" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 2px 6px" }}>
                   <span style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5 }}>{guest.name}{gHcpS > 0 ? " +" + gHcpS : ""}</span>
-                  {gScore && <span style={{ fontSize: 12, fontWeight: 700, color: "#22c55e" }}>{gScore} {scoreLabel(gScore, curHole?.par)}</span>}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    {gScore && <span style={{ fontSize: 12, fontWeight: 700, color: "#22c55e" }}>{gScore} {scoreLabel(gScore, curHole?.par)}</span>}
+                    {gScore && <button onClick={async () => { setGuestScores((prev) => { const n = {...prev}; if (n[guest.id]) { const nh = {...n[guest.id]}; delete nh[activeHole]; n[guest.id] = nh; } return n; }); try { await supabase.from("scores").delete().eq("player_id", guest.id).eq("hole_number", activeHole).eq("round_id", round.id); } catch(e) { console.error(e); } }} style={{ fontSize: 10, fontWeight: 700, color: "#ef4444", background: "none", border: "1px solid #ef4444", borderRadius: 6, padding: "2px 7px", cursor: "pointer", fontFamily: "inherit" }}>Clear</button>}
+                  </div>
                 </div>
                 <div style={S.scoreRow}>
                   {curHole && [curHole.par - 1, curHole.par, curHole.par + 1, curHole.par + 2, curHole.par + 3].map((s) => (
