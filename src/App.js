@@ -1448,7 +1448,7 @@ function SuperAdminScreen({ onLogout }) {
             role: "user",
             content: [
               ...images,
-              { type: "text", text: "Read this golf scorecard. Return ONLY valid JSON in this exact format, no other text: {"name": "Course Name", "holes": [{"hole_number": 1, "par": 4, "stroke_index": 11}, ...all 18 holes]}. Use the official course name from the scorecard header. Include all 18 holes with correct par and stroke index (SI) values." }
+              { type: "text", text: "Read this golf scorecard. Return ONLY valid JSON, no other text. Format: {name: string, holes: array of 18 objects each with hole_number, par, stroke_index}. Use the official course name from the scorecard header. Include all 18 holes with correct par and stroke_index values." }
             ]
           }]
         })
