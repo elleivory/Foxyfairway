@@ -1563,6 +1563,7 @@ function SuperAdminScreen({ onLogout }) {
                     </div>
                   </div>
                 ) : (
+                  <div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div>
                       <div style={{ fontSize: 14, fontWeight: 700, color: "#f8fafc" }}>{t.name}</div>
@@ -1601,7 +1602,6 @@ function SuperAdminScreen({ onLogout }) {
                       ))}
                     </div>
                   )}
-
                   </div>
                 )}
               </div>
