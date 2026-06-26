@@ -1030,7 +1030,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.23</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.24</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={shareApp} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", backdropFilter: "blur(4px)" }}>SHARE</button>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
@@ -4635,6 +4635,7 @@ function PastRoundsScreen({ onBack, onViewRound }) {
                   <div>
                     <div style={{ fontSize: 15, fontWeight: 700, color: "#f8fafc" }}>{r.course_name}</div>
                     <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>{GAME_TYPES[r.game_type]?.label} · {r.date}</div>
+                    <div style={{ fontSize: 11, color: "#475569", marginTop: 2, letterSpacing: 1, fontWeight: 600 }}>{r.code}</div>
                   </div>
                   <button style={{ ...S.smallBtn, color: "#ef4444", borderColor: "#ef4444" }} onClick={() => handleDelete(r.id, r.course_name)}>Remove</button>
                 </div>
