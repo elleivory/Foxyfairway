@@ -1030,7 +1030,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.26</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.27</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={shareApp} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", backdropFilter: "blur(4px)" }}>SHARE</button>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
@@ -1311,8 +1311,7 @@ function AdminDashboardScreen({ onLogout }) {
             ))}
             <div style={{ ...S.stepWrap, marginTop: 24 }}>
               <h4 style={S.stepTitle}>Add New Course</h4>
-              <label style={S.label}>Search for a course</label>
-              <CourseSearch onSelect={(course) => { setEditing(course); setHoles(course.holes || []); }} />
+
               <div style={{ textAlign: "center", color: "#475569", fontSize: 13, margin: "8px 0" }}>or add manually</div>
               <input style={S.input} placeholder="Course name" value={newName} onChange={(e) => setNewName(e.target.value)} />
               <button style={newName ? S.btnPrimary : S.btnDisabled} disabled={!newName} onClick={startNew}>Create Course Manually</button>
@@ -1422,7 +1421,7 @@ function SuperAdminScreen({ onLogout }) {
   const [saConfirmDeleteCourseId, setSaConfirmDeleteCourseId] = useState(null);
   const [saScanning, setSaScanning] = useState(false);
   const [saScanError, setSaScanError] = useState("");
-  const saFileInputRef = React.useRef(null);
+  const saFileInputRef = useRef(null);
 
   const handleScanScorecard = async (files) => {
     if (!files || files.length === 0) return;
@@ -1551,14 +1550,21 @@ function SuperAdminScreen({ onLogout }) {
         {tab === "players" && !loading && (
           <div>
             <div style={{ fontSize: 13, color: "#64748b", marginBottom: 16 }}>{allPlayers.length} total players</div>
-            {allPlayers.map((p) => (
-              <div key={p.id} style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 10, padding: "10px 14px", marginBottom: 6, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#f8fafc" }}>{p.name}</div>
-                  <div style={{ fontSize: 11, color: "#64748b" }}>HCP {p.handicap} · {new Date(p.created_at).toLocaleDateString("en-NZ")} {new Date(p.created_at).toLocaleTimeString("en-NZ", { hour: "2-digit", minute: "2-digit" })}</div>
+            {allPlayers.map((p) => {
+              const playerRound = rounds.find((r) => r.id === p.round_id);
+              return (
+                <div key={p.id} style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 10, padding: "10px 14px", marginBottom: 6, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#f8fafc" }}>{p.name}</div>
+                    <div style={{ fontSize: 11, color: "#64748b" }}>HCP {p.handicap} · {new Date(p.created_at).toLocaleDateString("en-NZ")} {new Date(p.created_at).toLocaleTimeString("en-NZ", { hour: "2-digit", minute: "2-digit" })}</div>
+                    {playerRound && <div style={{ fontSize: 11, color: "#22c55e", fontWeight: 600, marginTop: 2 }}>{playerRound.code} · {playerRound.course_name}</div>}
+                  </div>
+                  {playerRound && (
+                    <button onClick={() => { window.open(window.location.origin + window.location.pathname + "?watch=" + playerRound.code, "_blank"); }} style={{ background: "none", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 600, padding: "4px 8px", cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>👀 View</button>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -2815,16 +2821,31 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
                 <div style={S.lbName}>{p.name}<span style={S.lbHcp}>HCP {p.handicap}</span></div>
                 <div style={S.lbRight}>
                   <div style={S.lbScore}>
-                    {round.game_type === "stableford" ? (p.total + " pts")
-                      : round.game_type === "matchplay" ? (p.total === 0 ? "0 pts" : p.total + (p.total === 1 ? " pt" : " pts"))
-                      : round.game_type === "banker" ? <span style={{ color: p.total > 0 ? "#22c55e" : p.total < 0 ? "#ef4444" : "#94a3b8", fontSize: 18, fontWeight: 800 }}>{p.total >= 0 ? "+$" : "-$"}{Math.abs(p.total)}</span>
-                      : <>
-                          <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 500 }}>Gross: {p.grossTotal || 0}{isHandicap ? "  Net: " + (p.netTotal || 0) : ""}</div>
-                          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                            <span style={{ fontSize: 14, fontWeight: 800, color: p.toPar < 0 ? "#22c55e" : p.toPar > 0 ? "#ef4444" : "#94a3b8" }}>{formatToPar(p.toPar)}</span>
-                            {isHandicap && <span style={{ fontSize: 14, fontWeight: 800, color: (p.toPar - parseInt(p.handicap||0)) < 0 ? "#22c55e" : (p.toPar - parseInt(p.handicap||0)) > 0 ? "#ef4444" : "#94a3b8" }}>{formatToPar(p.toPar - parseInt(p.handicap||0))}</span>}
-                          </div>
-                        </>}
+                    {(() => {
+                      const gross = p.grossTotal || 0;
+                      const gtp = p.toPar || 0;
+                      const gtpColor = gtp < 0 ? "#22c55e" : gtp > 0 ? "#ef4444" : "#3b82f6";
+                      const gtpStr = formatToPar(gtp);
+                      if (round.game_type === "stableford") return <>
+                        <div style={{ fontSize: 11, color: "#94a3b8" }}>{gross} · <span style={{ color: gtpColor }}>{gtpStr}</span></div>
+                        <div style={{ fontSize: 16, fontWeight: 800, color: "#22c55e" }}>{p.total} pts</div>
+                      </>;
+                      if (round.game_type === "matchplay") return <>
+                        <div style={{ fontSize: 11, color: "#94a3b8" }}>{gross} · <span style={{ color: gtpColor }}>{gtpStr}</span></div>
+                        <div style={{ fontSize: 16, fontWeight: 800, color: "#22c55e" }}>{p.total === 0 ? "0 pts" : p.total + (p.total === 1 ? " pt" : " pts")}</div>
+                      </>;
+                      if (round.game_type === "banker") return <>
+                        <div style={{ fontSize: 11, color: "#94a3b8" }}>{gross} · <span style={{ color: gtpColor }}>{gtpStr}</span></div>
+                        <div style={{ fontSize: 16, fontWeight: 800, color: p.total > 0 ? "#22c55e" : p.total < 0 ? "#ef4444" : "#94a3b8" }}>{p.total >= 0 ? "+$" : "-$"}{Math.abs(p.total)}</div>
+                      </>;
+                      return <>
+                        <div style={{ fontSize: 11, color: "#94a3b8" }}>{gross}{isHandicap ? " · N " + (p.netTotal || 0) : ""}</div>
+                        <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                          <span style={{ fontSize: 16, fontWeight: 800, color: gtpColor }}>{gtpStr}</span>
+                          {isHandicap && <span style={{ fontSize: 16, fontWeight: 800, color: (p.toPar - parseInt(p.handicap||0)) < 0 ? "#22c55e" : (p.toPar - parseInt(p.handicap||0)) > 0 ? "#ef4444" : "#3b82f6" }}>{formatToPar(p.toPar - parseInt(p.handicap||0))}</span>}
+                        </div>
+                      </>;
+                    })()}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <div style={S.lbHoles}>{p.holesPlayed}/18</div>
