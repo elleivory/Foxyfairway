@@ -1030,7 +1030,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.24</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.25</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={shareApp} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", backdropFilter: "blur(4px)" }}>SHARE</button>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
@@ -1420,6 +1420,53 @@ function SuperAdminScreen({ onLogout }) {
   const [saEditingHoles, setSaEditingHoles] = useState([]);
   const [saSaving, setSaSaving] = useState(false);
   const [saConfirmDeleteCourseId, setSaConfirmDeleteCourseId] = useState(null);
+  const [saScanning, setSaScanning] = useState(false);
+  const [saScanError, setSaScanError] = useState("");
+  const saFileInputRef = React.useRef(null);
+
+  const handleScanScorecard = async (files) => {
+    if (!files || files.length === 0) return;
+    setSaScanning(true); setSaScanError("");
+    try {
+      const toBase64 = (file) => new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result.split(",")[1]);
+        r.onerror = rej;
+        r.readAsDataURL(file);
+      });
+      const images = await Promise.all(Array.from(files).slice(0, 2).map(async (f) => ({
+        type: "image",
+        source: { type: "base64", media_type: f.type || "image/jpeg", data: await toBase64(f) }
+      })));
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-api-key": process.env.REACT_APP_ANTHROPIC_KEY, "anthropic-version": "2023-06-01" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 1000,
+          messages: [{
+            role: "user",
+            content: [
+              ...images,
+              { type: "text", text: "Read this golf scorecard. Return ONLY valid JSON in this exact format, no other text: {"name": "Course Name", "holes": [{"hole_number": 1, "par": 4, "stroke_index": 11}, ...all 18 holes]}. Use the official course name from the scorecard header. Include all 18 holes with correct par and stroke index (SI) values." }
+            ]
+          }]
+        })
+      });
+      const data = await response.json();
+      const text = data.content?.[0]?.text || "";
+      const clean = text.replace(/```json|```/g, "").trim();
+      const parsed = JSON.parse(clean);
+      if (!parsed.name || !parsed.holes || parsed.holes.length !== 18) throw new Error("Invalid scorecard data");
+      const newCourse = { id: genId(), name: parsed.name, par: parsed.holes.reduce((s, h) => s + h.par, 0), holes: parsed.holes.map((h) => ({ hole_number: h.hole_number, par: h.par, stroke_index: h.stroke_index })) };
+      setSaEditingCourse(newCourse);
+      setSaEditingHoles(newCourse.holes);
+    } catch(e) {
+      console.error(e);
+      setSaScanError("Could not read scorecard. Please check the image is clear and try again.");
+    }
+    setSaScanning(false);
+  };
 
   useEffect(() => {
     (async () => {
@@ -1612,6 +1659,13 @@ function SuperAdminScreen({ onLogout }) {
           <div>
             {!saEditingCourse ? (
               <div>
+                {/* Scan Scorecard button */}
+                <input ref={saFileInputRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={(e) => handleScanScorecard(e.target.files)} />
+                <button onClick={() => saFileInputRef.current?.click()} disabled={saScanning} style={{ width: "100%", backgroundColor: "#1e293b", border: "2px dashed #22c55e", borderRadius: 10, padding: "12px", fontSize: 13, fontWeight: 700, color: saScanning ? "#475569" : "#22c55e", cursor: saScanning ? "not-allowed" : "pointer", fontFamily: "inherit", marginBottom: 8 }}>
+                  {saScanning ? "📷 Reading scorecard..." : "📷 Scan Scorecard (1-2 photos)"}
+                </button>
+                {saScanError && <div style={{ fontSize: 12, color: "#ef4444", marginBottom: 8 }}>{saScanError}</div>}
+                <button onClick={() => { const c = { id: genId(), name: "", par: 72, holes: Array.from({ length: 18 }, (_, i) => ({ hole_number: i + 1, par: null, stroke_index: null })) }; setSaEditingCourse(c); setSaEditingHoles(c.holes); }} style={{ width: "100%", backgroundColor: "#1e293b", border: "1px dashed #334155", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 700, color: "#64748b", cursor: "pointer", fontFamily: "inherit", marginBottom: 12 }}>+ Add Course Manually</button>
                 {saCourses.map((c) => (
                   <div key={c.id} style={S.courseItem}>
                     <div><div style={S.courseName}>{c.name}</div><div style={S.courseAddr}>18 holes</div></div>
@@ -1634,7 +1688,7 @@ function SuperAdminScreen({ onLogout }) {
               </div>
             ) : (
               <div>
-                <h3 style={S.stepTitle}>{saEditingCourse.name}</h3>
+                <input style={{ ...S.input, marginBottom: 12, fontSize: 15, fontWeight: 700 }} placeholder="Course name" value={saEditingCourse.name || ""} onChange={(e) => setSaEditingCourse((prev) => ({ ...prev, name: e.target.value }))} />
                 {(() => {
                   const front = saEditingHoles.slice(0, 9).reduce((s, h) => s + (parseInt(h.par) || 0), 0);
                   const back = saEditingHoles.slice(9, 18).reduce((s, h) => s + (parseInt(h.par) || 0), 0);
