@@ -23,7 +23,7 @@ exports.handler = async (event) => {
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
-        max_tokens: 1000,
+        max_tokens: 1500,
         messages: [{
           role: "user",
           content: [
@@ -33,7 +33,11 @@ exports.handler = async (event) => {
             })),
             {
               type: "text",
-              text: "Read this golf scorecard. Return ONLY valid JSON, no other text. Format: {\"name\": \"Course Name\", \"holes\": [{\"hole_number\": 1, \"par\": 4, \"stroke_index\": 11}]} for all 18 holes. Use the official course name from the scorecard header. Include all 18 holes with correct par and stroke_index (SI) values."
+              text: `You are reading a golf scorecard. Extract the course name and hole data.
+Return ONLY a JSON object with no other text, no markdown, no explanation.
+The JSON must have this exact structure:
+{"name":"Course Name","holes":[{"hole_number":1,"par":4,"stroke_index":11},{"hole_number":2,"par":3,"stroke_index":7}]}
+Include all 18 holes. Use the official course name from the scorecard header.`
             }
           ]
         }]
@@ -41,12 +45,25 @@ exports.handler = async (event) => {
     });
 
     const data = await response.json();
-    const text = data.content?.[0]?.text || "";
-    const clean = text.replace(/```json|```/g, "").trim();
-    const parsed = JSON.parse(clean);
+
+    if (!data.content || !data.content[0]) {
+      return { statusCode: 500, body: JSON.stringify({ error: "No response from Claude API: " + JSON.stringify(data) }) };
+    }
+
+    const text = data.content[0].text || "";
+
+    // Extract JSON from response - find first { to last }
+    const start = text.indexOf("{");
+    const end = text.lastIndexOf("}");
+    if (start === -1 || end === -1) {
+      return { statusCode: 422, body: JSON.stringify({ error: "No JSON found in response: " + text.substring(0, 200) }) };
+    }
+
+    const jsonStr = text.substring(start, end + 1);
+    const parsed = JSON.parse(jsonStr);
 
     if (!parsed.name || !parsed.holes || parsed.holes.length !== 18) {
-      return { statusCode: 422, body: JSON.stringify({ error: "Could not read all 18 holes from scorecard" }) };
+      return { statusCode: 422, body: JSON.stringify({ error: "Invalid data - got " + (parsed.holes?.length || 0) + " holes, need 18" }) };
     }
 
     return {
