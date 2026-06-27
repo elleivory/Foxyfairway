@@ -496,6 +496,43 @@ async function dbFindPlayerByName(roundId, name) {
 // Save/load last round from localStorage
 function saveLastRound(round, me) {
   localStorage.setItem("ff_last_round", JSON.stringify({ round, me, savedAt: Date.now() }));
+  // Also save as an active round reference so it shows in Past Rounds immediately
+  saveActiveRoundRef(round, me);
+}
+
+function saveActiveRoundRef(round, me) {
+  try {
+    const key = "ff_active_rounds";
+    const existing = JSON.parse(localStorage.getItem(key) || "[]");
+    const ref = {
+      id: round.id,
+      code: round.code,
+      course_name: round.course_name,
+      game_type: round.game_type,
+      holes: round.holes,
+      device_id: getDeviceId(),
+      status: "in_progress",
+      date: new Date().toLocaleString("en-NZ", { day: "numeric", month: "long", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true }),
+      createdBy: me?.name || "Unknown",
+      players: [me],
+      scores: [],
+    };
+    const filtered = existing.filter(r => r.id !== round.id);
+    localStorage.setItem(key, JSON.stringify([ref, ...filtered].slice(0, 30)));
+  } catch(e) {}
+}
+
+function getActiveRoundRefs() {
+  try { return JSON.parse(localStorage.getItem("ff_active_rounds") || "[]"); } catch { return []; }
+}
+
+function markRoundCompleted(roundId) {
+  try {
+    const key = "ff_active_rounds";
+    const existing = JSON.parse(localStorage.getItem(key) || "[]");
+    const updated = existing.map(r => r.id === roundId ? { ...r, status: "completed" } : r);
+    localStorage.setItem(key, JSON.stringify(updated));
+  } catch(e) {}
 }
 
 // Saved rounds history
@@ -535,6 +572,7 @@ async function saveRoundToHistory(round, players, scores, holes) {
   const filtered = existing.filter((r) => r.id !== round.id);
   const updated = [entry, ...filtered].slice(0, 20); // keep last 20
   localStorage.setItem("ff_saved_rounds", JSON.stringify(updated));
+  markRoundCompleted(round.id);
   try { await dbSaveRoundHistory(entry); } catch(e) { console.log("Remote save failed", e); }
   // Also refresh this round's data in any Supabase tournament it belongs to
   try {
@@ -857,7 +895,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.36</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.37</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
           </div>
@@ -2371,6 +2409,9 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
   const [loading, setLoading] = useState(false), [err, setErr] = useState("");
   const [showAddCourse, setShowAddCourse] = useState(false);
   const [newCourseName, setNewCourseName] = useState("");
+  const [crScanning, setCrScanning] = useState(false);
+  const [crScanErr, setCrScanErr] = useState("");
+  const crFileInputRef = useRef(null);
   const [courseEditing, setCourseEditing] = useState(null);
   const [courseHoles, setCourseHoles] = useState([]);
   const [addingCourse, setAddingCourse] = useState(false);
@@ -2445,10 +2486,40 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
             </div>
             <div style={{ maxHeight: "calc(100vh - 280px)", overflowY: "auto" }}>
 
+            <input ref={crFileInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={async (e) => {
+              const files = e.target.files;
+              if (!files || files.length === 0) return;
+              setCrScanning(true); setCrScanErr("");
+              try {
+                const imageFile = Array.from(files)[0];
+                const base64Data = await new Promise((res, rej) => {
+                  const reader = new FileReader();
+                  reader.onload = () => { const result = reader.result; if (typeof result !== "string" || !result.includes(",")) { rej(new Error("Image could not be read.")); return; } res(result.split(",")[1]); };
+                  reader.onerror = () => rej(new Error("Failed to read image."));
+                  reader.readAsDataURL(imageFile);
+                });
+                const mediaType = imageFile.type && imageFile.type.includes("png") ? "image/png" : "image/jpeg";
+                const response = await fetch("/.netlify/functions/scan-scorecard", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ images: [{ media_type: mediaType, data: base64Data }] }) });
+                const parsed = await response.json();
+                if (!response.ok) throw new Error(parsed.error || "Scan failed");
+                const newCourse = { id: genId(), name: parsed.course_name || "Scanned Course", par: parsed.holes?.reduce((s, h) => s + (h.par || 0), 0) || 72, holes: parsed.holes };
+                await supabase.from("courses").insert([{ id: newCourse.id, name: newCourse.name, par: newCourse.par, holes: newCourse.holes }]);
+                setCourses(prev => [...prev, newCourse].sort((a, b) => a.name.localeCompare(b.name)));
+                setCourse(newCourse);
+              } catch(e) { setCrScanErr("Scan failed: " + (e.message || "Unknown error")); }
+              setCrScanning(false);
+            }} />
+            {crScanErr && <div style={{ fontSize: 12, color: "#ef4444", marginBottom: 8, padding: "8px 12px", backgroundColor: "#1c0a0a", border: "1px solid #ef4444", borderRadius: 8 }}>{crScanErr}</div>}
             {!showAddCourse && !courseEditing && (
-              <button onClick={() => setShowAddCourse(true)} style={{ width: "100%", backgroundColor: "#1e293b", border: "1px dashed #334155", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 700, color: "#64748b", cursor: "pointer", fontFamily: "inherit", marginBottom: 12 }}>
-                + Add a Course
-              </button>
+              <div style={{ marginBottom: 12 }}>
+                <button onClick={() => setShowAddCourse(true)} style={{ width: "100%", backgroundColor: "#1e293b", border: "1px dashed #334155", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 700, color: "#64748b", cursor: "pointer", fontFamily: "inherit", marginBottom: 8 }}>
+                  + Add a Course Manually
+                </button>
+                <button onClick={() => { setCrScanErr(""); crFileInputRef.current?.click(); }} disabled={crScanning} style={{ width: "100%", backgroundColor: "#022c22", border: "2px dashed #22c55e", borderRadius: 10, padding: "12px", fontSize: 13, fontWeight: 700, color: crScanning ? "#475569" : "#22c55e", cursor: crScanning ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+                  {crScanning ? "📷 Reading scorecard..." : "📷 Scan a Scorecard to Add Course"}
+                </button>
+                <div style={{ fontSize: 11, color: "#64748b", textAlign: "center", marginTop: 6 }}>Take a photo of a physical card or screenshot from online</div>
+              </div>
             )}
 
             {showAddCourse && !courseEditing && (
@@ -3726,9 +3797,9 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
                 style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "14px 16px", color: "#f8fafc", fontSize: 22, fontWeight: 800, textAlign: "center", letterSpacing: 6, width: "100%", maxWidth: 260, outline: "none", fontFamily: "inherit", marginBottom: 16 }}
                 type="password" placeholder="••••" value={gameAdminCode}
                 onChange={(e) => setGameAdminCode(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter" && (gameAdminCode === "CH" || gameAdminCode === "ch24")) { setGameAdminAuthed(true); setAdminEditHoles(JSON.parse(JSON.stringify(round.holes || []))); const sc = {}; allScores.forEach(s => { if (!sc[s.player_id]) sc[s.player_id] = {}; sc[s.player_id][s.hole_number] = s.score; }); setAdminEditScores(sc); } }}
+                onKeyDown={(e) => { if (e.key === "Enter") { const isCreator = me?.name === round.created_by; if (gameAdminCode === "ch24" || (gameAdminCode === "CH" && isCreator)) { setGameAdminAuthed(true); setAdminEditHoles(JSON.parse(JSON.stringify(round.holes || []))); const sc = {}; allScores.forEach(s => { if (!sc[s.player_id]) sc[s.player_id] = {}; sc[s.player_id][s.hole_number] = s.score; }); setAdminEditScores(sc); } else { setAdminMsg("Incorrect code"); } } }}
               />
-              <button onClick={() => { if (gameAdminCode === "CH" || gameAdminCode === "ch24") { setGameAdminAuthed(true); setAdminEditHoles(JSON.parse(JSON.stringify(round.holes || []))); const sc = {}; allScores.forEach(s => { if (!sc[s.player_id]) sc[s.player_id] = {}; sc[s.player_id][s.hole_number] = s.score; }); setAdminEditScores(sc); } else { setAdminMsg("Incorrect code"); } }}
+              <button onClick={() => { const isCreator = me?.name === round.created_by; if (gameAdminCode === "ch24" || (gameAdminCode === "CH" && isCreator)) { setGameAdminAuthed(true); setAdminEditHoles(JSON.parse(JSON.stringify(round.holes || []))); const sc = {}; allScores.forEach(s => { if (!sc[s.player_id]) sc[s.player_id] = {}; sc[s.player_id][s.hole_number] = s.score; }); setAdminEditScores(sc); } else { setAdminMsg("Incorrect code"); } }}
                 style={{ backgroundColor: "#22c55e", color: "#0f172a", border: "none", borderRadius: 12, padding: "14px 32px", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", width: "100%", maxWidth: 260 }}>
                 Enter
               </button>
@@ -5077,15 +5148,20 @@ function PastRoundDetailScreen({ round, onBack }) {
 }
 
 function PastRoundsScreen({ onBack, onViewRound }) {
-  const [rounds, setRounds] = useState(getSavedRounds());
+  const [rounds, setRounds] = useState(() => {
+    const saved = getSavedRounds().map(r => ({ ...r, status: "completed" }));
+    const active = getActiveRoundRefs().filter(a => !saved.some(s => s.id === a.id));
+    return [...saved, ...active].sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
+  });
   const profile = getPlayerProfile();
   useEffect(() => {
     (async () => {
       if (profile.name) {
         const remote = await getSavedRoundsFromSupabase(profile.name);
-        const local = getSavedRounds();
-        const merged = [...remote, ...local.filter((l) => !remote.some((r) => r.id === l.id))];
-        setRounds(merged);
+        const local = getSavedRounds().map(r => ({ ...r, status: "completed" }));
+        const active = getActiveRoundRefs().filter(a => !local.some(s => s.id === a.id) && !remote.some(s => s.id === a.id));
+        const merged = [...remote.map(r => ({ ...r, status: "completed" })), ...local.filter(l => !remote.some(r => r.id === l.id)), ...active];
+        setRounds(merged.sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0)));
       }
     })();
   }, []);
@@ -5114,12 +5190,17 @@ function PastRoundsScreen({ onBack, onViewRound }) {
             return (
               <div key={r.id} style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "16px", marginBottom: 12 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-                  <div>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: "#f8fafc" }}>{r.course_name}</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: "#f8fafc" }}>{r.course_name}</div>
+                      <div style={{ fontSize: 9, fontWeight: 800, padding: "2px 7px", borderRadius: 20, backgroundColor: r.status === "completed" ? "rgba(34,197,94,0.15)" : "rgba(251,191,36,0.15)", color: r.status === "completed" ? "#22c55e" : "#fbbf24", textTransform: "uppercase", letterSpacing: 0.5, flexShrink: 0 }}>
+                        {r.status === "completed" ? "✓ Completed" : "● In Progress"}
+                      </div>
+                    </div>
                     <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>{GAME_TYPES[r.game_type]?.label} · {r.date}</div>
                     <div style={{ fontSize: 11, color: "#475569", marginTop: 2, letterSpacing: 1, fontWeight: 600 }}>{r.code}</div>
                   </div>
-                  <button style={{ ...S.smallBtn, color: "#ef4444", borderColor: "#ef4444" }} onClick={() => handleDelete(r.id, r.course_name)}>Remove</button>
+                  <button style={{ ...S.smallBtn, color: "#ef4444", borderColor: "#ef4444", flexShrink: 0 }} onClick={() => handleDelete(r.id, r.course_name)}>Remove</button>
                 </div>
                 {winner && (
                   <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 10 }}>
