@@ -1456,7 +1456,7 @@ function SuperAdminScreen({ onLogout }) {
         }))) })
       });
       const parsed = await response.json();
-      if (!response.ok) throw new Error("HTTP " + response.status + ": " + (parsed.error || "Scan failed"));
+      if (!response.ok) throw new Error(parsed.error || "Scan failed");
       if (!parsed.name || !parsed.holes || parsed.holes.length !== 18) throw new Error("Invalid scorecard data");
       const newCourse = { id: genId(), name: parsed.name, par: parsed.holes.reduce((s, h) => s + h.par, 0), holes: parsed.holes.map((h) => ({ hole_number: h.hole_number, par: h.par, stroke_index: h.stroke_index })) };
       setSaEditingCourse(newCourse);
@@ -1472,13 +1472,27 @@ function SuperAdminScreen({ onLogout }) {
     if (!files || files.length === 0) return;
     setSrScanning(true); setSrScanErr("");
     try {
+      // Convert image to base64 safely - iOS camera can return HEIC or unusual types
+      const imageFile = Array.from(files)[0];
+      const base64Data = await new Promise((res, rej) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result;
+          if (typeof result !== "string" || !result.includes(",")) {
+            rej(new Error("Image could not be read. Please try again or use a JPEG photo."));
+            return;
+          }
+          res(result.split(",")[1]);
+        };
+        reader.onerror = () => rej(new Error("Failed to read image file. Please try a different photo."));
+        reader.readAsDataURL(imageFile);
+      });
+      // Force media type to jpeg - Claude handles it fine and avoids HEIC issues
+      const mediaType = imageFile.type && imageFile.type.includes("png") ? "image/png" : "image/jpeg";
       const response = await fetch("/.netlify/functions/scan-player-scorecard", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ images: await Promise.all(Array.from(files).slice(0,1).map(async (f) => ({
-          media_type: f.type || "image/jpeg",
-          data: await new Promise((res,rej) => { const r = new FileReader(); r.onload = () => res(r.result.split(",")[1]); r.onerror = rej; r.readAsDataURL(f); })
-        }))) })
+        body: JSON.stringify({ images: [{ media_type: mediaType, data: base64Data }] })
       });
       const parsed = await response.json();
       if (!response.ok) throw new Error(parsed.error || "Scan failed");
@@ -1511,13 +1525,17 @@ function SuperAdminScreen({ onLogout }) {
           }
         }
       }
+      // Small pause to let Supabase finish committing all scores before we fetch them back
+      await new Promise(r => setTimeout(r, 800));
       const [allP, allS] = await Promise.all([dbGetPlayers(round.id), dbGetScores(round.id)]);
+      console.log("SR Publish - players:", allP.length, "scores:", allS.length);
+      if (allS.length === 0) throw new Error("Scores saved but could not be retrieved. Check Supabase scores table.");
       const lb = calcLeaderboard(allP, allS, course.holes, srGameType);
       await saveRoundToHistory(round, allP, allS, course.holes);
       setSrResult({ round, players: allP, scores: allS, lb, holes: course.holes });
       setSrStep("results");
     } catch(e) {
-      setSrScanErr("Publish failed at step: " + (e.message || "Unknown error. Check Netlify logs."));
+      setSrScanErr("Publish failed: " + (e.message || "Unknown"));
     }
     setSrPublishing(false);
   };
@@ -1812,18 +1830,6 @@ function SuperAdminScreen({ onLogout }) {
         {tab === "scanned" && (
           <div>
             <input ref={srFileInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => handleSrScanPlayer(e.target.files)} />
-
-            {/* ERROR BANNER - shows on any step if something went wrong */}
-            {srScanErr && (
-              <div style={{ backgroundColor: "#1c0a0a", border: "1px solid #ef4444", borderRadius: 10, padding: 14, marginBottom: 16 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#ef4444" }}>⚠️ Something went wrong</div>
-                  <button onClick={() => setSrScanErr("")} style={{ background: "none", border: "none", color: "#64748b", fontSize: 16, cursor: "pointer", padding: 0, lineHeight: 1 }}>✕</button>
-                </div>
-                <div style={{ fontSize: 12, color: "#fca5a5", fontFamily: "monospace", wordBreak: "break-all", lineHeight: 1.5 }}>{srScanErr}</div>
-                <div style={{ fontSize: 11, color: "#64748b", marginTop: 8 }}>You can dismiss this and try again, or check the Netlify function logs for more detail.</div>
-              </div>
-            )}
 
             {/* RESULTS */}
             {srStep === "results" && srResult && (
