@@ -1519,7 +1519,10 @@ function SuperAdminScreen({ onLogout }) {
         const p = await dbCreatePlayer({ name: sp.name, handicap: srUseHandicap ? (parseFloat(sp.handicap)||0) : 0, round_id: round.id, team, is_placeholder: false });
         for (const hs of sp.scores) {
           if (hs.score && parseInt(hs.score) > 0) {
-            await dbSaveScore({ id: genId(), round_id: round.id, player_id: p.id, hole_number: hs.hole_number, score: parseInt(hs.score) });
+            // Use plain insert for scanned rounds - these are new scores, not updates
+            const scoreObj = { id: genId(), round_id: round.id, player_id: p.id, hole_number: hs.hole_number, score: parseInt(hs.score) };
+            const { error: scoreErr } = await supabase.from("scores").insert([scoreObj]);
+            if (scoreErr) throw new Error("Score insert failed hole " + hs.hole_number + ": " + scoreErr.message);
           }
         }
       }
