@@ -1029,7 +1029,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.30</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.31</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={shareApp} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", backdropFilter: "blur(4px)" }}>SHARE</button>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
@@ -1401,7 +1401,7 @@ function AdminDashboardScreen({ onLogout }) {
 // =============================================================================
 // SUPER ADMIN SCREEN
 // =============================================================================
-function SuperAdminScreen({ onLogout }) {
+function SuperAdminScreen({ onLogout, onEnterRound }) {
   const [tab, setTab] = useState("rounds");
   const [rounds, setRounds] = useState([]);
   const [blocked, setBlocked] = useState([]);
@@ -1520,21 +1520,16 @@ function SuperAdminScreen({ onLogout }) {
         for (const hs of sp.scores) {
           if (hs.score && parseInt(hs.score) > 0) {
             // Use plain insert for scanned rounds - these are new scores, not updates
-            const scoreObj = { id: genId(), round_id: round.id, player_id: p.id, hole_number: hs.hole_number, score: parseInt(hs.score) };
+            const scoreObj = { round_id: round.id, player_id: p.id, hole_number: hs.hole_number, score: parseInt(hs.score) };
             const { error: scoreErr } = await supabase.from("scores").insert([scoreObj]);
             if (scoreErr) throw new Error("Score insert failed hole " + hs.hole_number + ": " + scoreErr.message);
           }
         }
       }
-      // Small pause to let Supabase finish committing all scores before we fetch them back
-      await new Promise(r => setTimeout(r, 1200));
-      const [allP, allS] = await Promise.all([dbGetPlayers(round.id), dbGetScores(round.id)]);
-      console.log("SR Publish - players:", allP.length, "scores:", allS.length);
-      if (allS.length === 0) throw new Error("Scores saved but could not be retrieved. Check Supabase scores table.");
-      const lb = calcLeaderboard(allP, allS, course.holes, srGameType);
-      await saveRoundToHistory(round, allP, allS, course.holes);
-      setSrResult({ round, players: allP, scores: allS, lb, holes: course.holes });
-      setSrStep("results");
+      // Navigate straight into the live game as the first player
+      const allP = await dbGetPlayers(round.id);
+      if (!allP || allP.length === 0) throw new Error("Players could not be retrieved after saving.");
+      onEnterRound(round, allP[0]);
     } catch(e) {
       setSrScanErr("Publish failed: " + (e.message || "Unknown"));
     }
@@ -1881,7 +1876,7 @@ function SuperAdminScreen({ onLogout }) {
                 <h3 style={S.stepTitle}>Scanned Round Setup</h3>
                 <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 16 }}>Scan physical scorecards and simulate a completed round.</div>
 
-                <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Game Mode</div>
+                <div style={{ fontSize: 11, color: "#f8fafc", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Game Mode</div>
                 {SR_GAME_TYPES.map((gt) => (
                   <button key={gt} onClick={() => setSrGameType(gt)} style={{ width: "100%", textAlign: "left", backgroundColor: srGameType === gt ? "#022c22" : "#1e293b", border: srGameType === gt ? "1px solid #22c55e" : "1px solid #334155", borderRadius: 10, padding: "10px 14px", marginBottom: 8, cursor: "pointer", fontFamily: "inherit" }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: srGameType === gt ? "#22c55e" : "#f8fafc" }}>{GAME_TYPES[gt]?.label}</div>
@@ -1889,7 +1884,7 @@ function SuperAdminScreen({ onLogout }) {
                   </button>
                 ))}
 
-                <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginTop: 16, marginBottom: 8 }}>Course</div>
+                <div style={{ fontSize: 11, color: "#f8fafc", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginTop: 16, marginBottom: 8 }}>Course</div>
                 {!srCourse ? (
                   <div style={{ maxHeight: 200, overflowY: "auto", border: "1px solid #334155", borderRadius: 10, backgroundColor: "#1e293b" }}>
                     {saCourses.map((c) => (
@@ -1980,7 +1975,7 @@ function SuperAdminScreen({ onLogout }) {
             {srStep === "confirm-name" && (
               <div>
                 <h3 style={S.stepTitle}>Confirm Player Name</h3>
-                <div style={{ fontSize: 12, color: "#64748b", marginBottom: 16 }}>Claude read this name from the card. Edit if needed.</div>
+                <div style={{ fontSize: 12, color: "#f8fafc", marginBottom: 16 }}>Claude read this name from the card. Edit if needed.</div>
                 <input style={{ ...S.input, fontSize: 16, fontWeight: 700, marginBottom: 16 }} value={srEditName} onChange={(e) => setSrEditName(e.target.value)} placeholder="Enter player name" autoFocus />
                 <button style={S.btnPrimary} onClick={() => setSrStep("confirm-hcp")}>Confirm Name</button>
                 <button style={S.btnSecondary} onClick={() => setSrStep("scan")}>Cancel</button>
@@ -1991,8 +1986,8 @@ function SuperAdminScreen({ onLogout }) {
             {srStep === "confirm-hcp" && (
               <div>
                 <h3 style={S.stepTitle}>Confirm Handicap</h3>
-                <div style={{ fontSize: 12, color: "#64748b", marginBottom: 8 }}>Player: <strong style={{ color: "#f8fafc" }}>{srEditName}</strong></div>
-                <div style={{ fontSize: 12, color: "#64748b", marginBottom: 16 }}>Edit if the handicap looks wrong.</div>
+                <div style={{ fontSize: 12, color: "#f8fafc", marginBottom: 8 }}>Player: <strong style={{ color: "#f8fafc" }}>{srEditName}</strong></div>
+                <div style={{ fontSize: 12, color: "#f8fafc", marginBottom: 16 }}>Edit if the handicap looks wrong.</div>
                 <input style={{ ...S.input, fontSize: 16, fontWeight: 700, marginBottom: 16 }} value={srEditHcp} onChange={(e) => setSrEditHcp(e.target.value)} placeholder="Handicap (e.g. 14)" type="number" autoFocus />
                 <button style={S.btnPrimary} onClick={() => setSrStep("confirm-scores")}>Confirm Handicap</button>
                 <button style={S.btnSecondary} onClick={() => setSrStep("confirm-name")}>Back</button>
@@ -2003,7 +1998,7 @@ function SuperAdminScreen({ onLogout }) {
             {srStep === "confirm-scores" && (
               <div>
                 <h3 style={S.stepTitle}>Confirm Scores</h3>
-                <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 12 }}>{srEditName} · HCP {srEditHcp} · Tap any score to edit</div>
+                <div style={{ fontSize: 12, color: "#f8fafc", marginBottom: 12 }}>{srEditName} · HCP {srEditHcp} · Tap any score to edit</div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
                   {[srEditScores.slice(0,9), srEditScores.slice(9,18)].map((nine, ni) => (
                     <div key={ni} style={{ backgroundColor: "#0f172a", border: "2px solid #334155", borderRadius: 10, padding: 10 }}>
@@ -2025,6 +2020,24 @@ function SuperAdminScreen({ onLogout }) {
                       })}
                     </div>
                   ))}
+                </div>
+                {/* Totals row */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 16 }}>
+                  {[
+                    { label: "Front 9", scores: srEditScores.slice(0,9), color: "#22c55e" },
+                    { label: "Back 9", scores: srEditScores.slice(9,18), color: "#3b82f6" },
+                    { label: "Total", scores: srEditScores, color: "#f8fafc" },
+                  ].map(({ label, scores, color }) => {
+                    const total = scores.reduce((sum, h) => sum + (parseInt(h.score) || 0), 0);
+                    const filled = scores.filter(h => h.score && parseInt(h.score) > 0).length;
+                    return (
+                      <div key={label} style={{ backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 10, padding: "10px 8px", textAlign: "center" }}>
+                        <div style={{ fontSize: 10, color: "#64748b", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>{label}</div>
+                        <div style={{ fontSize: 22, fontWeight: 800, color: total > 0 ? color : "#334155" }}>{total > 0 ? total : "-"}</div>
+                        <div style={{ fontSize: 10, color: "#475569" }}>{filled}/{ scores.length} holes</div>
+                      </div>
+                    );
+                  })}
                 </div>
                 <button style={S.btnPrimary} onClick={() => {
                   const player = { tempId: genId(), name: srEditName.trim(), handicap: parseFloat(srEditHcp) || 0, scores: srEditScores };
@@ -5086,7 +5099,7 @@ export default function GolfApp() {
       {screen === "scorecard_spectator" && round && <ScorecardScreen round={round} me={{ id: "spectator", name: "Spectator", handicap: 0 }} onViewDashboard={() => setScreen("dashboard_spectator")} isSpectator={true} />}
       {screen === "view_round" && viewingRound && <PastRoundDetailScreen round={viewingRound} onBack={() => setScreen("history")} />}
             {screen === "admin_login" && <AdminLoginScreen onBack={() => setScreen("home")} onLoginSuccess={(level) => { setAdminLevel(level); setScreen("admin"); }} />}
-      {screen === "admin" && adminLevel === "super" && <SuperAdminScreen onLogout={() => { localStorage.removeItem("ff_admin"); setScreen("home"); }} />}
+      {screen === "admin" && adminLevel === "super" && <SuperAdminScreen onLogout={() => { localStorage.removeItem("ff_admin"); setScreen("home"); }} onEnterRound={(r, p) => { setRound(r); setMe(p); setScreen("dashboard"); }} />}
       {screen === "admin" && adminLevel !== "super" && <AdminDashboardScreen onLogout={() => { localStorage.removeItem("ff_admin"); setScreen("home"); }} />}
       {screen === "create" && <CreateRoundScreen onBack={() => setScreen("home")} onRoundCreated={(r, p) => { setRound(r); setMe(p); setScreen("dashboard"); }} />}
       {screen === "join" && <JoinRoundScreen onBack={() => { setJoinCode(null); setScreen("home"); }} onJoined={(r, p) => { setRound(r); setMe(p); setJoinCode(null); setScreen("dashboard"); }} prefillCode={joinCode} />}
