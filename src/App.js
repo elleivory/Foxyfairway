@@ -552,8 +552,7 @@ async function dbSaveScore(obj) {
 
 async function dbGetCourses() {
   const { data } = await supabase.from("courses").select("*").order("name");
-  const deletedIds = getDeletedCourseIds();
-  return (data || []).filter((c) => !deletedIds.includes(c.id));
+  return data || [];
 }
 
 async function dbSaveCourse(course) {
@@ -1030,7 +1029,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.29</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.30</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={shareApp} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", backdropFilter: "blur(4px)" }}>SHARE</button>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
@@ -1292,7 +1291,6 @@ function AdminDashboardScreen({ onLogout }) {
                     <button style={{ ...S.smallBtn, color: "#ef4444", borderColor: "#ef4444" }} onClick={async () => {
                       try {
                         await dbDeleteCourse(c.id);
-                        markCourseDeleted(c.id);
                         setCourses((prev) => prev.filter((x) => x.id !== c.id));
                         setMsg("Course deleted.");
                         setTimeout(() => setMsg(""), 2000);
@@ -1526,7 +1524,7 @@ function SuperAdminScreen({ onLogout }) {
         }
       }
       // Small pause to let Supabase finish committing all scores before we fetch them back
-      await new Promise(r => setTimeout(r, 800));
+      await new Promise(r => setTimeout(r, 1200));
       const [allP, allS] = await Promise.all([dbGetPlayers(round.id), dbGetScores(round.id)]);
       console.log("SR Publish - players:", allP.length, "scores:", allS.length);
       if (allS.length === 0) throw new Error("Scores saved but could not be retrieved. Check Supabase scores table.");
@@ -1760,7 +1758,7 @@ function SuperAdminScreen({ onLogout }) {
                     {saConfirmDeleteCourseId === c.id ? (
                       <div style={{ display: "flex", gap: 6 }}>
                         <button style={{ ...S.smallBtn, color: "#ef4444", borderColor: "#ef4444" }} onClick={async () => {
-                          try { await dbDeleteCourse(c.id); markCourseDeleted(c.id); setSaCourses((prev) => prev.filter((x) => x.id !== c.id)); setMsg("Course deleted."); setTimeout(() => setMsg(""), 2000); } catch { setMsg("Delete failed."); }
+                          try { await dbDeleteCourse(c.id); setSaCourses((prev) => prev.filter((x) => x.id !== c.id)); setMsg("Course deleted."); setTimeout(() => setMsg(""), 2000); } catch { setMsg("Delete failed."); }
                           setSaConfirmDeleteCourseId(null);
                         }}>Confirm</button>
                         <button style={S.smallBtn} onClick={() => setSaConfirmDeleteCourseId(null)}>Cancel</button>
@@ -1831,6 +1829,18 @@ function SuperAdminScreen({ onLogout }) {
           <div>
             <input ref={srFileInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => handleSrScanPlayer(e.target.files)} />
 
+            {/* ERROR BANNER - always visible on any step */}
+            {srScanErr && (
+              <div style={{ backgroundColor: "#1c0a0a", border: "1px solid #ef4444", borderRadius: 10, padding: 14, marginBottom: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#ef4444" }}>⚠️ Something went wrong</div>
+                  <button onClick={() => setSrScanErr("")} style={{ background: "none", border: "none", color: "#64748b", fontSize: 16, cursor: "pointer", padding: 0, lineHeight: 1 }}>✕</button>
+                </div>
+                <div style={{ fontSize: 11, color: "#fca5a5", fontFamily: "monospace", wordBreak: "break-all", lineHeight: 1.6 }}>{srScanErr}</div>
+                <div style={{ fontSize: 11, color: "#64748b", marginTop: 8 }}>Dismiss and try again, or check Netlify logs for more detail.</div>
+              </div>
+            )}
+
             {/* RESULTS */}
             {srStep === "results" && srResult && (
               <div>
@@ -1866,7 +1876,7 @@ function SuperAdminScreen({ onLogout }) {
             {srStep === "setup" && (
               <div>
                 <h3 style={S.stepTitle}>Scanned Round Setup</h3>
-                <div style={{ fontSize: 12, color: "#64748b", marginBottom: 16 }}>Scan physical scorecards and simulate a completed round.</div>
+                <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 16 }}>Scan physical scorecards and simulate a completed round.</div>
 
                 <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Game Mode</div>
                 {SR_GAME_TYPES.map((gt) => (
@@ -1909,7 +1919,7 @@ function SuperAdminScreen({ onLogout }) {
             {srStep === "scan" && (
               <div>
                 <h3 style={S.stepTitle}>Scan Player Cards</h3>
-                <div style={{ fontSize: 12, color: "#64748b", marginBottom: 12 }}>{srCourse?.name} · {GAME_TYPES[srGameType]?.label}</div>
+                <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 12 }}>{srCourse?.name} · {GAME_TYPES[srGameType]?.label}</div>
 
                 {srPlayers.length > 0 && (
                   <div style={{ marginBottom: 16 }}>
@@ -1990,7 +2000,7 @@ function SuperAdminScreen({ onLogout }) {
             {srStep === "confirm-scores" && (
               <div>
                 <h3 style={S.stepTitle}>Confirm Scores</h3>
-                <div style={{ fontSize: 12, color: "#64748b", marginBottom: 12 }}>{srEditName} · HCP {srEditHcp} · Tap any score to edit</div>
+                <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 12 }}>{srEditName} · HCP {srEditHcp} · Tap any score to edit</div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
                   {[srEditScores.slice(0,9), srEditScores.slice(9,18)].map((nine, ni) => (
                     <div key={ni} style={{ backgroundColor: "#0f172a", border: "2px solid #334155", borderRadius: 10, padding: 10 }}>
