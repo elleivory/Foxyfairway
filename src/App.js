@@ -101,185 +101,7 @@ function addRoundToTournament(tournamentId, roundSummary) {
 // =============================================================================
 // COURSE DATA
 // =============================================================================
-const DEFAULT_COURSES = [
-  { id: "cromwell-1", name: "Cromwell Golf Club", par: 71, holes: [
-    {hole_number:1,par:5,stroke_index:3},{hole_number:2,par:4,stroke_index:5},
-    {hole_number:3,par:3,stroke_index:17},{hole_number:4,par:5,stroke_index:7},
-    {hole_number:5,par:3,stroke_index:13},{hole_number:6,par:4,stroke_index:9},
-    {hole_number:7,par:4,stroke_index:15},{hole_number:8,par:4,stroke_index:11},
-    {hole_number:9,par:4,stroke_index:1},{hole_number:10,par:4,stroke_index:12},
-    {hole_number:11,par:5,stroke_index:18},{hole_number:12,par:4,stroke_index:8},
-    {hole_number:13,par:4,stroke_index:10},{hole_number:14,par:3,stroke_index:14},
-    {hole_number:15,par:4,stroke_index:6},{hole_number:16,par:3,stroke_index:2},
-    {hole_number:17,par:4,stroke_index:16},{hole_number:18,par:4,stroke_index:4},
-  ]},
-  { id: "wanaka-1", name: "Wanaka Golf Club", par: 70, holes: [
-    {hole_number:1,par:4,stroke_index:3},{hole_number:2,par:3,stroke_index:14},
-    {hole_number:3,par:4,stroke_index:8},{hole_number:4,par:4,stroke_index:16},
-    {hole_number:5,par:4,stroke_index:2},{hole_number:6,par:3,stroke_index:18},
-    {hole_number:7,par:4,stroke_index:4},{hole_number:8,par:4,stroke_index:6},
-    {hole_number:9,par:4,stroke_index:12},{hole_number:10,par:5,stroke_index:11},
-    {hole_number:11,par:4,stroke_index:7},{hole_number:12,par:4,stroke_index:3},
-    {hole_number:13,par:3,stroke_index:15},{hole_number:14,par:4,stroke_index:1},
-    {hole_number:15,par:4,stroke_index:17},{hole_number:16,par:3,stroke_index:5},
-    {hole_number:17,par:5,stroke_index:4},{hole_number:18,par:4,stroke_index:4},
-  ]},
-  { id: "jacks-1", name: "Jacks Point Golf Club", par: 72, holes: [
-    {hole_number:1,par:4,stroke_index:14},{hole_number:2,par:4,stroke_index:2},
-    {hole_number:3,par:3,stroke_index:12},{hole_number:4,par:4,stroke_index:10},
-    {hole_number:5,par:5,stroke_index:6},{hole_number:6,par:4,stroke_index:16},
-    {hole_number:7,par:3,stroke_index:18},{hole_number:8,par:5,stroke_index:4},
-    {hole_number:9,par:4,stroke_index:8},{hole_number:10,par:4,stroke_index:17},
-    {hole_number:11,par:4,stroke_index:11},{hole_number:12,par:3,stroke_index:3},
-    {hole_number:13,par:4,stroke_index:13},{hole_number:14,par:4,stroke_index:15},
-    {hole_number:15,par:5,stroke_index:9},{hole_number:16,par:4,stroke_index:7},
-    {hole_number:17,par:3,stroke_index:1},{hole_number:18,par:5,stroke_index:5},
-  ]},
-  { id: "alexandra-1", name: "Alexandra Golf Club", par: 72, holes: [
-    {hole_number:1,par:4,stroke_index:5},{hole_number:2,par:4,stroke_index:11},
-    {hole_number:3,par:4,stroke_index:3},{hole_number:4,par:5,stroke_index:15},
-    {hole_number:5,par:3,stroke_index:17},{hole_number:6,par:4,stroke_index:7},
-    {hole_number:7,par:5,stroke_index:9},{hole_number:8,par:3,stroke_index:13},
-    {hole_number:9,par:4,stroke_index:1},{hole_number:10,par:4,stroke_index:6},
-    {hole_number:11,par:3,stroke_index:18},{hole_number:12,par:5,stroke_index:2},
-    {hole_number:13,par:4,stroke_index:10},{hole_number:14,par:4,stroke_index:8},
-    {hole_number:15,par:3,stroke_index:16},{hole_number:16,par:4,stroke_index:4},
-    {hole_number:17,par:4,stroke_index:12},{hole_number:18,par:5,stroke_index:14},
-  ]},
-  { id: "arrowtown-1", name: "Arrowtown Golf Club", par: 70, holes: [
-    {hole_number:1,par:5,stroke_index:13},{hole_number:2,par:4,stroke_index:8},
-    {hole_number:3,par:3,stroke_index:15},{hole_number:4,par:5,stroke_index:11},
-    {hole_number:5,par:3,stroke_index:10},{hole_number:6,par:4,stroke_index:1},
-    {hole_number:7,par:3,stroke_index:14},{hole_number:8,par:4,stroke_index:6},
-    {hole_number:9,par:4,stroke_index:2},{hole_number:10,par:3,stroke_index:16},
-    {hole_number:11,par:5,stroke_index:5},{hole_number:12,par:4,stroke_index:7},
-    {hole_number:13,par:4,stroke_index:9},{hole_number:14,par:4,stroke_index:3},
-    {hole_number:15,par:4,stroke_index:18},{hole_number:16,par:3,stroke_index:12},
-    {hole_number:17,par:4,stroke_index:4},{hole_number:18,par:3,stroke_index:17},
-  ]},
-  { id: "queenstown-1", name: "Queenstown Golf Club", par: 72, holes: [
-    {hole_number:1,par:4,stroke_index:13},{hole_number:2,par:4,stroke_index:11},
-    {hole_number:3,par:3,stroke_index:7},{hole_number:4,par:4,stroke_index:15},
-    {hole_number:5,par:5,stroke_index:5},{hole_number:6,par:4,stroke_index:1},
-    {hole_number:7,par:3,stroke_index:9},{hole_number:8,par:5,stroke_index:17},
-    {hole_number:9,par:4,stroke_index:3},{hole_number:10,par:4,stroke_index:14},
-    {hole_number:11,par:4,stroke_index:8},{hole_number:12,par:3,stroke_index:18},
-    {hole_number:13,par:4,stroke_index:2},{hole_number:14,par:5,stroke_index:12},
-    {hole_number:15,par:4,stroke_index:10},{hole_number:16,par:4,stroke_index:16},
-    {hole_number:17,par:3,stroke_index:4},{hole_number:18,par:5,stroke_index:6},
-  ]},
-  { id: "millbrook-remarkables", name: "Millbrook - Remarkables Course", par: 71, holes: [
-    {hole_number:1,par:5,stroke_index:14},{hole_number:2,par:4,stroke_index:6},
-    {hole_number:3,par:4,stroke_index:2},{hole_number:4,par:3,stroke_index:16},
-    {hole_number:5,par:5,stroke_index:4},{hole_number:6,par:4,stroke_index:10},
-    {hole_number:7,par:4,stroke_index:8},{hole_number:8,par:4,stroke_index:12},
-    {hole_number:9,par:3,stroke_index:18},{hole_number:10,par:4,stroke_index:11},
-    {hole_number:11,par:5,stroke_index:1},{hole_number:12,par:4,stroke_index:7},
-    {hole_number:13,par:3,stroke_index:17},{hole_number:14,par:4,stroke_index:9},
-    {hole_number:15,par:4,stroke_index:13},{hole_number:16,par:3,stroke_index:15},
-    {hole_number:17,par:4,stroke_index:5},{hole_number:18,par:4,stroke_index:3},
-  ]},
-  { id: "millbrook-coronet", name: "Millbrook - Coronet Course", par: 72, holes: [
-    {hole_number:1,par:5,stroke_index:14},{hole_number:2,par:3,stroke_index:6},
-    {hole_number:3,par:4,stroke_index:10},{hole_number:4,par:4,stroke_index:2},
-    {hole_number:5,par:4,stroke_index:16},{hole_number:6,par:4,stroke_index:4},
-    {hole_number:7,par:3,stroke_index:12},{hole_number:8,par:5,stroke_index:8},
-    {hole_number:9,par:4,stroke_index:18},{hole_number:10,par:4,stroke_index:7},
-    {hole_number:11,par:5,stroke_index:1},{hole_number:12,par:3,stroke_index:15},
-    {hole_number:13,par:4,stroke_index:11},{hole_number:14,par:4,stroke_index:5},
-    {hole_number:15,par:3,stroke_index:17},{hole_number:16,par:4,stroke_index:9},
-    {hole_number:17,par:4,stroke_index:3},{hole_number:18,par:5,stroke_index:13},
-  ]},
-  // SINGAPORE ELITE PRIVATE COURSES
-  { id: "sentosa-serapong", name: "Sentosa Golf Club (Serapong)", par: 72, holes: [
-    {hole_number:1,par:4,stroke_index:9},{hole_number:2,par:3,stroke_index:15},
-    {hole_number:3,par:4,stroke_index:1},{hole_number:4,par:5,stroke_index:5},
-    {hole_number:5,par:4,stroke_index:3},{hole_number:6,par:4,stroke_index:7},
-    {hole_number:7,par:4,stroke_index:11},{hole_number:8,par:3,stroke_index:17},
-    {hole_number:9,par:4,stroke_index:13},{hole_number:10,par:4,stroke_index:10},
-    {hole_number:11,par:4,stroke_index:4},{hole_number:12,par:5,stroke_index:14},
-    {hole_number:13,par:4,stroke_index:6},{hole_number:14,par:3,stroke_index:16},
-    {hole_number:15,par:5,stroke_index:8},{hole_number:16,par:4,stroke_index:2},
-    {hole_number:17,par:3,stroke_index:18},{hole_number:18,par:4,stroke_index:12},
-  ]},
-  { id: "sentosa-tanjong", name: "Sentosa Golf Club (Tanjong)", par: 72, holes: [
-    {hole_number:1,par:5,stroke_index:7},{hole_number:2,par:4,stroke_index:3},
-    {hole_number:3,par:4,stroke_index:11},{hole_number:4,par:3,stroke_index:17},
-    {hole_number:5,par:4,stroke_index:1},{hole_number:6,par:5,stroke_index:13},
-    {hole_number:7,par:3,stroke_index:15},{hole_number:8,par:4,stroke_index:5},
-    {hole_number:9,par:4,stroke_index:9},{hole_number:10,par:4,stroke_index:6},
-    {hole_number:11,par:3,stroke_index:16},{hole_number:12,par:5,stroke_index:2},
-    {hole_number:13,par:4,stroke_index:10},{hole_number:14,par:4,stroke_index:4},
-    {hole_number:15,par:4,stroke_index:12},{hole_number:16,par:3,stroke_index:18},
-    {hole_number:17,par:5,stroke_index:8},{hole_number:18,par:4,stroke_index:14},
-  ]},
-  { id: "laguna-masters", name: "Laguna National (Masters Course)", par: 72, holes: [
-    {hole_number:1,par:4,stroke_index:11},{hole_number:2,par:4,stroke_index:5},
-    {hole_number:3,par:5,stroke_index:15},{hole_number:4,par:3,stroke_index:17},
-    {hole_number:5,par:4,stroke_index:3},{hole_number:6,par:4,stroke_index:7},
-    {hole_number:7,par:3,stroke_index:13},{hole_number:8,par:5,stroke_index:9},
-    {hole_number:9,par:4,stroke_index:1},{hole_number:10,par:4,stroke_index:8},
-    {hole_number:11,par:3,stroke_index:18},{hole_number:12,par:4,stroke_index:4},
-    {hole_number:13,par:5,stroke_index:14},{hole_number:14,par:4,stroke_index:6},
-    {hole_number:15,par:4,stroke_index:10},{hole_number:16,par:3,stroke_index:16},
-    {hole_number:17,par:4,stroke_index:12},{hole_number:18,par:4,stroke_index:2},
-  ]},
-  { id: "tanah-merah-tampines", name: "Tanah Merah CC (Tampines)", par: 72, holes: [
-    {hole_number:1,par:4,stroke_index:11},{hole_number:2,par:4,stroke_index:1},
-    {hole_number:3,par:4,stroke_index:5},{hole_number:4,par:3,stroke_index:7},
-    {hole_number:5,par:5,stroke_index:3},{hole_number:6,par:3,stroke_index:15},
-    {hole_number:7,par:4,stroke_index:9},{hole_number:8,par:5,stroke_index:13},
-    {hole_number:9,par:4,stroke_index:17},{hole_number:10,par:5,stroke_index:8},
-    {hole_number:11,par:4,stroke_index:14},{hole_number:12,par:4,stroke_index:12},
-    {hole_number:13,par:4,stroke_index:10},{hole_number:14,par:3,stroke_index:18},
-    {hole_number:15,par:4,stroke_index:4},{hole_number:16,par:3,stroke_index:16},
-    {hole_number:17,par:4,stroke_index:2},{hole_number:18,par:5,stroke_index:6},
-  ]},
-  { id: "tanah-merah-garden", name: "Tanah Merah CC (Garden)", par: 71, holes: [
-    {hole_number:1,par:4,stroke_index:9},{hole_number:2,par:4,stroke_index:3},
-    {hole_number:3,par:4,stroke_index:11},{hole_number:4,par:4,stroke_index:1},
-    {hole_number:5,par:3,stroke_index:17},{hole_number:6,par:4,stroke_index:7},
-    {hole_number:7,par:5,stroke_index:13},{hole_number:8,par:3,stroke_index:15},
-    {hole_number:9,par:4,stroke_index:5},{hole_number:10,par:4,stroke_index:8},
-    {hole_number:11,par:4,stroke_index:2},{hole_number:12,par:3,stroke_index:16},
-    {hole_number:13,par:4,stroke_index:10},{hole_number:14,par:3,stroke_index:18},
-    {hole_number:15,par:4,stroke_index:4},{hole_number:16,par:5,stroke_index:14},
-    {hole_number:17,par:4,stroke_index:6},{hole_number:18,par:5,stroke_index:12},
-  ]},
-  { id: "sicc-bukit", name: "Singapore Island CC (Bukit)", par: 71, holes: [
-    {hole_number:1,par:4,stroke_index:13},{hole_number:2,par:3,stroke_index:15},
-    {hole_number:3,par:4,stroke_index:7},{hole_number:4,par:5,stroke_index:3},
-    {hole_number:5,par:3,stroke_index:17},{hole_number:6,par:4,stroke_index:1},
-    {hole_number:7,par:4,stroke_index:5},{hole_number:8,par:4,stroke_index:11},
-    {hole_number:9,par:4,stroke_index:9},{hole_number:10,par:4,stroke_index:14},
-    {hole_number:11,par:4,stroke_index:2},{hole_number:12,par:3,stroke_index:8},
-    {hole_number:13,par:5,stroke_index:6},{hole_number:14,par:3,stroke_index:16},
-    {hole_number:15,par:4,stroke_index:4},{hole_number:16,par:4,stroke_index:10},
-    {hole_number:17,par:4,stroke_index:12},{hole_number:18,par:4,stroke_index:18},
-  ]},
-  { id: "sicc-island", name: "Singapore Island CC (Island)", par: 72, holes: [
-    {hole_number:1,par:4,stroke_index:13},{hole_number:2,par:4,stroke_index:3},
-    {hole_number:3,par:3,stroke_index:15},{hole_number:4,par:5,stroke_index:5},
-    {hole_number:5,par:4,stroke_index:1},{hole_number:6,par:4,stroke_index:11},
-    {hole_number:7,par:3,stroke_index:17},{hole_number:8,par:5,stroke_index:9},
-    {hole_number:9,par:4,stroke_index:7},{hole_number:10,par:4,stroke_index:7},
-    {hole_number:11,par:3,stroke_index:13},{hole_number:12,par:5,stroke_index:9},
-    {hole_number:13,par:3,stroke_index:17},{hole_number:14,par:4,stroke_index:11},
-    {hole_number:15,par:4,stroke_index:3},{hole_number:16,par:4,stroke_index:5},
-    {hole_number:17,par:4,stroke_index:15},{hole_number:18,par:5,stroke_index:1},
-  ]},
-  { id: "rnzaf-whenuapai", name: "RNZAF Whenuapai", par: 71, holes: [
-    {hole_number:1,par:4,stroke_index:10},{hole_number:2,par:4,stroke_index:14},
-    {hole_number:3,par:3,stroke_index:18},{hole_number:4,par:4,stroke_index:6},
-    {hole_number:5,par:4,stroke_index:2},{hole_number:6,par:3,stroke_index:16},
-    {hole_number:7,par:4,stroke_index:12},{hole_number:8,par:4,stroke_index:4},
-    {hole_number:9,par:5,stroke_index:8},{hole_number:10,par:4,stroke_index:1},
-    {hole_number:11,par:5,stroke_index:5},{hole_number:12,par:3,stroke_index:13},
-    {hole_number:13,par:5,stroke_index:3},{hole_number:14,par:4,stroke_index:15},
-    {hole_number:15,par:3,stroke_index:17},{hole_number:16,par:4,stroke_index:9},
-    {hole_number:17,par:4,stroke_index:11},{hole_number:18,par:4,stroke_index:7},
-  ]},
-];
+const DEFAULT_COURSES = []; // Courses are added manually via Super Admin
 
 function getHolesForRound(round) {
   let holes = round.holes;
@@ -584,15 +406,7 @@ function markCourseDeleted(id) {
   if (!ids.includes(id)) localStorage.setItem("ff_deleted_courses", JSON.stringify([...ids, id]));
 }
 
-async function dbSeedCourses() {
-  const existing = await dbGetCourses();
-  const existingIds = existing.map((c) => c.id);
-  const deletedIds = getDeletedCourseIds();
-  const toInsert = DEFAULT_COURSES.filter((c) => !existingIds.includes(c.id) && !deletedIds.includes(c.id));
-  if (toInsert.length > 0) {
-    await supabase.from("courses").insert(toInsert.map((c) => ({ id: c.id, name: c.name, par: c.par, holes: c.holes })));
-  }
-}
+async function dbSeedCourses() { /* No default courses - all added manually via Super Admin */ }
 
 async function dbGetChat(roundId) {
   const { data } = await supabase.from("chat_messages").select("*").eq("round_id", roundId).order("created_at", { ascending: true });
@@ -1040,7 +854,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.34</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.35</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={shareApp} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", backdropFilter: "blur(4px)" }}>SHARE</button>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
@@ -1254,7 +1068,7 @@ function AdminDashboardScreen({ onLogout }) {
     (async () => {
       await dbSeedCourses();
       const c = await dbGetCourses();
-      setCourses(c.length > 0 ? c.sort((a, b) => a.name.localeCompare(b.name)) : DEFAULT_COURSES.sort((a, b) => a.name.localeCompare(b.name)));
+      setCourses(c.sort((a, b) => a.name.localeCompare(b.name)));
     })();
   }, []);
 
@@ -1646,6 +1460,7 @@ function SuperAdminScreen({ onLogout, onEnterRound }) {
                   </div>
                   <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                     <button style={{ ...S.smallBtn, color: "#22c55e", borderColor: "#22c55e" }} onClick={() => { navigator.clipboard.writeText(window.location.origin + "?join=" + r.code); setMsg("Join link copied for " + r.code); setTimeout(() => setMsg(""), 2000); }}>Share</button>
+                    <button style={{ ...S.smallBtn, color: "#3b82f6", borderColor: "#3b82f6" }} onClick={async () => { try { const fullRound = await dbGetRound(r.code); onEnterRound(fullRound, { id: "spectator", name: "Spectator", handicap: 0 }); } catch(e) { setMsg("Could not load round."); } }}>View</button>
                     <button style={{ ...S.smallBtn, color: "#ef4444", borderColor: "#ef4444" }} onClick={() => handleDeleteRound(r)}>Delete</button>
                   </div>
                 </div>
@@ -2522,7 +2337,7 @@ function ShareModal({ round, onClose }) {
 // =============================================================================
 function CreateRoundScreen({ onBack, onRoundCreated }) {
   const profile = getPlayerProfile();
-  const [step, setStep] = useState(1), [courses, setCourses] = useState([...DEFAULT_COURSES].sort((a, b) => a.name.localeCompare(b.name)));
+  const [step, setStep] = useState(1), [courses, setCourses] = useState([]);
   const [course, setCourse] = useState(null), [gameType, setGameType] = useState("stroke");
   const [name, setName] = useState(profile.name || ""), [hcp, setHcp] = useState(profile.handicap || ""), [team, setTeam] = useState("A");
   const [selectedTournament, setSelectedTournament] = useState("");
@@ -3863,7 +3678,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
         <button style={S.backBtn} onClick={onViewDashboard}>← Back</button>
         <h2 style={S.headerTitle}>Enter Score</h2>
         <div style={{ display: "flex", gap: 6 }}>
-          {!isSpectator && <button onClick={() => { setShowGameAdmin(true); setGameAdminCode(""); setGameAdminAuthed(false); setAdminMsg(""); }} style={{ backgroundColor: "#1e293b", color: "#f59e0b", border: "1px solid #f59e0b", borderRadius: 10, padding: "10px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>⚙️</button>}
+          <button onClick={() => { setShowGameAdmin(true); setGameAdminCode(""); setGameAdminAuthed(false); setAdminMsg(""); }} style={{ backgroundColor: "#1e293b", color: "#f59e0b", border: "1px solid #f59e0b", borderRadius: 10, padding: "10px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>⚙️</button>
           <button onClick={() => { setShowChat(true); setUnreadChat(0); }}
             style={{ position: "relative", backgroundColor: "#1e293b", color: "#e2e8f0", border: "1px solid #334155", borderRadius: 10, padding: "10px 16px", fontSize: 16, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
             💬
@@ -5354,7 +5169,7 @@ export default function GolfApp() {
       {screen === "scorecard_spectator" && round && <ScorecardScreen round={round} me={{ id: "spectator", name: "Spectator", handicap: 0 }} onViewDashboard={() => setScreen("dashboard_spectator")} isSpectator={true} />}
       {screen === "view_round" && viewingRound && <PastRoundDetailScreen round={viewingRound} onBack={() => setScreen("history")} />}
             {screen === "admin_login" && <AdminLoginScreen onBack={() => setScreen("home")} onLoginSuccess={(level) => { setAdminLevel(level); setScreen("admin"); }} />}
-      {screen === "admin" && adminLevel === "super" && <SuperAdminScreen onLogout={() => { localStorage.removeItem("ff_admin"); setScreen("home"); }} onEnterRound={(r, p) => { setRound(r); setMe(p); setScreen("dashboard"); }} />}
+      {screen === "admin" && adminLevel === "super" && <SuperAdminScreen onLogout={() => { localStorage.removeItem("ff_admin"); setScreen("home"); }} onEnterRound={(r, p) => { setRound(r); setMe(p); setScreen(p.id === "spectator" ? "dashboard_spectator" : "dashboard"); }} />}
       {screen === "admin" && adminLevel !== "super" && <AdminDashboardScreen onLogout={() => { localStorage.removeItem("ff_admin"); setScreen("home"); }} />}
       {screen === "create" && <CreateRoundScreen onBack={() => setScreen("home")} onRoundCreated={(r, p) => { setRound(r); setMe(p); setScreen("dashboard"); }} />}
       {screen === "join" && <JoinRoundScreen onBack={() => { setJoinCode(null); setScreen("home"); }} onJoined={(r, p) => { setRound(r); setMe(p); setJoinCode(null); setScreen("dashboard"); }} prefillCode={joinCode} />}
