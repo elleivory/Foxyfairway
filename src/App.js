@@ -1030,7 +1030,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.28</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.29</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={shareApp} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", backdropFilter: "blur(4px)" }}>SHARE</button>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
@@ -1423,6 +1423,25 @@ function SuperAdminScreen({ onLogout }) {
   const [saScanError, setSaScanError] = useState("");
   const saFileInputRef = useRef(null);
 
+  // Scanned Round state
+  const [srStep, setSrStep] = useState("setup");
+  const [srGameType, setSrGameType] = useState("stroke");
+  const [srCourse, setSrCourse] = useState(null);
+  const [srUseHandicap, setSrUseHandicap] = useState(true);
+  const [srPlayers, setSrPlayers] = useState([]);
+  const [srCurrentScan, setSrCurrentScan] = useState(null);
+  const [srEditName, setSrEditName] = useState("");
+  const [srEditHcp, setSrEditHcp] = useState("");
+  const [srEditScores, setSrEditScores] = useState(Array.from({length:18},(_,i)=>({hole_number:i+1,score:""})));
+  const [srScanning, setSrScanning] = useState(false);
+  const [srScanErr, setSrScanErr] = useState("");
+  const [srPublishing, setSrPublishing] = useState(false);
+  const [srResult, setSrResult] = useState(null);
+  const [srTeams, setSrTeams] = useState({});
+  const [srNeedTeams, setSrNeedTeams] = useState(false);
+  const srFileInputRef = useRef(null);
+  const SR_GAME_TYPES = ["stroke","stableford","matchplay","matchplay_teams"];
+
   const handleScanScorecard = async (files) => {
     if (!files || files.length === 0) return;
     setSaScanning(true); setSaScanError("");
@@ -1437,7 +1456,7 @@ function SuperAdminScreen({ onLogout }) {
         }))) })
       });
       const parsed = await response.json();
-      if (!response.ok) throw new Error(parsed.error || "Scan failed");
+      if (!response.ok) throw new Error("HTTP " + response.status + ": " + (parsed.error || "Scan failed"));
       if (!parsed.name || !parsed.holes || parsed.holes.length !== 18) throw new Error("Invalid scorecard data");
       const newCourse = { id: genId(), name: parsed.name, par: parsed.holes.reduce((s, h) => s + h.par, 0), holes: parsed.holes.map((h) => ({ hole_number: h.hole_number, par: h.par, stroke_index: h.stroke_index })) };
       setSaEditingCourse(newCourse);
@@ -1448,6 +1467,62 @@ function SuperAdminScreen({ onLogout }) {
     }
     setSaScanning(false);
   };
+
+  const handleSrScanPlayer = async (files) => {
+    if (!files || files.length === 0) return;
+    setSrScanning(true); setSrScanErr("");
+    try {
+      const response = await fetch("/.netlify/functions/scan-player-scorecard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ images: await Promise.all(Array.from(files).slice(0,1).map(async (f) => ({
+          media_type: f.type || "image/jpeg",
+          data: await new Promise((res,rej) => { const r = new FileReader(); r.onload = () => res(r.result.split(",")[1]); r.onerror = rej; r.readAsDataURL(f); })
+        }))) })
+      });
+      const parsed = await response.json();
+      if (!response.ok) throw new Error(parsed.error || "Scan failed");
+      setSrCurrentScan(parsed);
+      setSrEditName(parsed.player_name || "");
+      setSrEditHcp(parsed.handicap != null ? String(parsed.handicap) : "");
+      setSrEditScores(Array.from({length:18},(_,i) => ({ hole_number: i+1, score: String(parsed.scores?.[i+1] || "") })));
+      setSrStep("confirm-name");
+    } catch(e) {
+      setSrScanErr("Scan error: " + (e.message || "Unknown"));
+    }
+    setSrScanning(false);
+  };
+
+  const handleSrPublish = async () => { await handleSrPublishWithPlayers(srPlayers); };
+
+  const handleSrPublishWithPlayers = async (players) => {
+    if (players.length < 1) return;
+    setSrPublishing(true);
+    try {
+      const code = Math.random().toString(36).substr(2,6).toUpperCase();
+      const course = srCourse;
+      const round = await dbCreateRound({ code, course_name: course.name, course_id: course.id, game_type: srGameType, holes: course.holes, use_handicap: srUseHandicap, created_at: new Date().toISOString(), created_by: "Super Admin", is_scanned: true });
+      for (const sp of players) {
+        const team = srGameType === "matchplay_teams" ? (srTeams[sp.tempId] || "A") : null;
+        const p = await dbCreatePlayer({ name: sp.name, handicap: srUseHandicap ? (parseFloat(sp.handicap)||0) : 0, round_id: round.id, team, is_placeholder: false });
+        for (const hs of sp.scores) {
+          if (hs.score && parseInt(hs.score) > 0) {
+            await dbSaveScore({ id: genId(), round_id: round.id, player_id: p.id, hole_number: hs.hole_number, score: parseInt(hs.score) });
+          }
+        }
+      }
+      const [allP, allS] = await Promise.all([dbGetPlayers(round.id), dbGetScores(round.id)]);
+      const lb = calcLeaderboard(allP, allS, course.holes, srGameType);
+      await saveRoundToHistory(round, allP, allS, course.holes);
+      setSrResult({ round, players: allP, scores: allS, lb, holes: course.holes });
+      setSrStep("results");
+    } catch(e) {
+      setSrScanErr("Publish failed at step: " + (e.message || "Unknown error. Check Netlify logs."));
+    }
+    setSrPublishing(false);
+  };
+
+  const srReset = () => { setSrStep("setup"); setSrGameType("stroke"); setSrCourse(null); setSrPlayers([]); setSrCurrentScan(null); setSrEditName(""); setSrEditHcp(""); setSrEditScores(Array.from({length:18},(_,i)=>({hole_number:i+1,score:""}))); setSrResult(null); setSrTeams({}); setSrNeedTeams(false); setSrScanErr(""); };
 
   useEffect(() => {
     (async () => {
@@ -1518,10 +1593,17 @@ function SuperAdminScreen({ onLogout }) {
         <h2 style={S.headerTitle}>Super Admin</h2>
         <div style={{ ...S.adminBadge, backgroundColor: "#ef4444" }}>SUPER</div>
       </div>
-      <div style={{ display: "flex", borderBottom: "1px solid #334155" }}>
-        {["rounds", "players", "blocked", "tournaments", "courses", "stats"].map((t) => (
-          <button key={t} style={{ flex: 1, padding: "12px 0", background: "none", border: "none", color: tab === t ? "#22c55e" : "#64748b", fontWeight: tab === t ? 700 : 400, fontSize: 13, cursor: "pointer", borderBottom: tab === t ? "2px solid #22c55e" : "none", fontFamily: "inherit", textTransform: "capitalize" }} onClick={() => setTab(t)}>{t}</button>
-        ))}
+      <div style={{ borderBottom: "1px solid #334155" }}>
+        <div style={{ display: "flex", borderBottom: "1px solid #1e293b" }}>
+          {[["rounds","Rounds"],["players","Players"],["blocked","Blocked"],["scanned","⛳ Scan Game"]].map(([key,label]) => (
+            <button key={key} style={{ flex: 1, padding: "10px 0", background: "none", border: "none", color: tab === key ? "#22c55e" : "#64748b", fontWeight: tab === key ? 700 : 400, fontSize: 11, cursor: "pointer", borderBottom: tab === key ? "2px solid #22c55e" : "none", fontFamily: "inherit" }} onClick={() => setTab(key)}>{label}</button>
+          ))}
+        </div>
+        <div style={{ display: "flex" }}>
+          {[["tournaments","Tournaments"],["courses","Courses"],["stats","Stats"]].map(([key,label]) => (
+            <button key={key} style={{ flex: 1, padding: "10px 0", background: "none", border: "none", color: tab === key ? "#22c55e" : "#64748b", fontWeight: tab === key ? 700 : 400, fontSize: 11, cursor: "pointer", borderBottom: tab === key ? "2px solid #22c55e" : "none", fontFamily: "inherit" }} onClick={() => setTab(key)}>{label}</button>
+          ))}
+        </div>
       </div>
       <div style={S.content}>
         {msg && <div style={{ backgroundColor: "#022c22", border: "1px solid #22c55e", borderRadius: 8, padding: "10px 14px", marginBottom: 16, color: "#22c55e", fontSize: 13 }}>{msg}</div>}
@@ -1723,6 +1805,224 @@ function SuperAdminScreen({ onLogout }) {
                   <button style={S.btnPrimary} disabled={saSaving} onClick={saSaveCourse}>{saSaving ? "Saving..." : "Save Course"}</button>
                   <button style={S.btnSecondary} onClick={() => { setSaEditingCourse(null); setSaEditingHoles([]); }}>Cancel</button>
                 </div>
+              </div>
+            )}
+          </div>
+        )}
+        {tab === "scanned" && (
+          <div>
+            <input ref={srFileInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => handleSrScanPlayer(e.target.files)} />
+
+            {/* ERROR BANNER - shows on any step if something went wrong */}
+            {srScanErr && (
+              <div style={{ backgroundColor: "#1c0a0a", border: "1px solid #ef4444", borderRadius: 10, padding: 14, marginBottom: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#ef4444" }}>⚠️ Something went wrong</div>
+                  <button onClick={() => setSrScanErr("")} style={{ background: "none", border: "none", color: "#64748b", fontSize: 16, cursor: "pointer", padding: 0, lineHeight: 1 }}>✕</button>
+                </div>
+                <div style={{ fontSize: 12, color: "#fca5a5", fontFamily: "monospace", wordBreak: "break-all", lineHeight: 1.5 }}>{srScanErr}</div>
+                <div style={{ fontSize: 11, color: "#64748b", marginTop: 8 }}>You can dismiss this and try again, or check the Netlify function logs for more detail.</div>
+              </div>
+            )}
+
+            {/* RESULTS */}
+            {srStep === "results" && srResult && (
+              <div>
+                <div style={{ backgroundColor: "#022c22", border: "1px solid #22c55e", borderRadius: 10, padding: 14, marginBottom: 16, textAlign: "center" }}>
+                  <div style={{ fontSize: 22 }}>🏆</div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: "#f8fafc", marginTop: 4 }}>{srResult.round.course_name}</div>
+                  <div style={{ fontSize: 12, color: "#22c55e", fontWeight: 600 }}>{GAME_TYPES[srResult.round.game_type]?.label} · Scanned Round</div>
+                </div>
+                {srResult.lb.map((p, i) => (
+                  <div key={p.id} style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 10, padding: "12px 14px", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: i === 0 ? "#f59e0b" : "#475569", width: 24 }}>{i+1}</div>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: "#f8fafc" }}>{p.name}</div>
+                        <div style={{ fontSize: 11, color: "#64748b" }}>HCP {p.handicap} · {p.holesPlayed} holes</div>
+                      </div>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontSize: 15, fontWeight: 800, color: "#22c55e" }}>
+                        {srResult.round.game_type === "stableford" ? p.total + " pts"
+                          : srResult.round.game_type === "matchplay" || srResult.round.game_type === "matchplay_teams" ? p.total + " holes"
+                          : formatToPar(p.toPar)}
+                      </div>
+                      <div style={{ fontSize: 11, color: "#64748b" }}>{p.grossTotal} gross</div>
+                    </div>
+                  </div>
+                ))}
+                <button style={{ ...S.btnSecondary, marginTop: 16 }} onClick={srReset}>Start New Scan</button>
+              </div>
+            )}
+
+            {/* SETUP */}
+            {srStep === "setup" && (
+              <div>
+                <h3 style={S.stepTitle}>Scanned Round Setup</h3>
+                <div style={{ fontSize: 12, color: "#64748b", marginBottom: 16 }}>Scan physical scorecards and simulate a completed round.</div>
+
+                <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Game Mode</div>
+                {SR_GAME_TYPES.map((gt) => (
+                  <button key={gt} onClick={() => setSrGameType(gt)} style={{ width: "100%", textAlign: "left", backgroundColor: srGameType === gt ? "#022c22" : "#1e293b", border: srGameType === gt ? "1px solid #22c55e" : "1px solid #334155", borderRadius: 10, padding: "10px 14px", marginBottom: 8, cursor: "pointer", fontFamily: "inherit" }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: srGameType === gt ? "#22c55e" : "#f8fafc" }}>{GAME_TYPES[gt]?.label}</div>
+                    <div style={{ fontSize: 11, color: "#64748b" }}>{GAME_TYPES[gt]?.description}</div>
+                  </button>
+                ))}
+
+                <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginTop: 16, marginBottom: 8 }}>Course</div>
+                {!srCourse ? (
+                  <div style={{ maxHeight: 200, overflowY: "auto", border: "1px solid #334155", borderRadius: 10, backgroundColor: "#1e293b" }}>
+                    {saCourses.map((c) => (
+                      <button key={c.id} onClick={() => setSrCourse(c)} style={{ width: "100%", textAlign: "left", background: "none", border: "none", borderBottom: "1px solid #334155", padding: "10px 14px", cursor: "pointer", fontFamily: "inherit" }}>
+                        <div style={{ fontSize: 13, color: "#f8fafc" }}>{c.name}</div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ backgroundColor: "#022c22", border: "1px solid #22c55e", borderRadius: 10, padding: "10px 14px", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#22c55e" }}>{srCourse.name}</div>
+                    <button onClick={() => setSrCourse(null)} style={{ background: "none", border: "none", color: "#64748b", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>Change</button>
+                  </div>
+                )}
+
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 16, marginBottom: 20, backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 10, padding: "12px 14px" }}>
+                  <div style={{ fontSize: 13, color: "#f8fafc", fontWeight: 600 }}>Apply Handicaps</div>
+                  <button onClick={() => setSrUseHandicap(!srUseHandicap)} style={{ width: 44, height: 24, borderRadius: 12, backgroundColor: srUseHandicap ? "#22c55e" : "#334155", border: "none", cursor: "pointer", position: "relative", transition: "background 0.2s" }}>
+                    <div style={{ width: 20, height: 20, borderRadius: "50%", backgroundColor: "#fff", position: "absolute", top: 2, left: srUseHandicap ? 22 : 2, transition: "left 0.2s" }} />
+                  </button>
+                </div>
+
+                <button style={{ ...S.btnPrimary, opacity: srCourse ? 1 : 0.4 }} disabled={!srCourse} onClick={() => setSrStep("scan")}>
+                  Next: Scan Players
+                </button>
+              </div>
+            )}
+
+            {/* SCAN - add players */}
+            {srStep === "scan" && (
+              <div>
+                <h3 style={S.stepTitle}>Scan Player Cards</h3>
+                <div style={{ fontSize: 12, color: "#64748b", marginBottom: 12 }}>{srCourse?.name} · {GAME_TYPES[srGameType]?.label}</div>
+
+                {srPlayers.length > 0 && (
+                  <div style={{ marginBottom: 16 }}>
+                    {srPlayers.map((p, i) => (
+                      <div key={p.tempId} style={{ backgroundColor: "#1e293b", border: "1px solid #22c55e", borderRadius: 10, padding: "10px 14px", marginBottom: 6, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: "#f8fafc" }}>{p.name}</div>
+                          <div style={{ fontSize: 11, color: "#64748b" }}>HCP {p.handicap} · {p.scores.filter(s => s.score && s.score !== "").length} holes</div>
+                        </div>
+                        <button onClick={() => setSrPlayers(prev => prev.filter(x => x.tempId !== p.tempId))} style={{ background: "none", border: "1px solid #334155", borderRadius: 6, color: "#ef4444", fontSize: 10, fontWeight: 600, padding: "4px 8px", cursor: "pointer", fontFamily: "inherit" }}>Remove</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {srScanErr && <div style={{ fontSize: 12, color: "#ef4444", marginBottom: 8 }}>{srScanErr}</div>}
+
+                <button onClick={() => { setSrScanErr(""); srFileInputRef.current?.click(); }} disabled={srScanning} style={{ width: "100%", backgroundColor: "#1e293b", border: "2px dashed #22c55e", borderRadius: 10, padding: "14px", fontSize: 13, fontWeight: 700, color: srScanning ? "#475569" : "#22c55e", cursor: srScanning ? "not-allowed" : "pointer", fontFamily: "inherit", marginBottom: 12 }}>
+                  {srScanning ? "📷 Reading card..." : "📷 Scan Next Player Card"}
+                </button>
+
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button style={{ ...S.btnSecondary, flex: 1, marginTop: 0 }} onClick={() => setSrStep("setup")}>Back</button>
+                  {srPlayers.length > 0 && (
+                    srGameType === "matchplay_teams" && !srNeedTeams ? (
+                      <button style={{ ...S.btnPrimary, flex: 1 }} onClick={() => setSrNeedTeams(true)}>Assign Teams</button>
+                    ) : srGameType === "matchplay_teams" && srNeedTeams ? (
+                      <button style={{ ...S.btnPrimary, flex: 1 }} onClick={handleSrPublish} disabled={srPublishing}>{srPublishing ? "Publishing..." : "Publish Round"}</button>
+                    ) : (
+                      <button style={{ ...S.btnPrimary, flex: 1 }} onClick={handleSrPublish} disabled={srPublishing}>{srPublishing ? "Publishing..." : "Publish Round"}</button>
+                    )
+                  )}
+                </div>
+
+                {srGameType === "matchplay_teams" && srNeedTeams && (
+                  <div style={{ marginTop: 16 }}>
+                    <div style={{ fontSize: 12, color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 }}>Assign Teams</div>
+                    {srPlayers.map((p) => (
+                      <div key={p.tempId} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 10, padding: "10px 14px", marginBottom: 8 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "#f8fafc" }}>{p.name}</div>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          {["A","B"].map((team) => (
+                            <button key={team} onClick={() => setSrTeams(prev => ({...prev, [p.tempId]: team}))} style={{ padding: "6px 14px", borderRadius: 8, border: "none", backgroundColor: srTeams[p.tempId] === team ? "#22c55e" : "#334155", color: srTeams[p.tempId] === team ? "#0f172a" : "#94a3b8", fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>{team}</button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    <button style={S.btnPrimary} onClick={handleSrPublish} disabled={srPublishing}>{srPublishing ? "Publishing..." : "Publish Round"}</button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* CONFIRM NAME */}
+            {srStep === "confirm-name" && (
+              <div>
+                <h3 style={S.stepTitle}>Confirm Player Name</h3>
+                <div style={{ fontSize: 12, color: "#64748b", marginBottom: 16 }}>Claude read this name from the card. Edit if needed.</div>
+                <input style={{ ...S.input, fontSize: 16, fontWeight: 700, marginBottom: 16 }} value={srEditName} onChange={(e) => setSrEditName(e.target.value)} placeholder="Enter player name" autoFocus />
+                <button style={S.btnPrimary} onClick={() => setSrStep("confirm-hcp")}>Confirm Name</button>
+                <button style={S.btnSecondary} onClick={() => setSrStep("scan")}>Cancel</button>
+              </div>
+            )}
+
+            {/* CONFIRM HCP */}
+            {srStep === "confirm-hcp" && (
+              <div>
+                <h3 style={S.stepTitle}>Confirm Handicap</h3>
+                <div style={{ fontSize: 12, color: "#64748b", marginBottom: 8 }}>Player: <strong style={{ color: "#f8fafc" }}>{srEditName}</strong></div>
+                <div style={{ fontSize: 12, color: "#64748b", marginBottom: 16 }}>Edit if the handicap looks wrong.</div>
+                <input style={{ ...S.input, fontSize: 16, fontWeight: 700, marginBottom: 16 }} value={srEditHcp} onChange={(e) => setSrEditHcp(e.target.value)} placeholder="Handicap (e.g. 14)" type="number" autoFocus />
+                <button style={S.btnPrimary} onClick={() => setSrStep("confirm-scores")}>Confirm Handicap</button>
+                <button style={S.btnSecondary} onClick={() => setSrStep("confirm-name")}>Back</button>
+              </div>
+            )}
+
+            {/* CONFIRM SCORES */}
+            {srStep === "confirm-scores" && (
+              <div>
+                <h3 style={S.stepTitle}>Confirm Scores</h3>
+                <div style={{ fontSize: 12, color: "#64748b", marginBottom: 12 }}>{srEditName} · HCP {srEditHcp} · Tap any score to edit</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
+                  {[srEditScores.slice(0,9), srEditScores.slice(9,18)].map((nine, ni) => (
+                    <div key={ni} style={{ backgroundColor: "#0f172a", border: "2px solid #334155", borderRadius: 10, padding: 10 }}>
+                      <div style={{ fontSize: 10, fontWeight: 800, color: ni === 0 ? "#22c55e" : "#3b82f6", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8, textAlign: "center" }}>{ni === 0 ? "Front 9" : "Back 9"}</div>
+                      {nine.map((hs, idx) => {
+                        const holeIdx = ni * 9 + idx;
+                        const courseHole = srCourse?.holes?.find(h => h.hole_number === hs.hole_number);
+                        return (
+                          <div key={hs.hole_number} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                            <div style={{ fontSize: 11, color: "#64748b" }}>H{hs.hole_number} <span style={{ color: "#475569" }}>p{courseHole?.par || "-"}</span></div>
+                            <input
+                              style={{ width: 40, backgroundColor: hs.score ? "#22c55e" : "#1e293b", border: "1px solid #334155", borderRadius: 6, color: hs.score ? "#0f172a" : "#94a3b8", fontSize: 13, fontWeight: 700, textAlign: "center", padding: "4px 0", fontFamily: "inherit", outline: "none" }}
+                              value={hs.score}
+                              onChange={(e) => { const updated = [...srEditScores]; updated[holeIdx] = { ...updated[holeIdx], score: e.target.value }; setSrEditScores(updated); }}
+                              type="number" min="1" max="15"
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+                <button style={S.btnPrimary} onClick={() => {
+                  const player = { tempId: genId(), name: srEditName.trim(), handicap: parseFloat(srEditHcp) || 0, scores: srEditScores };
+                  setSrPlayers(prev => [...prev, player]);
+                  setSrEditName(""); setSrEditHcp(""); setSrEditScores(Array.from({length:18},(_,i)=>({hole_number:i+1,score:""})));
+                  setSrCurrentScan(null); setSrStep("scan");
+                }}>Add Player + Scan Next</button>
+                <button style={{ ...S.btnPrimary, backgroundColor: "#0f172a", border: "1px solid #22c55e", color: "#22c55e", marginTop: 8 }} onClick={() => {
+                  const player = { tempId: genId(), name: srEditName.trim(), handicap: parseFloat(srEditHcp) || 0, scores: srEditScores };
+                  const allPlayers = [...srPlayers, player];
+                  setSrPlayers(allPlayers);
+                  setSrEditName(""); setSrEditHcp(""); setSrEditScores(Array.from({length:18},(_,i)=>({hole_number:i+1,score:""})));
+                  setSrCurrentScan(null);
+                  if (srGameType === "matchplay_teams") { setSrNeedTeams(true); setSrStep("scan"); }
+                  else handleSrPublishWithPlayers(allPlayers);
+                }}>{srPublishing ? "Publishing..." : "Publish Round"}</button>
+                <button style={S.btnSecondary} onClick={() => setSrStep("confirm-hcp")}>Back</button>
               </div>
             )}
           </div>
