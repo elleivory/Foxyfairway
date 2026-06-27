@@ -1040,7 +1040,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.32</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.33</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={shareApp} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", backdropFilter: "blur(4px)" }}>SHARE</button>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
@@ -3193,7 +3193,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <div style={S.lbHoles}>{p.holesPlayed}/18</div>
-                    {!isSpectator && me?.name === round.created_by && p.id !== me?.id && scores.filter(s => s.score > 0).length === 0 && (
+                    {!isSpectator && (me?.name === round.created_by || round.is_scanned) && p.id !== me?.id && (round.is_scanned || scores.filter(s => s.score > 0).length === 0) && (
                       <>
                         <span onClick={() => { setEditingPlayerId(p.id); setEditPlayerName(p.name?.replace(" (Guest)", "") || p.name); setEditPlayerHcp(String(p.handicap)); }} style={{ fontSize: 12, cursor: "pointer", padding: "2px 4px" }}>✏️</span>
                         <span onClick={async () => { await supabase.from("players").delete().eq("id", p.id); refresh(); }} style={{ fontSize: 12, cursor: "pointer", color: "#ef4444", padding: "2px 4px", fontWeight: 700, fontSize: 14 }}>✕</span>
@@ -3494,6 +3494,14 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
   const [activeHole, setActiveHole] = useState(1);
   const [showChat, setShowChat] = useState(false);
   const [unreadChat, setUnreadChat] = useState(0);
+  const [showGameAdmin, setShowGameAdmin] = useState(false);
+  const [gameAdminCode, setGameAdminCode] = useState("");
+  const [gameAdminAuthed, setGameAdminAuthed] = useState(false);
+  const [gameAdminTab, setGameAdminTab] = useState("scores");
+  const [adminEditScores, setAdminEditScores] = useState({});
+  const [adminEditHoles, setAdminEditHoles] = useState([]);
+  const [adminSaving, setAdminSaving] = useState(false);
+  const [adminMsg, setAdminMsg] = useState("");
   const [lastMsgCount, setLastMsgCount] = useState(0);
   const [initialBankerId, setInitialBankerId] = useState(null);
   const [currentBankerId, setCurrentBankerId] = useState(null);
@@ -3716,7 +3724,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
       if (round.game_type !== "banker") {
         // Auto-advance based on local device scores only - don't wait for other devices
         // Only round creator has guests to score; other devices advance immediately
-        const myGuests = me.name === round.created_by
+        const myGuests = (me.name === round.created_by || round.is_scanned)
           ? others.filter((p) => p.name?.endsWith("(Guest)"))
           : [];
         const allLocalGuestsScored = myGuests.every((g) =>
@@ -3740,7 +3748,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
 
   const tryAdvanceHole = (holeNum, updatedGuestScores) => {
     if (round.game_type === "banker" || holeNum >= 18) return;
-    const myGuests = me.name === round.created_by
+    const myGuests = (me.name === round.created_by || round.is_scanned)
       ? others.filter((p) => p.name?.endsWith("(Guest)"))
       : [];
     const myScored = myScores[holeNum] > 0;
@@ -3850,13 +3858,168 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
       <div style={S.header}>
         <button style={S.backBtn} onClick={onViewDashboard}>← Back</button>
         <h2 style={S.headerTitle}>Enter Score</h2>
-        <button onClick={() => { setShowChat(true); setUnreadChat(0); }}
-          style={{ position: "relative", backgroundColor: "#1e293b", color: "#e2e8f0", border: "1px solid #334155", borderRadius: 10, padding: "10px 16px", fontSize: 16, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-          💬
-          {unreadChat > 0 && <span style={{ position: "absolute", top: -6, right: -6, backgroundColor: "#ef4444", color: "#fff", borderRadius: "50%", width: 20, height: 20, fontSize: 10, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", animation: "pulse 1s infinite", boxShadow: "0 0 0 3px rgba(239,68,68,0.3)" }}>{unreadChat}</span>}
-        </button>
+        <div style={{ display: "flex", gap: 6 }}>
+          {!isSpectator && <button onClick={() => { setShowGameAdmin(true); setGameAdminCode(""); setGameAdminAuthed(false); setAdminMsg(""); }} style={{ backgroundColor: "#1e293b", color: "#f59e0b", border: "1px solid #f59e0b", borderRadius: 10, padding: "10px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>⚙️</button>}
+          <button onClick={() => { setShowChat(true); setUnreadChat(0); }}
+            style={{ position: "relative", backgroundColor: "#1e293b", color: "#e2e8f0", border: "1px solid #334155", borderRadius: 10, padding: "10px 16px", fontSize: 16, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+            💬
+            {unreadChat > 0 && <span style={{ position: "absolute", top: -6, right: -6, backgroundColor: "#ef4444", color: "#fff", borderRadius: "50%", width: 20, height: 20, fontSize: 10, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", animation: "pulse 1s infinite", boxShadow: "0 0 0 3px rgba(239,68,68,0.3)" }}>{unreadChat}</span>}
+          </button>
+        </div>
       </div>
       {showChat && <ChatPanel round={round} me={me} onClose={() => { setShowChat(false); setUnreadChat(0); }} isSpectator={isSpectator} />}
+
+      {/* IN-GAME ADMIN PANEL */}
+      {showGameAdmin && (
+        <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.85)", zIndex: 100, display: "flex", flexDirection: "column" }}>
+          <div style={{ backgroundColor: "#0f172a", borderBottom: "1px solid #334155", padding: "calc(env(safe-area-inset-top,44px) + 8px) 16px 12px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: "#f8fafc" }}>⚙️ Game Admin</div>
+            <button onClick={() => { setShowGameAdmin(false); setGameAdminAuthed(false); setAdminMsg(""); }} style={{ background: "none", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: "6px 12px", fontFamily: "inherit" }}>Close</button>
+          </div>
+
+          {!gameAdminAuthed ? (
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 32 }}>
+              <div style={{ fontSize: 14, color: "#94a3b8", marginBottom: 16 }}>Enter admin code to continue</div>
+              <input
+                style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "14px 16px", color: "#f8fafc", fontSize: 22, fontWeight: 800, textAlign: "center", letterSpacing: 6, width: "100%", maxWidth: 260, outline: "none", fontFamily: "inherit", marginBottom: 16 }}
+                type="password" placeholder="••••" value={gameAdminCode}
+                onChange={(e) => setGameAdminCode(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter" && (gameAdminCode === "CH" || gameAdminCode === "CH24")) { setGameAdminAuthed(true); setAdminEditHoles(JSON.parse(JSON.stringify(round.holes || []))); const sc = {}; allScores.forEach(s => { if (!sc[s.player_id]) sc[s.player_id] = {}; sc[s.player_id][s.hole_number] = s.score; }); setAdminEditScores(sc); } }}
+              />
+              <button onClick={() => { if (gameAdminCode === "CH" || gameAdminCode === "CH24") { setGameAdminAuthed(true); setAdminEditHoles(JSON.parse(JSON.stringify(round.holes || []))); const sc = {}; allScores.forEach(s => { if (!sc[s.player_id]) sc[s.player_id] = {}; sc[s.player_id][s.hole_number] = s.score; }); setAdminEditScores(sc); } else { setAdminMsg("Incorrect code"); } }}
+                style={{ backgroundColor: "#22c55e", color: "#0f172a", border: "none", borderRadius: 12, padding: "14px 32px", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", width: "100%", maxWidth: 260 }}>
+                Enter
+              </button>
+              {adminMsg && <div style={{ color: "#ef4444", fontSize: 13, marginTop: 10 }}>{adminMsg}</div>}
+            </div>
+          ) : (
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+              {/* Tabs */}
+              <div style={{ display: "flex", gap: 6, padding: "10px 16px", backgroundColor: "#0f172a" }}>
+                {[["scores","Scores"],["pars","Pars"],["indexes","Indexes"]].map(([key,label]) => (
+                  <button key={key} onClick={() => setGameAdminTab(key)} style={{ flex: 1, padding: "8px 4px", borderRadius: 8, border: "none", backgroundColor: gameAdminTab === key ? "#22c55e" : "#1e293b", color: gameAdminTab === key ? "#0f172a" : "#94a3b8", fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>{label}</button>
+                ))}
+              </div>
+
+              <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
+                {adminMsg && <div style={{ backgroundColor: "#022c22", border: "1px solid #22c55e", borderRadius: 8, padding: "10px 14px", marginBottom: 12, color: "#22c55e", fontSize: 13 }}>{adminMsg}</div>}
+
+                {/* SCORES TAB */}
+                {gameAdminTab === "scores" && (
+                  <div>
+                    <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 12 }}>Tap any score to edit. Changes save to this round only.</div>
+                    {[...others, me].map((player) => (
+                      <div key={player.id} style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: 12, marginBottom: 12 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "#22c55e", marginBottom: 8 }}>{player.name} <span style={{ color: "#475569", fontWeight: 400 }}>HCP {player.handicap}</span></div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                          {[holes.slice(0,9), holes.slice(9,18)].map((nine, ni) => (
+                            <div key={ni} style={{ backgroundColor: "#0f172a", borderRadius: 8, padding: 8 }}>
+                              <div style={{ fontSize: 9, fontWeight: 800, color: ni === 0 ? "#22c55e" : "#3b82f6", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6, textAlign: "center" }}>{ni === 0 ? "Front" : "Back"}</div>
+                              {nine.map((h) => (
+                                <div key={h.hole_number} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                                  <div style={{ fontSize: 10, color: "#475569" }}>H{h.hole_number} p{h.par}</div>
+                                  <input
+                                    style={{ width: 38, backgroundColor: adminEditScores[player.id]?.[h.hole_number] ? "#22c55e" : "#1e293b", border: "1px solid #334155", borderRadius: 6, color: adminEditScores[player.id]?.[h.hole_number] ? "#0f172a" : "#94a3b8", fontSize: 12, fontWeight: 700, textAlign: "center", padding: "3px 0", fontFamily: "inherit", outline: "none" }}
+                                    type="number" min="1" max="15"
+                                    value={adminEditScores[player.id]?.[h.hole_number] || ""}
+                                    onChange={(e) => { const v = parseInt(e.target.value); setAdminEditScores(prev => ({ ...prev, [player.id]: { ...(prev[player.id]||{}), [h.hole_number]: v||"" } })); }}
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    <button disabled={adminSaving} onClick={async () => {
+                      setAdminSaving(true); setAdminMsg("");
+                      try {
+                        for (const [playerId, holeMap] of Object.entries(adminEditScores)) {
+                          for (const [holeNum, score] of Object.entries(holeMap)) {
+                            if (score && parseInt(score) > 0) {
+                              const obj = { player_id: playerId, hole_number: parseInt(holeNum), score: parseInt(score), round_id: round.id };
+                              await dbSaveScore(obj);
+                            }
+                          }
+                        }
+                        const fresh = await dbGetScores(round.id);
+                        setAllScores(fresh);
+                        setAdminMsg("Scores saved!");
+                        setTimeout(() => setAdminMsg(""), 2000);
+                      } catch(e) { setAdminMsg("Error: " + e.message); }
+                      setAdminSaving(false);
+                    }} style={{ ...{ backgroundColor: "#22c55e", color: "#0f172a", border: "none", borderRadius: 12, padding: "14px", fontSize: 15, fontWeight: 700, cursor: "pointer", width: "100%", fontFamily: "inherit" }, opacity: adminSaving ? 0.6 : 1 }}>
+                      {adminSaving ? "Saving..." : "Save All Scores"}
+                    </button>
+                  </div>
+                )}
+
+                {/* PARS TAB */}
+                {gameAdminTab === "pars" && (
+                  <div>
+                    <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 12 }}>Change par for any hole. This round only.</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
+                      {adminEditHoles.map((h, i) => (
+                        <div key={h.hole_number} style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 10, padding: "10px 12px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                          <div style={{ fontSize: 13, color: "#f8fafc", fontWeight: 600 }}>Hole {h.hole_number}</div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <button onClick={() => { const u=[...adminEditHoles]; u[i]={...u[i],par:Math.max(3,u[i].par-1)}; setAdminEditHoles(u); }} style={{ width:28,height:28,borderRadius:6,border:"1px solid #334155",backgroundColor:"#0f172a",color:"#f8fafc",fontSize:16,fontWeight:700,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center" }}>-</button>
+                            <div style={{ fontSize:16,fontWeight:800,color:"#22c55e",width:20,textAlign:"center" }}>{h.par}</div>
+                            <button onClick={() => { const u=[...adminEditHoles]; u[i]={...u[i],par:Math.min(6,u[i].par+1)}; setAdminEditHoles(u); }} style={{ width:28,height:28,borderRadius:6,border:"1px solid #334155",backgroundColor:"#0f172a",color:"#f8fafc",fontSize:16,fontWeight:700,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center" }}>+</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <button disabled={adminSaving} onClick={async () => {
+                      setAdminSaving(true); setAdminMsg("");
+                      try {
+                        await supabase.from("rounds").update({ holes: adminEditHoles }).eq("id", round.id);
+                        round.holes = adminEditHoles;
+                        setAdminMsg("Pars updated for this round!");
+                        setTimeout(() => setAdminMsg(""), 2000);
+                      } catch(e) { setAdminMsg("Error: " + e.message); }
+                      setAdminSaving(false);
+                    }} style={{ backgroundColor: "#22c55e", color: "#0f172a", border: "none", borderRadius: 12, padding: "14px", fontSize: 15, fontWeight: 700, cursor: "pointer", width: "100%", fontFamily: "inherit", opacity: adminSaving ? 0.6 : 1 }}>
+                      {adminSaving ? "Saving..." : "Save Pars"}
+                    </button>
+                  </div>
+                )}
+
+                {/* INDEXES TAB */}
+                {gameAdminTab === "indexes" && (
+                  <div>
+                    <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 12 }}>Change stroke index for any hole. This round only.</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
+                      {adminEditHoles.map((h, i) => (
+                        <div key={h.hole_number} style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 10, padding: "10px 12px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                          <div style={{ fontSize: 13, color: "#f8fafc", fontWeight: 600 }}>Hole {h.hole_number}</div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <button onClick={() => { const u=[...adminEditHoles]; u[i]={...u[i],stroke_index:Math.max(1,u[i].stroke_index-1)}; setAdminEditHoles(u); }} style={{ width:28,height:28,borderRadius:6,border:"1px solid #334155",backgroundColor:"#0f172a",color:"#f8fafc",fontSize:16,fontWeight:700,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center" }}>-</button>
+                            <div style={{ fontSize:16,fontWeight:800,color:"#f59e0b",width:24,textAlign:"center" }}>{h.stroke_index}</div>
+                            <button onClick={() => { const u=[...adminEditHoles]; u[i]={...u[i],stroke_index:Math.min(18,u[i].stroke_index+1)}; setAdminEditHoles(u); }} style={{ width:28,height:28,borderRadius:6,border:"1px solid #334155",backgroundColor:"#0f172a",color:"#f8fafc",fontSize:16,fontWeight:700,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center" }}>+</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <button disabled={adminSaving} onClick={async () => {
+                      setAdminSaving(true); setAdminMsg("");
+                      try {
+                        await supabase.from("rounds").update({ holes: adminEditHoles }).eq("id", round.id);
+                        round.holes = adminEditHoles;
+                        setAdminMsg("Indexes updated for this round!");
+                        setTimeout(() => setAdminMsg(""), 2000);
+                      } catch(e) { setAdminMsg("Error: " + e.message); }
+                      setAdminSaving(false);
+                    }} style={{ backgroundColor: "#22c55e", color: "#0f172a", border: "none", borderRadius: 12, padding: "14px", fontSize: 15, fontWeight: 700, cursor: "pointer", width: "100%", fontFamily: "inherit", opacity: adminSaving ? 0.6 : 1 }}>
+                      {adminSaving ? "Saving..." : "Save Indexes"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Hole nav - master scroll, drives all score rows */}
       <div style={{ backgroundColor: "#1e293b", borderBottom: "1px solid #334155", padding: "10px 16px" }}>
@@ -4205,8 +4368,8 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
               onChange={(e) => e.target.value && saveScore(activeHole, parseInt(e.target.value))} />
           </div>}
 
-          {/* Guest player score rows - only shown to round creator AND only after banker accepts bets */}
-          {me.name === round.created_by && others.filter((p) => p.name?.endsWith("(Guest)")).map((guest) => {
+          {/* Guest player score rows - shown to round creator or in scanned rounds */}
+          {(me.name === round.created_by || round.is_scanned) && others.filter((p) => p.name?.endsWith("(Guest)")).map((guest) => {
             if (round.game_type === "banker") {
               const thisBankerNow = activeHole === 1 ? initialBankerId : currentBankerId;
               const betsOpen = betsAcceptedRef.current[activeHole] || allScores.some((s) => s.player_id === thisBankerNow && s.hole_number === activeHole && s.hole_pot > 0);
