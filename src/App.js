@@ -552,7 +552,18 @@ async function dbSaveScore(obj) {
 
 async function dbGetCourses() {
   const { data } = await supabase.from("courses").select("*").order("name");
-  return data || [];
+  const allCourses = data || [];
+  // One-time cleanup: remove from Supabase any courses previously only marked deleted in localStorage
+  const localDeletedIds = getDeletedCourseIds();
+  if (localDeletedIds.length > 0) {
+    const toDelete = allCourses.filter(c => localDeletedIds.includes(c.id));
+    for (const c of toDelete) {
+      await supabase.from("courses").delete().eq("id", c.id);
+    }
+    localStorage.removeItem("ff_deleted_courses");
+    return allCourses.filter(c => !localDeletedIds.includes(c.id));
+  }
+  return allCourses;
 }
 
 async function dbSaveCourse(course) {
@@ -1029,7 +1040,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.31</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.32</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={shareApp} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", backdropFilter: "blur(4px)" }}>SHARE</button>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
@@ -1607,15 +1618,15 @@ function SuperAdminScreen({ onLogout, onEnterRound }) {
         <h2 style={S.headerTitle}>Super Admin</h2>
         <div style={{ ...S.adminBadge, backgroundColor: "#ef4444" }}>SUPER</div>
       </div>
-      <div style={{ borderBottom: "1px solid #334155" }}>
-        <div style={{ display: "flex", borderBottom: "1px solid #1e293b" }}>
-          {[["rounds","Rounds"],["players","Players"],["blocked","Blocked"],["scanned","⛳ Scan Game"]].map(([key,label]) => (
-            <button key={key} style={{ flex: 1, padding: "10px 0", background: "none", border: "none", color: tab === key ? "#22c55e" : "#64748b", fontWeight: tab === key ? 700 : 400, fontSize: 11, cursor: "pointer", borderBottom: tab === key ? "2px solid #22c55e" : "none", fontFamily: "inherit" }} onClick={() => setTab(key)}>{label}</button>
+      <div style={{ padding: "12px 16px 0", backgroundColor: "#0f172a" }}>
+        <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+          {[["rounds","Rounds"],["players","Players"],["blocked","Blocked"],["scanned","⛳ Scan"]].map(([key,label]) => (
+            <button key={key} onClick={() => setTab(key)} style={{ flex: 1, padding: "8px 4px", borderRadius: 8, border: "none", backgroundColor: tab === key ? "#22c55e" : "#1e293b", color: tab === key ? "#0f172a" : "#94a3b8", fontWeight: 700, fontSize: 10, cursor: "pointer", fontFamily: "inherit", outline: "none" }}>{label}</button>
           ))}
         </div>
-        <div style={{ display: "flex" }}>
+        <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
           {[["tournaments","Tournaments"],["courses","Courses"],["stats","Stats"]].map(([key,label]) => (
-            <button key={key} style={{ flex: 1, padding: "10px 0", background: "none", border: "none", color: tab === key ? "#22c55e" : "#64748b", fontWeight: tab === key ? 700 : 400, fontSize: 11, cursor: "pointer", borderBottom: tab === key ? "2px solid #22c55e" : "none", fontFamily: "inherit" }} onClick={() => setTab(key)}>{label}</button>
+            <button key={key} onClick={() => setTab(key)} style={{ flex: 1, padding: "8px 4px", borderRadius: 8, border: "none", backgroundColor: tab === key ? "#22c55e" : "#1e293b", color: tab === key ? "#0f172a" : "#94a3b8", fontWeight: 700, fontSize: 10, cursor: "pointer", fontFamily: "inherit", outline: "none" }}>{label}</button>
           ))}
         </div>
       </div>
@@ -1625,13 +1636,13 @@ function SuperAdminScreen({ onLogout, onEnterRound }) {
 
         {tab === "rounds" && !loading && (
           <div>
-            <div style={{ fontSize: 13, color: "#64748b", marginBottom: 16 }}>{rounds.length} total rounds</div>
+            <div style={{ fontSize: 13, color: "#f8fafc", fontWeight: 600, marginBottom: 16 }}>{rounds.length} total rounds</div>
             {rounds.map((r) => (
               <div key={r.id} style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 10, padding: "12px 14px", marginBottom: 8 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 14, fontWeight: 600, color: "#f8fafc" }}>{r.course_name}</div>
-                    <div style={{ fontSize: 11, color: "#64748b" }}>{r.code} · {GAME_TYPES[r.game_type]?.label} · {new Date(r.created_at).toLocaleDateString("en-NZ")}</div>
+                    <div style={{ fontSize: 11, color: "#94a3b8" }}>{r.code} · {GAME_TYPES[r.game_type]?.label} · {new Date(r.created_at).toLocaleDateString("en-NZ")}</div>
                   </div>
                   <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                     <button style={{ ...S.smallBtn, color: "#22c55e", borderColor: "#22c55e" }} onClick={() => { navigator.clipboard.writeText(window.location.origin + "?join=" + r.code); setMsg("Join link copied for " + r.code); setTimeout(() => setMsg(""), 2000); }}>Share</button>
@@ -1874,7 +1885,7 @@ function SuperAdminScreen({ onLogout, onEnterRound }) {
             {srStep === "setup" && (
               <div>
                 <h3 style={S.stepTitle}>Scanned Round Setup</h3>
-                <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 16 }}>Scan physical scorecards and simulate a completed round.</div>
+                <div style={{ fontSize: 12, color: "#f8fafc", marginBottom: 16 }}>Scan physical scorecards and simulate a completed round.</div>
 
                 <div style={{ fontSize: 11, color: "#f8fafc", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>Game Mode</div>
                 {SR_GAME_TYPES.map((gt) => (
@@ -1917,7 +1928,7 @@ function SuperAdminScreen({ onLogout, onEnterRound }) {
             {srStep === "scan" && (
               <div>
                 <h3 style={S.stepTitle}>Scan Player Cards</h3>
-                <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 12 }}>{srCourse?.name} · {GAME_TYPES[srGameType]?.label}</div>
+                <div style={{ fontSize: 12, color: "#f8fafc", marginBottom: 12 }}>{srCourse?.name} · {GAME_TYPES[srGameType]?.label}</div>
 
                 {srPlayers.length > 0 && (
                   <div style={{ marginBottom: 16 }}>
@@ -2069,7 +2080,7 @@ function SuperAdminScreen({ onLogout, onEnterRound }) {
                 { label: "Most Popular", value: rounds.reduce((acc, r) => { acc[r.course_name] = (acc[r.course_name] || 0) + 1; return acc; }, {}) && Object.entries(rounds.reduce((acc, r) => { acc[r.course_name] = (acc[r.course_name] || 0) + 1; return acc; }, {})).sort((a, b) => b[1] - a[1])[0]?.[0]?.split(" ")[0] || "—" },
               ].map((s) => (
                 <div key={s.label} style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 10, padding: "14px" }}>
-                  <div style={{ fontSize: 11, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>{s.label}</div>
+                  <div style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>{s.label}</div>
                   <div style={{ fontSize: 24, fontWeight: 800, color: "#22c55e" }}>{s.value}</div>
                 </div>
               ))}
@@ -2975,6 +2986,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
         </div>
         <div style={{ display: "flex", gap: 8, padding: "0 16px 10px" }}>
           {!isSpectator && <button style={{ flex: 1, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 11, fontWeight: 600, cursor: "pointer", padding: "8px 4px", fontFamily: "inherit" }} onClick={() => { saveRoundToHistory(round, players, scores, holes); alert("Round saved!"); }}>💾 Save Round</button>}
+          {!isSpectator && round.is_scanned && <button style={{ flex: 1, backgroundColor: "#22c55e", border: "none", borderRadius: 8, color: "#0f172a", fontSize: 11, fontWeight: 700, cursor: "pointer", padding: "8px 4px", fontFamily: "inherit" }} onClick={() => { saveRoundToHistory(round, players, scores, holes); setShowComplete(true); }}>✅ Complete</button>}
           <button style={{ flex: 1, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 11, fontWeight: 600, cursor: "pointer", padding: "8px 4px", fontFamily: "inherit" }} onClick={async () => { try { await exportScorecardPDF(round, players, scores, holes); } catch(e) { alert("Please allow popups to export scorecard"); } }}>📄 Scorecard</button>
         </div>
       </div>
@@ -2998,7 +3010,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
         </div>
         <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
           <button style={{ ...S.btnPrimary, flex: 1, fontSize: 17, marginBottom: 0 }} onClick={onViewScorecard}>⛳ Live Scoring</button>
-          {me?.name === round.created_by && !isSpectator && <button onClick={() => setShowAddGuest(true)} style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, color: "#94a3b8", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", padding: "0 14px", flexShrink: 0 }}>+ Guest</button>}
+          {!isSpectator && (me?.name === round.created_by || round.is_scanned) && <button onClick={() => setShowAddGuest(true)} style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, color: "#94a3b8", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", padding: "0 14px", flexShrink: 0 }}>+ Guest</button>}
         </div>
 
         {/* Link to Tournament - creator only, not spectator */}
@@ -5142,7 +5154,7 @@ const S = {
   logoWrap: { textAlign: "center", marginBottom: 48 },
   logoIcon: { fontSize: 64, display: "block", marginBottom: 12 },
   appTitle: { fontSize: 42, fontWeight: 800, margin: 0, letterSpacing: "-1px", color: "#f8fafc" },
-  tagline: { fontSize: 16, color: "#64748b", margin: "8px 0 0" },
+  tagline: { fontSize: 16, color: "#94a3b8", margin: "8px 0 0" },
   homeButtons: { width: "100%", maxWidth: 320, display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 },
   adminLink: { background: "none", border: "none", color: "#64748b", fontSize: 12, cursor: "pointer", padding: 0, textDecoration: "underline", fontFamily: "inherit" },
   header: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 20px 16px", backgroundColor: "#1e293b", borderBottom: "1px solid #334155", position: "sticky", top: 0, zIndex: 10 },
