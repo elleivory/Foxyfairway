@@ -8,7 +8,7 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const ADMIN_CODE = "CH";
-const SUPER_ADMIN_CODE = "CH24";
+const SUPER_ADMIN_CODE = "ch24";
 
 const GAME_TYPES = {
   stroke:          { label: "Stroke Play",     description: "Lowest total score wins" },
@@ -348,7 +348,7 @@ async function dbGetRound(code) {
 }
 
 async function dbCreatePlayer(data) {
-  const row = { id: genId(), ...data };
+  const row = { id: genId(), device_id: getDeviceId(), ...data };
   const { data: result, error } = await supabase.from("players").insert([row]).select().single();
   if (error) throw error;
   return result;
@@ -461,10 +461,12 @@ async function dbGetRoundHistory(playerName) {
   const deviceId = getDeviceId();
   const { data } = await supabase.from("saved_rounds").select("*").order("created_at", { ascending: false });
   if (!data) return [];
-  // Filter by device ID first, fall back to name match for rounds saved before device ID was added
   return data.filter((r) => {
-    if (r.device_id && r.device_id !== deviceId) return false;
-    return r.data?.players?.some((p) => p.name?.toLowerCase() === playerName?.toLowerCase());
+    // Primary: match by device ID
+    if (r.device_id && r.device_id === deviceId) return true;
+    // Fallback: match by player name for rounds saved before device ID was added
+    if (!r.device_id && playerName && r.data?.players?.some((p) => p.name?.toLowerCase() === playerName?.toLowerCase())) return true;
+    return false;
   }).map((r) => r.data);
 }
 
@@ -834,6 +836,7 @@ function exportScorecardImage(round, players, scores, holes) {
 // HOME SCREEN
 // =============================================================================
 function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, onRejoin, lastRound, savedRounds, onViewHistory, onViewTournaments }) {
+  const [showShareModal, setShowShareModal] = useState(false);
   const shareApp = () => {
     if (navigator.share) {
       navigator.share({ title: "Foxy Fairways", text: "Golf scoring app", url: "https://foxyfairway.netlify.app" }).catch(() => {});
@@ -854,9 +857,8 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.35</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.36</span>
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={shareApp} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", backdropFilter: "blur(4px)" }}>SHARE</button>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
           </div>
         </div>
@@ -897,20 +899,41 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
           {/* Spacer */}
           <div style={{ flex: 1, minHeight: 20 }} />
 
-          {/* Four small bottom buttons */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
+          {/* Five small bottom buttons */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr", gap: 6, marginBottom: 8 }}>
             {[
               { label: "Join", icon: "\uD83E\uDD1D", action: onJoinRound },
               { label: "Watch", icon: "\uD83D\uDC40", action: onWatchRound },
               { label: "Past Rounds", icon: "\uD83D\uDCCB", action: onViewHistory },
               { label: "Tournaments", icon: "\uD83C\uDFC6", action: onViewTournaments },
+              { label: "Share App", icon: "\uD83D\uDCE4", action: () => setShowShareModal(true) },
             ].map((btn) => (
-              <button key={btn.label} onClick={btn.action} style={{ background: "rgba(30,41,59,0.7)", border: "1px solid rgba(51,65,85,0.8)", borderRadius: 10, color: "#94a3b8", fontSize: 10, fontWeight: 600, padding: "10px 4px 8px", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, fontFamily: "inherit", backdropFilter: "blur(8px)" }}>
-                <span style={{ fontSize: 16 }}>{btn.icon}</span>
-                <span style={{ fontSize: 9, textAlign: "center", lineHeight: 1.2 }}>{btn.label}</span>
+              <button key={btn.label} onClick={btn.action} style={{ background: "rgba(30,41,59,0.7)", border: "1px solid rgba(51,65,85,0.8)", borderRadius: 10, color: "#94a3b8", fontSize: 10, fontWeight: 600, padding: "10px 2px 8px", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, fontFamily: "inherit", backdropFilter: "blur(8px)" }}>
+                <span style={{ fontSize: 15 }}>{btn.icon}</span>
+                <span style={{ fontSize: 8, textAlign: "center", lineHeight: 1.2 }}>{btn.label}</span>
               </button>
             ))}
           </div>
+
+          {/* Share App Modal */}
+          {showShareModal && (
+            <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.8)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+              <div style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 16, padding: 24, width: "100%", maxWidth: 320, textAlign: "center" }}>
+                <div style={{ fontSize: 16, fontWeight: 800, color: "#f8fafc", marginBottom: 4 }}>Share Foxy Fairways</div>
+                <div style={{ fontSize: 12, color: "#64748b", marginBottom: 16 }}>Invite friends to join the app</div>
+                <div style={{ backgroundColor: "#fff", borderRadius: 12, padding: 12, marginBottom: 16, display: "inline-block" }}>
+                  <QRCodeSVG value="https://foxyfairway.netlify.app" size={160} />
+                </div>
+                <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 16 }}>foxyfairway.netlify.app</div>
+                <button onClick={shareApp} style={{ width: "100%", backgroundColor: "#22c55e", color: "#0f172a", border: "none", borderRadius: 12, padding: "12px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", marginBottom: 8 }}>
+                  📤 Share Link
+                </button>
+                <button onClick={() => setShowShareModal(false)} style={{ width: "100%", backgroundColor: "transparent", color: "#64748b", border: "1px solid #334155", borderRadius: 12, padding: "10px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                  Close
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -1456,7 +1479,7 @@ function SuperAdminScreen({ onLogout, onEnterRound }) {
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 14, fontWeight: 600, color: "#f8fafc" }}>{r.course_name}</div>
-                    <div style={{ fontSize: 11, color: "#94a3b8" }}>{r.code} · {GAME_TYPES[r.game_type]?.label} · {new Date(r.created_at).toLocaleDateString("en-NZ")}</div>
+                    <div style={{ fontSize: 11, color: "#94a3b8" }}>{r.code} · {GAME_TYPES[r.game_type]?.label} · {new Date(r.created_at).toLocaleDateString("en-NZ")} {new Date(r.created_at).toLocaleTimeString("en-NZ", { hour: "2-digit", minute: "2-digit" })}{r.created_by ? " · " + r.created_by : ""}</div>
                   </div>
                   <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                     <button style={{ ...S.smallBtn, color: "#22c55e", borderColor: "#22c55e" }} onClick={() => { navigator.clipboard.writeText(window.location.origin + "?join=" + r.code); setMsg("Join link copied for " + r.code); setTimeout(() => setMsg(""), 2000); }}>Share</button>
@@ -2287,7 +2310,7 @@ function TournamentScreen({ onBack }) {
         {loadingTournaments ? (
           <div style={S.empty}>Loading tournaments...</div>
         ) : tournaments.length === 0 && !creating ? (
-          <div style={S.empty}>No tournaments yet. Create one to track a season!</div>
+          <div style={{ ...S.empty, color: "#f8fafc" }}>No tournaments yet. Create one to track a season!</div>
         ) : (
           tournaments.map((t) => (
             <button key={t.id} style={{ ...S.courseCard, marginBottom: 8, width: "100%" }} onClick={() => setViewing(t)}>
@@ -2644,7 +2667,7 @@ function WatchRoundScreen({ onBack, onWatch, prefillCode }) {
       <div style={S.content}>
         <div style={S.stepWrap}>
           <h3 style={S.stepTitle}>Enter round code</h3>
-          <p style={S.hint}>Ask the round creator for the 6-letter code.</p>
+          <p style={{ ...S.hint, color: "#f8fafc" }}>Ask the round creator for the 6-letter code.</p>
           <input style={{ ...S.input, ...S.codeInput }} placeholder="ABC123" value={code}
             onChange={(e) => setCode(e.target.value.toUpperCase())} maxLength={6} />
           {err && <p style={S.error}>{err}</p>}
@@ -3703,9 +3726,9 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
                 style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "14px 16px", color: "#f8fafc", fontSize: 22, fontWeight: 800, textAlign: "center", letterSpacing: 6, width: "100%", maxWidth: 260, outline: "none", fontFamily: "inherit", marginBottom: 16 }}
                 type="password" placeholder="••••" value={gameAdminCode}
                 onChange={(e) => setGameAdminCode(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter" && (gameAdminCode === "CH" || gameAdminCode === "CH24")) { setGameAdminAuthed(true); setAdminEditHoles(JSON.parse(JSON.stringify(round.holes || []))); const sc = {}; allScores.forEach(s => { if (!sc[s.player_id]) sc[s.player_id] = {}; sc[s.player_id][s.hole_number] = s.score; }); setAdminEditScores(sc); } }}
+                onKeyDown={(e) => { if (e.key === "Enter" && (gameAdminCode === "CH" || gameAdminCode === "ch24")) { setGameAdminAuthed(true); setAdminEditHoles(JSON.parse(JSON.stringify(round.holes || []))); const sc = {}; allScores.forEach(s => { if (!sc[s.player_id]) sc[s.player_id] = {}; sc[s.player_id][s.hole_number] = s.score; }); setAdminEditScores(sc); } }}
               />
-              <button onClick={() => { if (gameAdminCode === "CH" || gameAdminCode === "CH24") { setGameAdminAuthed(true); setAdminEditHoles(JSON.parse(JSON.stringify(round.holes || []))); const sc = {}; allScores.forEach(s => { if (!sc[s.player_id]) sc[s.player_id] = {}; sc[s.player_id][s.hole_number] = s.score; }); setAdminEditScores(sc); } else { setAdminMsg("Incorrect code"); } }}
+              <button onClick={() => { if (gameAdminCode === "CH" || gameAdminCode === "ch24") { setGameAdminAuthed(true); setAdminEditHoles(JSON.parse(JSON.stringify(round.holes || []))); const sc = {}; allScores.forEach(s => { if (!sc[s.player_id]) sc[s.player_id] = {}; sc[s.player_id][s.hole_number] = s.score; }); setAdminEditScores(sc); } else { setAdminMsg("Incorrect code"); } }}
                 style={{ backgroundColor: "#22c55e", color: "#0f172a", border: "none", borderRadius: 12, padding: "14px 32px", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", width: "100%", maxWidth: 260 }}>
                 Enter
               </button>
@@ -5114,9 +5137,28 @@ function PastRoundsScreen({ onBack, onViewRound }) {
                     </div>
                   ))}
                 </div>
-                <button style={{ ...S.btnSecondary, marginTop: 0, padding: "10px", fontSize: 13 }} onClick={() => onViewRound(r)}>
-                  View Scorecard
-                </button>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button style={{ ...S.btnSecondary, marginTop: 0, padding: "10px", fontSize: 13, flex: 1 }} onClick={() => onViewRound(r)}>
+                    View Scorecard
+                  </button>
+                  {r.code && (
+                    <button style={{ flex: 1, backgroundColor: "#22c55e", color: "#0f172a", border: "none", borderRadius: 12, padding: "10px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+                      onClick={async () => {
+                        try {
+                          const fullRound = await dbGetRound(r.code);
+                          const profile = getPlayerProfile();
+                          const existing = profile.name ? await dbFindPlayerByName(fullRound.id, profile.name) : null;
+                          if (existing) {
+                            onViewRound({ ...r, _rejoinPlayer: existing, _rejoinRound: fullRound });
+                          } else {
+                            window.location.href = window.location.origin + "?join=" + r.code;
+                          }
+                        } catch(e) { alert("Could not rejoin round. Try joining with the code " + r.code); }
+                      }}>
+                      Rejoin →
+                    </button>
+                  )}
+                </div>
               </div>
             );
           })
