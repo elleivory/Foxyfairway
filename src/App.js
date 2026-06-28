@@ -3458,14 +3458,6 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
                 ))}
               </div>
             </div>
-          ) : (
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 32, textAlign: "center" }}>
-              <div style={{ fontSize: 40, marginBottom: 16 }}>🏌️</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: "#f8fafc", marginBottom: 8 }}>Need to make a change?</div>
-              <div style={{ fontSize: 14, color: "#94a3b8", lineHeight: 1.6 }}>
-                This round was created by <span style={{ color: "#22c55e", fontWeight: 700 }}>{round.created_by}</span>. Contact them to make any changes to the round.
-              </div>
-            </div>
           )}
         </div>
       )}
