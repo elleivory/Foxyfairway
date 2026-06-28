@@ -895,7 +895,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.37</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.40</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
           </div>
@@ -2515,10 +2515,10 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
                 <button onClick={() => setShowAddCourse(true)} style={{ width: "100%", backgroundColor: "#1e293b", border: "1px dashed #334155", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 700, color: "#64748b", cursor: "pointer", fontFamily: "inherit", marginBottom: 8 }}>
                   + Add a Course Manually
                 </button>
-                <button onClick={() => { setCrScanErr(""); crFileInputRef.current?.click(); }} disabled={crScanning} style={{ width: "100%", backgroundColor: "#022c22", border: "2px dashed #22c55e", borderRadius: 10, padding: "12px", fontSize: 13, fontWeight: 700, color: crScanning ? "#475569" : "#22c55e", cursor: crScanning ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
-                  {crScanning ? "📷 Reading scorecard..." : "📷 Scan a Scorecard to Add Course"}
+                <button onClick={() => { setCrScanErr(""); crFileInputRef.current?.click(); }} disabled={crScanning} style={{ width: "100%", backgroundColor: "#022c22", border: "2px dashed #22c55e", borderRadius: 10, padding: "12px 12px 10px", cursor: crScanning ? "not-allowed" : "pointer", fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: crScanning ? "#475569" : "#22c55e" }}>{crScanning ? "📷 Reading scorecard..." : "📷 Scan a Scorecard to Add Course"}</span>
+                  {!crScanning && <span style={{ fontSize: 11, color: "#94a3b8" }}>Take a photo of a physical card or screenshot from online</span>}
                 </button>
-                <div style={{ fontSize: 11, color: "#64748b", textAlign: "center", marginTop: 6 }}>Take a photo of a physical card or screenshot from online</div>
               </div>
             )}
 
@@ -2842,6 +2842,8 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
   const [players, setPlayers] = useState([]), [scores, setScores] = useState([]), [showShare, setShowShare] = useState(false), [showSpectatorQR, setShowSpectatorQR] = useState(false);
   const [showComplete, setShowComplete] = useState(false);
   const [showAddGuest, setShowAddGuest] = useState(false);
+  const [showDashAdmin, setShowDashAdmin] = useState(false);
+  const isCreator = me?.name === round.created_by;
   const [guestName, setGuestName] = useState(""), [guestHcp, setGuestHcp] = useState(""), [guestTeam, setGuestTeam] = useState("A"), [addingGuest, setAddingGuest] = useState(false);
   const [editingPlayerId, setEditingPlayerId] = useState(null);
   const [editPlayerName, setEditPlayerName] = useState("");
@@ -2891,7 +2893,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
             <div style={{ fontSize: 15, fontWeight: 700, color: "#f8fafc" }}>{round.course_name}</div>
             <div style={{ fontSize: 11, color: "#64748b" }}>{GAME_TYPES[round.game_type]?.label}{round.use_handicap === false ? " · Scratch" : ""} · {me?.name} (HCP {me?.handicap})</div>
           </div>
-          <button onClick={() => setShowShare(true)} style={{ backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 11, fontWeight: 600, cursor: "pointer", padding: "8px 10px", fontFamily: "inherit", flexShrink: 0, opacity: 0 }} disabled>🔗</button>
+          <button onClick={() => setShowDashAdmin(true)} style={{ backgroundColor: "#0f172a", border: "1px solid #f59e0b", borderRadius: 8, color: "#f59e0b", fontSize: 13, fontWeight: 700, cursor: "pointer", padding: "8px 10px", fontFamily: "inherit", flexShrink: 0 }}>⚙️</button>
         </div>
         <div style={{ display: "flex", gap: 8, padding: "0 16px 10px" }}>
           {!isSpectator && <button style={{ flex: 1, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 11, fontWeight: 600, cursor: "pointer", padding: "8px 4px", fontFamily: "inherit" }} onClick={() => { saveRoundToHistory(round, players, scores, holes); alert("Round saved!"); }}>💾 Save Round</button>}
@@ -3245,6 +3247,82 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
             onDismiss={() => { setShowComplete(false); completeDismissedRef.current = true; }} />
         )}
 
+      {/* DASHBOARD ADMIN PANEL */}
+      {showDashAdmin && (
+        <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.85)", zIndex: 100, display: "flex", flexDirection: "column" }}>
+          <div style={{ backgroundColor: "#0f172a", borderBottom: "1px solid #334155", padding: "calc(env(safe-area-inset-top,44px) + 8px) 16px 12px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: "#f8fafc" }}>⚙️ Round Admin</div>
+            <button onClick={() => setShowDashAdmin(false)} style={{ background: "none", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: "6px 12px", fontFamily: "inherit" }}>Close</button>
+          </div>
+
+          {isCreator ? (
+            <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
+              <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 16 }}>You created this round. Options below apply to this round only.</div>
+
+              {/* Add Guest */}
+              {round.game_type !== "banker" ? (
+                <div style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: 14, marginBottom: 12 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#f8fafc", marginBottom: 10 }}>➕ Add Guest Player</div>
+                  <input style={{ ...{ backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 10, padding: "12px 14px", color: "#f8fafc", fontSize: 14, width: "100%", outline: "none", fontFamily: "inherit", marginBottom: 8, boxSizing: "border-box" } }} placeholder="Guest name" value={guestName} onChange={(e) => setGuestName(e.target.value)} />
+                  {round.use_handicap !== false && <input style={{ backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 10, padding: "12px 14px", color: "#f8fafc", fontSize: 14, width: "100%", outline: "none", fontFamily: "inherit", marginBottom: 12, boxSizing: "border-box" }} type="number" placeholder="Handicap" value={guestHcp} onChange={(e) => setGuestHcp(e.target.value)} />}
+                  {round.game_type === "matchplay_teams" && (
+                    <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                      {["A","B"].map(t => <button key={t} onClick={() => setGuestTeam(t)} style={{ flex: 1, backgroundColor: guestTeam === t ? "#22c55e" : "#0f172a", color: guestTeam === t ? "#0f172a" : "#94a3b8", border: "1px solid " + (guestTeam === t ? "#22c55e" : "#334155"), borderRadius: 10, padding: "10px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Team {t}</button>)}
+                    </div>
+                  )}
+                  <button onClick={async () => {
+                    if (!guestName.trim()) return;
+                    setAddingGuest(true);
+                    try {
+                      await dbCreatePlayer({ name: guestName.trim() + " (Guest)", handicap: round.use_handicap === false ? 0 : (parseFloat(guestHcp) || 0), round_id: round.id, team: round.game_type === "matchplay_teams" ? guestTeam : null, is_placeholder: false });
+                      setGuestName(""); setGuestHcp(""); setGuestTeam("A");
+                      const p = await dbGetPlayers(round.id); setPlayers(p);
+                    } catch(e) { console.error(e); }
+                    setAddingGuest(false);
+                  }} disabled={!guestName.trim() || addingGuest} style={{ width: "100%", backgroundColor: guestName.trim() ? "#22c55e" : "#334155", color: guestName.trim() ? "#0f172a" : "#64748b", border: "none", borderRadius: 10, padding: "12px", fontSize: 14, fontWeight: 700, cursor: guestName.trim() ? "pointer" : "not-allowed", fontFamily: "inherit" }}>
+                    {addingGuest ? "Adding..." : "Add Guest"}
+                  </button>
+                </div>
+              ) : (
+                <div style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: 14, marginBottom: 12 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#f8fafc", marginBottom: 6 }}>➕ Add Guest Player</div>
+                  <div style={{ fontSize: 12, color: "#f59e0b" }}>Players cannot be added to a Banker round once it has started as it affects the bet calculations.</div>
+                </div>
+              )}
+
+              {/* Player list with remove */}
+              <div style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: 14 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#f8fafc", marginBottom: 10 }}>👥 Players in this Round</div>
+                {players.map(p => (
+                  <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid #1e293b" }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "#f8fafc" }}>{p.name}</div>
+                      <div style={{ fontSize: 11, color: "#64748b" }}>HCP {p.handicap}</div>
+                    </div>
+                    {p.id !== me?.id && (
+                      <button onClick={async () => {
+                        if (!window.confirm("Remove " + p.name + " from this round?")) return;
+                        await supabase.from("scores").delete().eq("player_id", p.id).eq("round_id", round.id);
+                        await supabase.from("players").delete().eq("id", p.id);
+                        const fresh = await dbGetPlayers(round.id); setPlayers(fresh);
+                      }} style={{ backgroundColor: "#1c0a0a", border: "1px solid #ef4444", borderRadius: 8, color: "#ef4444", fontSize: 11, fontWeight: 700, cursor: "pointer", padding: "5px 10px", fontFamily: "inherit" }}>Remove</button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 32, textAlign: "center" }}>
+              <div style={{ fontSize: 40, marginBottom: 16 }}>🏌️</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: "#f8fafc", marginBottom: 8 }}>Need to make a change?</div>
+              <div style={{ fontSize: 14, color: "#94a3b8", lineHeight: 1.6 }}>
+                This round was created by <span style={{ color: "#22c55e", fontWeight: 700 }}>{round.created_by}</span>. Contact them to make any changes to the round.
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
         {/* Live scorecards - all game modes */}
         {players.length > 0 && holes.length > 0 && (() => {
           const front9 = holes.filter((h) => h.hole_number <= 9);
@@ -3416,6 +3494,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
   const [adminEditPlayerHcp, setAdminEditPlayerHcp] = useState("");
   const [adminConfirmRemove, setAdminConfirmRemove] = useState(null);
   const [lastMsgCount, setLastMsgCount] = useState(0);
+  const [showCustomFor, setShowCustomFor] = useState(null); // player id or "me"
   const [initialBankerId, setInitialBankerId] = useState(null);
   const [currentBankerId, setCurrentBankerId] = useState(null);
   const [pendingBets, setPendingBets] = useState({}); // unsubmitted bet amounts
@@ -3768,9 +3847,14 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
 
   return (
     <BgScreen bg={BG_OTHER}>
-      <div style={S.header}>
+      <div style={{ ...S.header, position: "sticky", top: 0, zIndex: 30, backgroundColor: "#1e293b", borderBottom: "1px solid #334155" }}>
         <button style={S.backBtn} onClick={onViewDashboard}>← Back</button>
-        <h2 style={S.headerTitle}>Enter Score</h2>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 18, fontWeight: 900, color: "#f8fafc", lineHeight: 1 }}>
+            {curHole ? "Hole " + curHole.hole_number : "Enter Score"}
+          </div>
+          {curHole && <div style={{ fontSize: 11, color: "#64748b", marginTop: 1 }}>SI {curHole.stroke_index} · Par {curHole.par}</div>}
+        </div>
         <div style={{ display: "flex", gap: 6 }}>
           <button onClick={() => { setShowGameAdmin(true); setGameAdminCode(""); setGameAdminAuthed(false); setAdminMsg(""); }} style={{ backgroundColor: "#1e293b", color: "#f59e0b", border: "1px solid #f59e0b", borderRadius: 10, padding: "10px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>⚙️</button>
           <button onClick={() => { setShowChat(true); setUnreadChat(0); }}
@@ -4011,7 +4095,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
       )}
 
       {/* Hole nav - master scroll, drives all score rows */}
-      <div style={{ backgroundColor: "#1e293b", borderBottom: "1px solid #334155", padding: "10px 16px" }}>
+      <div style={{ backgroundColor: "#1e293b", borderBottom: "1px solid #334155", padding: "10px 16px", position: "sticky", top: 0, zIndex: 20 }}>
         <div id="ff-master-scroll" style={S.holeNav} onScroll={(e) => {
           document.querySelectorAll(".ff-slave-scroll").forEach((el) => { if (el !== e.target) el.scrollLeft = e.target.scrollLeft; });
         }}>
@@ -4045,7 +4129,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
       </div>
 
       {curHole && (
-        <div style={S.holeCard}>
+        <div style={{ ...S.holeCard, position: "sticky", top: 61, zIndex: 19 }}>
           <div style={S.holeTop}>
             <div>
               <div style={S.holeNum}>Hole {curHole.hole_number}</div>
@@ -4324,78 +4408,76 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
             const isLocked = round.game_type === "banker" && (!betsAccepted || (!iAmBkr && !myBetConfirmedLocal));
             return (
               <div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 2px 6px" }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: "#22c55e", textTransform: "uppercase", letterSpacing: 0.5 }}>{me.name} (You){hcpS > 0 ? " +" + hcpS : ""}</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    {myScores[activeHole] && <span style={{ fontSize: 12, fontWeight: 700, color: "#22c55e" }}>{myScores[activeHole]} {scoreLabel(myScores[activeHole], curHole?.par)}</span>}
-                    {myScores[activeHole] && !isLocked && <button onClick={async () => { setMyScores((prev) => { const n = {...prev}; delete n[activeHole]; return n; }); try { await supabase.from("scores").delete().eq("player_id", me.id).eq("hole_number", activeHole).eq("round_id", round.id); } catch(e) { console.error(e); } }} style={{ fontSize: 10, fontWeight: 700, color: "#ef4444", background: "none", border: "1px solid #ef4444", borderRadius: 6, padding: "2px 7px", cursor: "pointer", fontFamily: "inherit" }}>Clear</button>}
-                  </div>
-                </div>
-                <div style={S.scoreRow}>
-                  {[curHole.par - 1, curHole.par, curHole.par + 1, curHole.par + 2, curHole.par + 3].map((s) => (
-                    <button key={s} onClick={() => !isLocked && saveScore(activeHole, s)}
-                      style={{ ...S.scoreBtn,
-                      backgroundColor: isLocked ? "#0f172a" : myScores[activeHole] === s ? "#22c55e" : "#ffffff",
-                      color: isLocked ? "#2d3f5a" : myScores[activeHole] === s ? "#0f172a" : "#0f172a",
-                      border: "none", opacity: isLocked ? 0.4 : 1,
-                      cursor: isLocked ? "not-allowed" : "pointer",
-                      boxShadow: !isLocked ? "0 2px 4px rgba(0,0,0,0.3)" : "none" }}>
-                      <span style={S.scoreBtnNum}>{s}</span>
-                      <span style={{ ...S.scoreBtnLabel, color: isLocked ? "#2d3f5a" : myScores[activeHole] === s ? "#065f46" : "#475569" }}>{scoreLabel(s, curHole.par)}</span>
-                    </button>
-                  ))}
-                </div>
+                {/* COMPACT SCORE ROWS - me first, then guests, all non-banker */}
+                {[{ player: me, isMe: true }, ...(me.name === round.created_by || round.is_scanned ? others.filter(p => p.name?.endsWith("(Guest)")) : []).map(g => ({ player: g, isMe: false }))].map(({ player, isMe }) => {
+                  const pScore = isMe ? myScores[activeHole] : ((guestScores[player.id] || {})[activeHole] || allScores.find(s => s.player_id === player.id && s.hole_number === activeHole)?.score);
+                  const pHcpS = curHole ? getHcpStrokes(player.handicap, curHole.stroke_index) : 0;
+                  const shortName = player.name.replace(" (Guest)", "").split(" ")[0].toUpperCase();
+                  const customVal = isMe
+                    ? (pScore && ![curHole.par-1,curHole.par,curHole.par+1,curHole.par+2,curHole.par+3].includes(pScore) ? String(pScore) : "")
+                    : (guestCustomScores[player.id] || (pScore && ![curHole.par-1,curHole.par,curHole.par+1,curHole.par+2,curHole.par+3].includes(pScore) ? String(pScore) : ""));
+                  return (
+                    <div key={player.id} style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 0", borderBottom: "1px solid #0f172a" }}>
+                      <div style={{ width: 44, flexShrink: 0 }}>
+                        <div style={{ fontSize: 10, fontWeight: 800, color: isMe ? "#22c55e" : "#94a3b8", lineHeight: 1.2 }}>{shortName}{isMe ? "" : ""}</div>
+                        {pHcpS > 0 && <div style={{ fontSize: 8, color: "#475569" }}>+{pHcpS}</div>}
+                      </div>
+                      <div style={{ display: "flex", gap: 3, flex: 1 }}>
+                        {[curHole.par-1,curHole.par,curHole.par+1,curHole.par+2,curHole.par+3].map(s => (
+                          <button key={s} onClick={() => {
+                            if (isMe) { if (!isLocked) saveScore(activeHole, s); }
+                            else { saveGuestScore(player, activeHole, s); setGuestCustomScores(prev => ({...prev, [player.id]: ""})); }
+                          }} style={{ flex: 1, backgroundColor: pScore === s ? "#22c55e" : "#f8fafc", color: "#0f172a", border: "none", borderRadius: 8, padding: "7px 1px 5px", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, opacity: isMe && isLocked ? 0.4 : 1 }}>
+                            <span style={{ fontSize: 16, fontWeight: 900, lineHeight: 1 }}>{s}</span>
+                            <span style={{ fontSize: 7, fontWeight: 600, textTransform: "uppercase", color: pScore === s ? "#065f46" : "#475569" }}>{scoreLabel(s, curHole.par)}</span>
+                          </button>
+                        ))}
+                      </div>
+                      <button onClick={() => setShowCustomFor(isMe ? "me" : player.id)} style={{ width: 30, height: 40, flexShrink: 0, backgroundColor: customVal ? "#0f172a" : "#1e293b", border: customVal ? "1px solid #22c55e" : "1px solid #334155", borderRadius: 8, color: customVal ? "#22c55e" : "#64748b", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
+                        {customVal || "···"}
+                      </button>
+                      <div style={{ width: 28, flexShrink: 0, textAlign: "right" }}>
+                        {pScore ? <span style={{ fontSize: 10, fontWeight: 700, color: "#22c55e" }}>{scoreLabel(pScore, curHole?.par)}</span> : <span style={{ fontSize: 12, color: "#334155" }}>—</span>}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             );
           })()}
           </div>
 
-          {!isSpectator && <div style={S.customScore}>
-            <span style={S.customLabel}>Other score</span>
-            <input style={S.customInput} type="number" min="1" max="15" placeholder="—"
-              value={myScores[activeHole] && ![curHole.par-1,curHole.par,curHole.par+1,curHole.par+2,curHole.par+3].includes(myScores[activeHole]) ? myScores[activeHole] : ""}
-              onChange={(e) => e.target.value && saveScore(activeHole, parseInt(e.target.value))} />
-          </div>}
-
-          {/* Guest player score rows - shown to round creator or in scanned rounds */}
-          {(me.name === round.created_by || round.is_scanned) && others.filter((p) => p.name?.endsWith("(Guest)")).map((guest) => {
-            if (round.game_type === "banker") {
-              const thisBankerNow = activeHole === 1 ? initialBankerId : currentBankerId;
-              const betsOpen = betsAcceptedRef.current[activeHole] || allScores.some((s) => s.player_id === thisBankerNow && s.hole_number === activeHole && s.hole_pot > 0);
-              if (!betsOpen) return null;
-            }
-            const gHcpS = curHole ? getHcpStrokes(guest.handicap, curHole.stroke_index) : 0;
-            const gScore = (guestScores[guest.id] || {})[activeHole] || allScores.find((s) => s.player_id === guest.id && s.hole_number === activeHole)?.score;
-            return (
-              <div key={guest.id} style={{ marginBottom: 12, backgroundColor: "#0f2233", border: "1px solid #1e3a5f", borderRadius: 12, padding: "10px 12px" }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 2px 6px" }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5 }}>{guest.name}{gHcpS > 0 ? " +" + gHcpS : ""}</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    {gScore && <span style={{ fontSize: 12, fontWeight: 700, color: "#22c55e" }}>{gScore} {scoreLabel(gScore, curHole?.par)}</span>}
-                    {gScore && <button onClick={async () => { setGuestScores((prev) => { const n = {...prev}; if (n[guest.id]) { const nh = {...n[guest.id]}; delete nh[activeHole]; n[guest.id] = nh; } return n; }); try { await supabase.from("scores").delete().eq("player_id", guest.id).eq("hole_number", activeHole).eq("round_id", round.id); } catch(e) { console.error(e); } }} style={{ fontSize: 10, fontWeight: 700, color: "#ef4444", background: "none", border: "1px solid #ef4444", borderRadius: 6, padding: "2px 7px", cursor: "pointer", fontFamily: "inherit" }}>Clear</button>}
-                  </div>
+          {/* Custom score modal */}
+          {showCustomFor && curHole && (
+            <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.7)", zIndex: 50, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+              <div style={{ backgroundColor: "#1e293b", borderRadius: "16px 16px 0 0", padding: 20, width: "100%", maxWidth: 480 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: "#f8fafc", marginBottom: 4 }}>
+                  Custom Score — {showCustomFor === "me" ? me.name : others.find(p => p.id === showCustomFor)?.name?.replace(" (Guest)", "")}
                 </div>
-                <div style={S.scoreRow}>
-                  {curHole && [curHole.par - 1, curHole.par, curHole.par + 1, curHole.par + 2, curHole.par + 3].map((s) => (
-                    <button key={s} onClick={() => { saveGuestScore(guest, activeHole, s); setGuestCustomScores((prev) => ({ ...prev, [guest.id]: "" })); }}
-                      style={{ ...S.scoreBtn,
-                        backgroundColor: gScore === s ? "#22c55e" : "#ffffff",
-                        color: "#0f172a",
-                        border: "none", boxShadow: "0 2px 4px rgba(0,0,0,0.3)" }}>
-                      <span style={S.scoreBtnNum}>{s}</span>
-                      <span style={{ ...S.scoreBtnLabel, color: gScore === s ? "#065f46" : "#475569" }}>{scoreLabel(s, curHole.par)}</span>
-                    </button>
-                  ))}
-                </div>
-                <div style={S.customScore}>
-                  <span style={S.customLabel}>Other score</span>
-                  <input style={S.customInput} type="number" min="1" max="15" placeholder="—"
-                    value={guestCustomScores[guest.id] || (gScore && ![curHole.par-1,curHole.par,curHole.par+1,curHole.par+2,curHole.par+3].includes(gScore) ? gScore : "")}
-                    onChange={(e) => { const v = parseInt(e.target.value); setGuestCustomScores((prev) => ({ ...prev, [guest.id]: e.target.value })); if (v >= 1 && v <= 15) saveGuestScore(guest, activeHole, v); }} />
+                <div style={{ fontSize: 12, color: "#64748b", marginBottom: 14 }}>Hole {curHole.hole_number} · Par {curHole.par} · Enter any score</div>
+                <input autoFocus type="number" min="1" max="20" placeholder="e.g. 10"
+                  defaultValue={showCustomFor === "me"
+                    ? (myScores[activeHole] && ![curHole.par-1,curHole.par,curHole.par+1,curHole.par+2,curHole.par+3].includes(myScores[activeHole]) ? myScores[activeHole] : "")
+                    : (guestCustomScores[showCustomFor] || "")}
+                  id="customScoreInput"
+                  style={{ width: "100%", backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 12, padding: 14, color: "#f8fafc", fontSize: 28, fontWeight: 800, textAlign: "center", outline: "none", marginBottom: 12, fontFamily: "inherit" }} />
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={() => setShowCustomFor(null)} style={{ flex: 1, backgroundColor: "transparent", color: "#64748b", border: "1px solid #334155", borderRadius: 12, padding: "14px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+                  <button onClick={() => {
+                    const val = parseInt(document.getElementById("customScoreInput").value);
+                    if (val >= 1 && val <= 20) {
+                      if (showCustomFor === "me") { saveScore(activeHole, val); }
+                      else {
+                        const guest = others.find(p => p.id === showCustomFor);
+                        if (guest) { saveGuestScore(guest, activeHole, val); setGuestCustomScores(prev => ({...prev, [showCustomFor]: String(val)})); }
+                      }
+                    }
+                    setShowCustomFor(null);
+                  }} style={{ flex: 2, backgroundColor: "#22c55e", color: "#0f172a", border: "none", borderRadius: 12, padding: "14px", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Confirm Score</button>
                 </div>
               </div>
-            );
-          })}
+            </div>
+          )}
 
           <div style={S.scoreInfoBoxes}>
             {/* Combined Course Info row */}
