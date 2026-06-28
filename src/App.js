@@ -895,7 +895,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.40</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.41</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
           </div>
@@ -2891,7 +2891,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
           <button style={S.backBtn} onClick={() => { if (isSpectator || window.confirm("Exit round? It stays saved.")) onBack(); }}>← Back</button>
           <div style={{ flex: 1, textAlign: "center" }}>
             <div style={{ fontSize: 15, fontWeight: 700, color: "#f8fafc" }}>{round.course_name}</div>
-            <div style={{ fontSize: 11, color: "#64748b" }}>{GAME_TYPES[round.game_type]?.label}{round.use_handicap === false ? " · Scratch" : ""} · {me?.name} (HCP {me?.handicap})</div>
+            <div style={{ fontSize: 11, color: "#f8fafc" }}>{GAME_TYPES[round.game_type]?.label}{round.use_handicap === false ? " · Scratch" : ""} · {me?.name} (HCP {me?.handicap})</div>
           </div>
           <button onClick={() => setShowDashAdmin(true)} style={{ backgroundColor: "#0f172a", border: "1px solid #f59e0b", borderRadius: 8, color: "#f59e0b", fontSize: 13, fontWeight: 700, cursor: "pointer", padding: "8px 10px", fontFamily: "inherit", flexShrink: 0 }}>⚙️</button>
         </div>
@@ -2928,7 +2928,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
         {me?.name === round.created_by && !isSpectator && (
           <div style={{ marginBottom: 12 }}>
             {!showTournamentLink
-              ? <button onClick={async () => { setShowTournamentLink(true); const t = await dbGetTournaments(); setLinkTournaments(t); }} style={{ background: "none", border: "none", color: "#64748b", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", padding: 0, textDecoration: "underline" }}>🏆 Link to Tournament</button>
+              ? <button onClick={async () => { setShowTournamentLink(true); const t = await dbGetTournaments(); setLinkTournaments(t); }} style={{ background: "none", border: "none", color: "#f8fafc", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", padding: 0, textDecoration: "underline" }}>🏆 Link to Tournament</button>
               : <div style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: 14 }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: "#f8fafc", marginBottom: 10 }}>Link to Tournament</div>
                   {linkSuccess
@@ -3850,10 +3850,10 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
       <div style={{ ...S.header, position: "sticky", top: 0, zIndex: 30, backgroundColor: "#1e293b", borderBottom: "1px solid #334155" }}>
         <button style={S.backBtn} onClick={onViewDashboard}>← Back</button>
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 18, fontWeight: 900, color: "#f8fafc", lineHeight: 1 }}>
-            {curHole ? "Hole " + curHole.hole_number : "Enter Score"}
+          <div style={{ fontSize: 20, fontWeight: 900, color: "#f8fafc", lineHeight: 1, letterSpacing: -0.5 }}>
+            {curHole ? "Hole " + curHole.hole_number + "  ·  Par " + curHole.par : "Enter Score"}
           </div>
-          {curHole && <div style={{ fontSize: 11, color: "#64748b", marginTop: 1 }}>SI {curHole.stroke_index} · Par {curHole.par}</div>}
+          {curHole && <div style={{ fontSize: 11, color: "#f8fafc", marginTop: 3, fontWeight: 600 }}>SI {curHole.stroke_index}</div>}
         </div>
         <div style={{ display: "flex", gap: 6 }}>
           <button onClick={() => { setShowGameAdmin(true); setGameAdminCode(""); setGameAdminAuthed(false); setAdminMsg(""); }} style={{ backgroundColor: "#1e293b", color: "#f59e0b", border: "1px solid #f59e0b", borderRadius: 10, padding: "10px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>⚙️</button>
@@ -4130,17 +4130,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
 
       {curHole && (
         <div style={{ ...S.holeCard, position: "sticky", top: 61, zIndex: 19 }}>
-          <div style={S.holeTop}>
-            <div>
-              <div style={S.holeNum}>Hole {curHole.hole_number}</div>
-              <div style={S.holeMeta}>SI {curHole.stroke_index}</div>
-              {round.game_type === "banker" && (() => {
-                const thisBankerId2 = activeHole === 1 ? initialBankerId : currentBankerId;
-                const bankerName = (isSpectator ? [...others] : [...others, me]).find((p) => p.id === thisBankerId2)?.name;
-                if (!bankerName) return null;
-                return <div style={{ fontSize: 11, color: "#f59e0b", fontWeight: 700, marginTop: 2 }}>🏦 {thisBankerId2 === me.id ? "YOU ARE BANKER" : bankerName + " is Banker"}</div>;
-              })()}
-            </div>
+          <div style={{ ...S.holeTop, justifyContent: "center" }}>
             <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
               {(() => {
                 let label, value, color;
@@ -4166,10 +4156,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
                   </div>
                 );
               })()}
-              <div style={S.parBadge}>
-                <div style={S.parNum}>Par {curHole.par}</div>
-                {hcpS > 0 && <div style={S.hcpBadge}>+{hcpS} stroke{hcpS > 1 ? "s" : ""}</div>}
-              </div>
+              {hcpS > 0 && <div style={S.parBadge}><div style={S.hcpBadge}>+{hcpS} stroke{hcpS > 1 ? "s" : ""}</div></div>}
             </div>
           </div>
 
@@ -4449,32 +4436,32 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
 
           {/* Custom score modal */}
           {showCustomFor && curHole && (
-            <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.7)", zIndex: 50, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-              <div style={{ backgroundColor: "#1e293b", borderRadius: "16px 16px 0 0", padding: 20, width: "100%", maxWidth: 480 }}>
+            <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.7)", zIndex: 50, display: "flex", alignItems: "flex-end", justifyContent: "center" }} onClick={() => setShowCustomFor(null)}>
+              <div style={{ backgroundColor: "#1e293b", borderRadius: "16px 16px 0 0", padding: 20, width: "100%", maxWidth: 480 }} onClick={e => e.stopPropagation()}>
                 <div style={{ fontSize: 15, fontWeight: 700, color: "#f8fafc", marginBottom: 4 }}>
                   Custom Score — {showCustomFor === "me" ? me.name : others.find(p => p.id === showCustomFor)?.name?.replace(" (Guest)", "")}
                 </div>
-                <div style={{ fontSize: 12, color: "#64748b", marginBottom: 14 }}>Hole {curHole.hole_number} · Par {curHole.par} · Enter any score</div>
+                <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 14 }}>Hole {curHole.hole_number} · Par {curHole.par} · Type score and press Done</div>
                 <input autoFocus type="number" min="1" max="20" placeholder="e.g. 10"
                   defaultValue={showCustomFor === "me"
                     ? (myScores[activeHole] && ![curHole.par-1,curHole.par,curHole.par+1,curHole.par+2,curHole.par+3].includes(myScores[activeHole]) ? myScores[activeHole] : "")
                     : (guestCustomScores[showCustomFor] || "")}
                   id="customScoreInput"
-                  style={{ width: "100%", backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 12, padding: 14, color: "#f8fafc", fontSize: 28, fontWeight: 800, textAlign: "center", outline: "none", marginBottom: 12, fontFamily: "inherit" }} />
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button onClick={() => setShowCustomFor(null)} style={{ flex: 1, backgroundColor: "transparent", color: "#64748b", border: "1px solid #334155", borderRadius: 12, padding: "14px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
-                  <button onClick={() => {
-                    const val = parseInt(document.getElementById("customScoreInput").value);
+                  style={{ width: "100%", backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 12, padding: 14, color: "#f8fafc", fontSize: 28, fontWeight: 800, textAlign: "center", outline: "none", marginBottom: 12, fontFamily: "inherit" }}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value);
                     if (val >= 1 && val <= 20) {
                       if (showCustomFor === "me") { saveScore(activeHole, val); }
                       else {
                         const guest = others.find(p => p.id === showCustomFor);
                         if (guest) { saveGuestScore(guest, activeHole, val); setGuestCustomScores(prev => ({...prev, [showCustomFor]: String(val)})); }
                       }
+                      setTimeout(() => setShowCustomFor(null), 300);
                     }
-                    setShowCustomFor(null);
-                  }} style={{ flex: 2, backgroundColor: "#22c55e", color: "#0f172a", border: "none", borderRadius: 12, padding: "14px", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Confirm Score</button>
-                </div>
+                  }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === "Done") setShowCustomFor(null); }}
+                />
+                <button onClick={() => setShowCustomFor(null)} style={{ width: "100%", backgroundColor: "transparent", color: "#64748b", border: "1px solid #334155", borderRadius: 12, padding: "12px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
               </div>
             </div>
           )}
@@ -4500,10 +4487,9 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
                           outline: isActive ? "1px solid #22c55e" : "none", outlineOffset: -1 }}>
                         <div style={{ fontSize: 16, fontWeight: 900, color: isActive ? "#22c55e" : "#f8fafc", lineHeight: 1 }}>{h.hole_number}</div>
                         <div style={{ width: 20, height: 1, backgroundColor: isActive ? "#22c55e" : "#334155", margin: "3px 0" }} />
-                        <div style={{ fontSize: 11, fontWeight: 700, color: isActive ? "#22c55e" : "#94a3b8", lineHeight: 1 }}>P{h.par}</div>
-                        <div style={{ fontSize: 9, fontWeight: 400, color: "#475569", lineHeight: 1.4 }}>{h.stroke_index}</div>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: isActive ? "#22c55e" : "#f8fafc", lineHeight: 1 }}>P{h.par}</div>
+                        <div style={{ fontSize: 9, fontWeight: 400, color: "#f8fafc", lineHeight: 1.4 }}>{h.stroke_index}</div>
                         {getHcpStrokes(me.handicap, h.stroke_index) > 0 && <div style={{ width: 4, height: 4, borderRadius: "50%", backgroundColor: "#f59e0b", marginTop: 1 }} />}
-                        {round.game_type === "stableford" && <div style={{ fontSize: 8, color: "#22c55e", lineHeight: 1, fontWeight: 600 }}>{2 + getHcpStrokes(me.handicap, h.stroke_index)}pt</div>}
                       </div>
                     );
                   })}
@@ -5469,7 +5455,7 @@ const S = {
   holeCard: { margin: "16px", backgroundColor: "#1e293b", borderRadius: 16, padding: "20px", border: "1px solid #334155" },
   holeTop: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 },
   holeNum: { fontSize: 24, fontWeight: 800, color: "#f8fafc" },
-  holeMeta: { fontSize: 12, color: "#64748b", marginTop: 4 },
+  holeMeta: { fontSize: 12, color: "#f8fafc", marginTop: 4 },
   parBadge: { textAlign: "right" },
   parNum: { fontSize: 20, fontWeight: 700, color: "#f8fafc" },
   hcpBadge: { fontSize: 11, color: "#0f172a", backgroundColor: "#f59e0b", borderRadius: 6, padding: "2px 6px", fontWeight: 700, marginTop: 4, display: "inline-block" },
