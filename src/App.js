@@ -895,7 +895,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.42</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.44</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
           </div>
@@ -3996,7 +3996,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
           {curHole && <div style={{ fontSize: 11, color: "#f8fafc", marginTop: 3, fontWeight: 600 }}>SI {curHole.stroke_index}</div>}
         </div>
         <div style={{ display: "flex", gap: 6 }}>
-          <button onClick={() => { setShowGameAdmin(true); setGameAdminCode(""); setAdminMsg(""); if (isScorecardCreator) { setGameAdminAuthed(true); setAdminEditHoles(JSON.parse(JSON.stringify(round.holes || []))); const sc = {}; allScores.forEach(s => { if (!sc[s.player_id]) sc[s.player_id] = {}; sc[s.player_id][s.hole_number] = s.score; }); setAdminEditScores(sc); } else { setGameAdminAuthed(false); } }} style={{ backgroundColor: "#1e293b", color: "#f59e0b", border: "1px solid #f59e0b", borderRadius: 10, padding: "10px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>⚙️</button>
+          <button onClick={() => { setShowDashAdmin(true); setGameAdminTab("scores"); setAdminMsg(""); setAdminEditHoles(JSON.parse(JSON.stringify(round.holes || []))); const sc = {}; allScores.forEach(s => { if (!sc[s.player_id]) sc[s.player_id] = {}; sc[s.player_id][s.hole_number] = s.score; }); setAdminEditScores(sc); }} style={{ backgroundColor: "#1e293b", color: "#f59e0b", border: "1px solid #f59e0b", borderRadius: 10, padding: "10px 12px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>⚙️</button>
           <button onClick={() => { setShowChat(true); setUnreadChat(0); }}
             style={{ position: "relative", backgroundColor: "#1e293b", color: "#e2e8f0", border: "1px solid #334155", borderRadius: 10, padding: "10px 16px", fontSize: 16, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
             💬
@@ -4245,7 +4245,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
       )}
 
       {/* Hole nav - master scroll, drives all score rows */}
-      <div style={{ backgroundColor: "#1e293b", borderBottom: "1px solid #334155", padding: "10px 16px", position: "sticky", top: 0, zIndex: 20 }}>
+      <div style={{ backgroundColor: "#1e293b", borderBottom: "1px solid #334155", padding: "10px 16px", position: "sticky", top: 88, zIndex: 20 }}>
         <div id="ff-master-scroll" style={S.holeNav} onScroll={(e) => {
           document.querySelectorAll(".ff-slave-scroll").forEach((el) => { if (el !== e.target) el.scrollLeft = e.target.scrollLeft; });
         }}>
@@ -4279,39 +4279,11 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
       </div>
 
       {curHole && (
-        <div style={{ ...S.holeCard, position: "sticky", top: 61, zIndex: 19 }}>
-          <div style={{ ...S.holeTop, justifyContent: "center" }}>
-            <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-              {(() => {
-                let label, value, color;
-                if (round.game_type === "stableford") {
-                  label = "Points"; value = myStablefordTotal + " pts"; color = "#22c55e";
-                } else if (round.game_type === "matchplay" || round.game_type === "matchplay_teams") {
-                  const lead = Math.floor(myMatchTotal);
-                  label = "Match"; color = lead > 0 ? "#22c55e" : "#94a3b8";
-                  value = lead === 0 ? "0 pts" : lead + (lead === 1 ? " pt" : " pts");
-                  // Add holes played context
-                } else if (round.game_type === "banker") {
-                  // Show MY running balance, not the pot
-                  label = "Balance"; 
-                  color = myBankerTotal > 0 ? "#22c55e" : myBankerTotal < 0 ? "#ef4444" : "#94a3b8";
-                  value = (myBankerTotal >= 0 ? "+$" : "-$") + Math.abs(myBankerTotal);
-                } else {
-                  label = "Gross"; value = formatToPar(myGrossTotal); color = "#e2e8f0";
-                }
-                return (
-                  <div style={{ backgroundColor: "#0f172a", border: "1px solid #475569", borderRadius: 10, padding: "8px 12px", textAlign: "center" }}>
-                    <div style={{ fontSize: 9, color: "#64748b", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 }}>{label}</div>
-                    <div style={{ fontSize: 18, fontWeight: 800, color: color || "#e2e8f0" }}>{value}</div>
-                  </div>
-                );
-              })()}
-              {hcpS > 0 && <div style={S.parBadge}><div style={S.hcpBadge}>+{hcpS} stroke{hcpS > 1 ? "s" : ""}</div></div>}
-            </div>
-          </div>
+        <div style={S.holeCard}>
 
-          {/* Player stats strip */}
-          {!isSpectator && curHole && (() => {
+
+          {/* Player stats strip - shows for all game modes */}
+          {!isSpectator && curHole && round.game_type !== "banker" && (() => {
             const myGross = Object.values(myScores).reduce((s, v) => s + (v || 0), 0);
             const myGrossPar = holes.reduce((s, h) => myScores[h.hole_number] ? s + h.par : s, 0);
             const myToPar = myGross - myGrossPar;
