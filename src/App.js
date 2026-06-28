@@ -2851,8 +2851,8 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
   const [adminMsg, setAdminMsg] = useState("");
   const [guestName, setGuestName] = useState("");
   const [guestHcp, setGuestHcp] = useState("");
+  const [guestTeam, setGuestTeam] = useState("A");
   const [addingGuest, setAddingGuest] = useState(false);
-  const [guestName, setGuestName] = useState(""), [guestHcp, setGuestHcp] = useState(""), [guestTeam, setGuestTeam] = useState("A"), [addingGuest, setAddingGuest] = useState(false);
   const [editingPlayerId, setEditingPlayerId] = useState(null);
   const [editPlayerName, setEditPlayerName] = useState("");
   const [editPlayerHcp, setEditPlayerHcp] = useState("");
