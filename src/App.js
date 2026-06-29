@@ -895,7 +895,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.44</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.45</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
           </div>
@@ -2844,6 +2844,61 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
   const [showAddGuest, setShowAddGuest] = useState(false);
   const [showDashAdmin, setShowDashAdmin] = useState(false);
   const isCreator = me?.name === round.created_by;
+
+  const askRules = async (question) => {
+    if (!question?.trim()) return;
+    setRulesLoading(true);
+    setRulesAnswer(null);
+    setRulesImages([]);
+    setRulesTab("ask");
+    try {
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 1000,
+          system: `You are an official USGA Rules of Golf expert. You ONLY answer using the official USGA Rules of Golf 2023 edition. Never reference any other rulebook, local rules, or unofficial interpretations. Always cite the specific Rule number (e.g. Rule 17.1a). Be practical and clear. If a situation is not covered by the USGA Rules, say so explicitly. At the very end of your answer, on a new line, write exactly: IMAGE_SEARCH: followed by 2-3 specific search terms that would find a relevant USGA rules diagram or golf rules illustration for this topic. Example: IMAGE_SEARCH: USGA penalty area relief options diagram`,
+          messages: [{ role: "user", content: question }]
+        })
+      });
+      const data = await response.json();
+      const fullText = data.content?.[0]?.text || "No answer received.";
+      const imageSearchMatch = fullText.match(/IMAGE_SEARCH:\s*(.+)$/m);
+      const cleanAnswer = fullText.replace(/IMAGE_SEARCH:.*$/m, "").trim();
+      setRulesAnswer(cleanAnswer);
+      if (imageSearchMatch) {
+        const searchTerms = imageSearchMatch[1].trim();
+        try {
+          const imgResponse = await fetch("https://api.anthropic.com/v1/messages", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              model: "claude-sonnet-4-6",
+              max_tokens: 200,
+              system: "You are a helpful assistant. Return ONLY a JSON array of 2 image URLs from usga.org, randa.org, or golf rules educational sites that show diagrams for the given search terms. Return only valid image URLs in a JSON array, nothing else.",
+              messages: [{ role: "user", content: "Find golf rules diagram images for: " + searchTerms }]
+            })
+          });
+          const imgData = await imgResponse.json();
+          const imgText = imgData.content?.[0]?.text || "[]";
+          try {
+            const urls = JSON.parse(imgText.replace(/```json|```/g, "").trim());
+            if (Array.isArray(urls)) setRulesImages(urls.slice(0, 2));
+          } catch {}
+        } catch {}
+      }
+    } catch(e) {
+      setRulesAnswer("Sorry, could not load rules. Please check your connection and try again.");
+    }
+    setRulesLoading(false);
+  };
+  const [showRules, setShowRules] = useState(false);
+  const [rulesTab, setRulesTab] = useState("ask");
+  const [rulesQuestion, setRulesQuestion] = useState("");
+  const [rulesAnswer, setRulesAnswer] = useState(null);
+  const [rulesLoading, setRulesLoading] = useState(false);
+  const [rulesImages, setRulesImages] = useState([]);
   const [gameAdminTab, setGameAdminTab] = useState("scores");
   const [adminEditHoles, setAdminEditHoles] = useState([]);
   const [adminEditScores, setAdminEditScores] = useState({});
@@ -2929,6 +2984,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
         </div>
         <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
           <button style={{ ...S.btnPrimary, flex: 1, fontSize: 17, marginBottom: 0 }} onClick={onViewScorecard}>⛳ Live Scoring</button>
+          <button onClick={() => setShowRules(true)} style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, color: "#f8fafc", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", padding: "0 14px", flexShrink: 0 }}>📖 Rules</button>
           {!isSpectator && (me?.name === round.created_by || round.is_scanned) && <button onClick={() => setShowAddGuest(true)} style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, color: "#94a3b8", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", padding: "0 14px", flexShrink: 0 }}>+ Guest</button>}
         </div>
 
@@ -3254,6 +3310,135 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
             onSave={() => { saveRoundToHistory(round, players, scores, holes); setShowComplete(false); completeDismissedRef.current = true; alert("Round saved!"); }}
             onDismiss={() => { setShowComplete(false); completeDismissedRef.current = true; }} />
         )}
+
+      {/* RULES PANEL */}
+      {showRules && (
+        <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.9)", zIndex: 100, display: "flex", flexDirection: "column" }}>
+          <div style={{ backgroundColor: "#0f172a", borderBottom: "1px solid #334155", padding: "calc(env(safe-area-inset-top,44px) + 8px) 16px 12px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: "#f8fafc" }}>📖 USGA Rules of Golf</div>
+            <button onClick={() => { setShowRules(false); setRulesAnswer(null); setRulesQuestion(""); setRulesImages([]); }} style={{ background: "none", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: "6px 12px", fontFamily: "inherit" }}>Close</button>
+          </div>
+
+          {/* Tabs */}
+          <div style={{ display: "flex", gap: 6, padding: "10px 16px", backgroundColor: "#0f172a" }}>
+            {[["ask","💬 Ask"],["browse","📋 Browse Rules"]].map(([key,label]) => (
+              <button key={key} onClick={() => { setRulesTab(key); setRulesAnswer(null); setRulesImages([]); }} style={{ flex: 1, padding: "10px", borderRadius: 10, border: "none", backgroundColor: rulesTab === key ? "#22c55e" : "#1e293b", color: rulesTab === key ? "#0f172a" : "#94a3b8", fontWeight: 700, fontSize: 13, cursor: "pointer", fontFamily: "inherit" }}>{label}</button>
+            ))}
+          </div>
+
+          <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
+            {/* ASK TAB */}
+            {rulesTab === "ask" && (
+              <div>
+                <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 14 }}>Ask any golf rules question. Answers are based on the official USGA Rules of Golf 2023.</div>
+                <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+                  <input
+                    style={{ flex: 1, backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "12px 14px", color: "#f8fafc", fontSize: 14, outline: "none", fontFamily: "inherit" }}
+                    placeholder="e.g. My ball is in a penalty area, what are my options?"
+                    value={rulesQuestion}
+                    onChange={(e) => setRulesQuestion(e.target.value)}
+                    onKeyDown={async (e) => { if (e.key === "Enter" && rulesQuestion.trim()) { await askRules(rulesQuestion); } }}
+                  />
+                  <button onClick={() => askRules(rulesQuestion)} disabled={!rulesQuestion.trim() || rulesLoading}
+                    style={{ backgroundColor: rulesQuestion.trim() ? "#22c55e" : "#334155", color: rulesQuestion.trim() ? "#0f172a" : "#64748b", border: "none", borderRadius: 12, padding: "12px 16px", fontSize: 14, fontWeight: 700, cursor: rulesQuestion.trim() ? "pointer" : "not-allowed", fontFamily: "inherit", flexShrink: 0 }}>
+                    {rulesLoading ? "..." : "Ask"}
+                  </button>
+                </div>
+
+                {/* Quick question chips */}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
+                  {["Ball lost, what do I do?","My ball is in a water hazard","Can I remove a loose branch near my ball?","What is stroke and distance?","Unplayable ball options","Ball on wrong green","Can I ground my club in a bunker?"].map(q => (
+                    <button key={q} onClick={() => { setRulesQuestion(q); askRules(q); }}
+                      style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 20, padding: "6px 12px", fontSize: 11, fontWeight: 600, color: "#94a3b8", cursor: "pointer", fontFamily: "inherit" }}>{q}</button>
+                  ))}
+                </div>
+
+                {rulesLoading && (
+                  <div style={{ textAlign: "center", padding: 32, color: "#22c55e", fontSize: 14, fontWeight: 600 }}>📖 Looking up the rules...</div>
+                )}
+
+                {rulesAnswer && !rulesLoading && (
+                  <div style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 14, padding: 16 }}>
+                    {rulesImages.length > 0 && (
+                      <div style={{ display: "flex", gap: 8, marginBottom: 14, overflowX: "auto" }}>
+                        {rulesImages.map((img, i) => (
+                          <img key={i} src={img} alt="Rules diagram" style={{ height: 160, borderRadius: 10, objectFit: "cover", flexShrink: 0 }} onError={(e) => e.target.style.display = "none"} />
+                        ))}
+                      </div>
+                    )}
+                    <div style={{ fontSize: 14, color: "#f8fafc", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{rulesAnswer}</div>
+                    <button onClick={() => { setRulesAnswer(null); setRulesImages([]); setRulesQuestion(""); }} style={{ marginTop: 14, background: "none", border: "1px solid #334155", borderRadius: 8, color: "#64748b", fontSize: 12, fontWeight: 600, cursor: "pointer", padding: "6px 12px", fontFamily: "inherit" }}>Ask another question</button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* BROWSE TAB */}
+            {rulesTab === "browse" && !rulesAnswer && (
+              <div>
+                <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 14 }}>Tap any rule to get a full explanation with diagrams.</div>
+                {[
+    ["Rule 1", "The Game, Player Conduct and the Rules"],
+    ["Rule 2", "The Course"],
+    ["Rule 3", "The Competition"],
+    ["Rule 4", "The Player's Equipment"],
+    ["Rule 5", "Playing the Round"],
+    ["Rule 6", "Playing a Hole"],
+    ["Rule 7", "Ball Search: Finding and Identifying Ball"],
+    ["Rule 8", "Course Played as It Is Found"],
+    ["Rule 9", "Ball Played as It Lies"],
+    ["Rule 10", "Preparing for and Making a Stroke"],
+    ["Rule 11", "Ball in Motion Accidentally Hits Person, Animal or Object"],
+    ["Rule 12", "Bunkers"],
+    ["Rule 13", "Putting Greens"],
+    ["Rule 14", "Procedures for Ball: Marking, Lifting, Cleaning, Dropping and Placing"],
+    ["Rule 15", "Relief from Loose Impediments and Movable Obstructions"],
+    ["Rule 16", "Relief from Abnormal Course Conditions"],
+    ["Rule 17", "Penalty Areas"],
+    ["Rule 18", "Stroke-and-Distance Relief, Ball Lost or Out of Bounds, Provisional Ball"],
+    ["Rule 19", "Unplayable Ball"],
+    ["Rule 20", "Resolving Rules Issues During Round"],
+    ["Rule 21", "Other Forms of Stroke Play"],
+    ["Rule 22", "Foursomes"],
+    ["Rule 23", "Four-Ball"],
+    ["Rule 24", "Team Competitions"],
+    ["Rule 25", "Modifications for Players with Disabilities"]
+  ].map(([rule, title]) => (
+                  <button key={rule} onClick={() => askRules("Explain " + rule + " of the USGA Rules of Golf: " + title + ". Include all key points, exceptions, and practical examples.")}
+                    style={{ width: "100%", textAlign: "left", backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "12px 14px", marginBottom: 8, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 800, color: "#22c55e", marginBottom: 2 }}>{rule}</div>
+                      <div style={{ fontSize: 13, color: "#f8fafc" }}>{title}</div>
+                    </div>
+                    <span style={{ color: "#334155", fontSize: 18 }}>›</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Rule answer from browse */}
+            {rulesTab === "browse" && rulesAnswer && !rulesLoading && (
+              <div>
+                <button onClick={() => { setRulesAnswer(null); setRulesImages([]); }} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: "#22c55e", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", marginBottom: 14, padding: 0 }}>‹ Back to Rules List</button>
+                <div style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 14, padding: 16 }}>
+                  {rulesImages.length > 0 && (
+                    <div style={{ display: "flex", gap: 8, marginBottom: 14, overflowX: "auto" }}>
+                      {rulesImages.map((img, i) => (
+                        <img key={i} src={img} alt="Rules diagram" style={{ height: 160, borderRadius: 10, objectFit: "cover", flexShrink: 0 }} onError={(e) => e.target.style.display = "none"} />
+                      ))}
+                    </div>
+                  )}
+                  <div style={{ fontSize: 14, color: "#f8fafc", lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{rulesAnswer}</div>
+                </div>
+              </div>
+            )}
+
+            {rulesLoading && rulesTab === "browse" && (
+              <div style={{ textAlign: "center", padding: 32, color: "#22c55e", fontSize: 14, fontWeight: 600 }}>📖 Looking up the rules...</div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* DASHBOARD ADMIN PANEL */}
       {showDashAdmin && (
