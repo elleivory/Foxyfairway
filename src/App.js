@@ -2852,41 +2852,19 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
     setRulesImages([]);
     setRulesTab("ask");
     try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
+      const response = await fetch("/.netlify/functions/ask-rules", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: 1000,
-          system: `You are an official USGA Rules of Golf expert. You ONLY answer using the official USGA Rules of Golf 2023 edition. Never reference any other rulebook, local rules, or unofficial interpretations. Always cite the specific Rule number (e.g. Rule 17.1a). Be practical and clear. If a situation is not covered by the USGA Rules, say so explicitly. At the very end of your answer, on a new line, write exactly: IMAGE_SEARCH: followed by 2-3 specific search terms that would find a relevant USGA rules diagram or golf rules illustration for this topic. Example: IMAGE_SEARCH: USGA penalty area relief options diagram`,
-          messages: [{ role: "user", content: question }]
-        })
+        body: JSON.stringify({ question: question.trim() })
       });
       const data = await response.json();
-      const fullText = data.content?.[0]?.text || "No answer received.";
-      const imageSearchMatch = fullText.match(/IMAGE_SEARCH:\s*(.+)$/m);
-      const cleanAnswer = fullText.replace(/IMAGE_SEARCH:.*$/m, "").trim();
-      setRulesAnswer(cleanAnswer);
-      if (imageSearchMatch) {
-        const searchTerms = imageSearchMatch[1].trim();
-        try {
-          const imgResponse = await fetch("https://api.anthropic.com/v1/messages", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              model: "claude-sonnet-4-6",
-              max_tokens: 200,
-              system: "You are a helpful assistant. Return ONLY a JSON array of 2 image URLs from usga.org, randa.org, or golf rules educational sites that show diagrams for the given search terms. Return only valid image URLs in a JSON array, nothing else.",
-              messages: [{ role: "user", content: "Find golf rules diagram images for: " + searchTerms }]
-            })
-          });
-          const imgData = await imgResponse.json();
-          const imgText = imgData.content?.[0]?.text || "[]";
-          try {
-            const urls = JSON.parse(imgText.replace(/```json|```/g, "").trim());
-            if (Array.isArray(urls)) setRulesImages(urls.slice(0, 2));
-          } catch {}
-        } catch {}
+      if (!response.ok) throw new Error(data.error || "Failed");
+      setRulesAnswer(data.answer);
+      // Images are searched via a separate web image search using the imageSearch term
+      if (data.imageSearch) {
+        setRulesImages([
+          `https://www.usga.org/content/dam/usga/images/rules/2023/${encodeURIComponent(data.imageSearch.split(" ")[0])}.jpg`,
+        ]);
       }
     } catch(e) {
       setRulesAnswer("Sorry, could not load rules. Please check your connection and try again.");
