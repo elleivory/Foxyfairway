@@ -895,7 +895,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.45</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.46</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
           </div>
@@ -2860,7 +2860,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Failed");
       setRulesAnswer(data.answer);
-      // Images are searched via a separate web image search using the imageSearch term
+      setRulesQuestion(""); // Auto-clear input after answer
       if (data.imageSearch) {
         setRulesImages([
           `https://www.usga.org/content/dam/usga/images/rules/2023/${encodeURIComponent(data.imageSearch.split(" ")[0])}.jpg`,
@@ -2940,6 +2940,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
           {!isSpectator && <button style={{ flex: 1, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 11, fontWeight: 600, cursor: "pointer", padding: "8px 4px", fontFamily: "inherit" }} onClick={() => { saveRoundToHistory(round, players, scores, holes); alert("Round saved!"); }}>💾 Save Round</button>}
           {!isSpectator && round.is_scanned && <button style={{ flex: 1, backgroundColor: "#22c55e", border: "none", borderRadius: 8, color: "#0f172a", fontSize: 11, fontWeight: 700, cursor: "pointer", padding: "8px 4px", fontFamily: "inherit" }} onClick={() => { saveRoundToHistory(round, players, scores, holes); setShowComplete(true); }}>✅ Complete</button>}
           <button style={{ flex: 1, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 11, fontWeight: 600, cursor: "pointer", padding: "8px 4px", fontFamily: "inherit" }} onClick={async () => { try { await exportScorecardPDF(round, players, scores, holes); } catch(e) { alert("Please allow popups to export scorecard"); } }}>📄 Scorecard</button>
+          <button style={{ flex: 1, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#f8fafc", fontSize: 11, fontWeight: 700, cursor: "pointer", padding: "8px 4px", fontFamily: "inherit" }} onClick={() => setShowRules(true)}>📖 Rules</button>
         </div>
       </div>
 
@@ -2962,7 +2963,6 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
         </div>
         <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
           <button style={{ ...S.btnPrimary, flex: 1, fontSize: 17, marginBottom: 0 }} onClick={onViewScorecard}>⛳ Live Scoring</button>
-          <button onClick={() => setShowRules(true)} style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, color: "#f8fafc", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", padding: "0 14px", flexShrink: 0 }}>📖 Rules</button>
           {!isSpectator && (me?.name === round.created_by || round.is_scanned) && <button onClick={() => setShowAddGuest(true)} style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, color: "#94a3b8", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", padding: "0 14px", flexShrink: 0 }}>+ Guest</button>}
         </div>
 
