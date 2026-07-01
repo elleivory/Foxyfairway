@@ -4353,10 +4353,6 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
         <div style={{ display: "flex", gap: 6, flexShrink: 0, width: 120, justifyContent: "flex-end" }}>
           <button onClick={() => { setShowChat(true); setUnreadChat(0); }}
             style={{ position: "relative", backgroundColor: "#1e293b", color: "#e2e8f0", border: "1px solid #334155", borderRadius: 10, padding: "10px 16px", fontSize: 16, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-            \uD83D\uDCAC
-            {unreadChat > 0 && <span style={{ position: "absolute", top: -6, right: -6, backgroundColor: "#ef4444", color: "#fff", borderRadius: "50%", width: 20, height: 20, fontSize: 10, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", animation: "pulse 1s infinite", boxShadow: "0 0 0 3px rgba(239,68,68,0.3)" }}>{unreadChat}</span>}
-          </button>
-        </div>
             💬
             {unreadChat > 0 && <span style={{ position: "absolute", top: -6, right: -6, backgroundColor: "#ef4444", color: "#fff", borderRadius: "50%", width: 20, height: 20, fontSize: 10, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", animation: "pulse 1s infinite", boxShadow: "0 0 0 3px rgba(239,68,68,0.3)" }}>{unreadChat}</span>}
           </button>
