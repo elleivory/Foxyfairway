@@ -1056,7 +1056,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.50</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.51</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
           </div>
@@ -3106,29 +3106,28 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
 
       <div style={S.content}>
         {/* Round Tools group */}
-        <div style={{ backgroundColor: "rgba(15,23,42,0.4)", border: "1px solid #334155", borderRadius: 12, padding: "10px 12px", marginBottom: 8 }}>
-          <div style={{ fontSize: 9, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 1, fontWeight: 700, marginBottom: 8 }}>Round Tools</div>
-          <div style={{ display: "flex", gap: 6 }}>
-            {!isSpectator && <button style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, backgroundColor: "rgba(30,41,59,0.6)", border: "none", borderRadius: 8, padding: "8px 2px", color: "#94a3b8", fontSize: 8, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }} onClick={() => { saveRoundToHistory(round, players, scores, holes); alert("Round saved!"); }}><span style={{ fontSize: 15 }}>💾</span>Save</button>}
-            {!isSpectator && round.is_scanned && <button style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, backgroundColor: "rgba(34,197,94,0.15)", border: "1px solid #22c55e", borderRadius: 8, padding: "8px 2px", color: "#22c55e", fontSize: 8, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }} onClick={() => { saveRoundToHistory(round, players, scores, holes); setShowComplete(true); }}><span style={{ fontSize: 15 }}>✅</span>Complete</button>}
-            <button style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, backgroundColor: "rgba(30,41,59,0.6)", border: "none", borderRadius: 8, padding: "8px 2px", color: "#94a3b8", fontSize: 8, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }} onClick={async () => { try { await exportScorecardPDF(round, players, scores, holes); } catch(e) { alert("Please allow popups to export scorecard"); } }}><span style={{ fontSize: 15 }}>📄</span>Card</button>
-            <button style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, backgroundColor: "rgba(30,41,59,0.6)", border: "none", borderRadius: 8, padding: "8px 2px", color: "#f8fafc", fontSize: 8, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }} onClick={() => setShowRules(true)}><span style={{ fontSize: 15 }}>📖</span>Rules</button>
-            <button style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, backgroundColor: "rgba(245,158,11,0.12)", border: "1px solid #f59e0b", borderRadius: 8, padding: "8px 2px", color: "#f59e0b", fontSize: 8, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }} onClick={() => { setShowDashAdmin(true); setGameAdminTab("scores"); setAdminMsg(""); setAdminEditHoles(JSON.parse(JSON.stringify(holes || []))); const sc = {}; scores.forEach(s => { if (!sc[s.player_id]) sc[s.player_id] = {}; sc[s.player_id][s.hole_number] = s.score; }); setAdminEditScores(sc); }}><span style={{ fontSize: 15 }}>⚙️</span>Admin</button>
+        <div style={{ backgroundColor: "rgba(15,23,42,0.4)", border: "1px solid #334155", borderRadius: 10, padding: "7px 9px", marginBottom: 6 }}>
+          <div style={{ fontSize: 8, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 1, fontWeight: 700, marginBottom: 6 }}>Round Tools</div>
+          <div style={{ display: "flex", gap: 5 }}>
+            {!isSpectator && <button style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, backgroundColor: "rgba(30,41,59,0.6)", border: "none", borderRadius: 7, padding: "6px 2px", color: "#94a3b8", fontSize: 7, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }} onClick={() => { saveRoundToHistory(round, players, scores, holes); alert("Round saved!"); }}><span style={{ fontSize: 12 }}>💾</span>Save</button>}
+            {!isSpectator && round.is_scanned && <button style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, backgroundColor: "rgba(34,197,94,0.15)", border: "1px solid #22c55e", borderRadius: 7, padding: "6px 2px", color: "#22c55e", fontSize: 7, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }} onClick={() => { saveRoundToHistory(round, players, scores, holes); setShowComplete(true); }}><span style={{ fontSize: 12 }}>✅</span>Complete</button>}
+            <button style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, backgroundColor: "rgba(30,41,59,0.6)", border: "none", borderRadius: 7, padding: "6px 2px", color: "#94a3b8", fontSize: 7, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }} onClick={async () => { try { await exportScorecardPDF(round, players, scores, holes); } catch(e) { alert("Please allow popups to export scorecard"); } }}><span style={{ fontSize: 12 }}>📄</span>Card</button>
+            <button style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, backgroundColor: "rgba(30,41,59,0.6)", border: "none", borderRadius: 7, padding: "6px 2px", color: "#f8fafc", fontSize: 7, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }} onClick={() => setShowRules(true)}><span style={{ fontSize: 12 }}>📖</span>Rules</button>
+            <button style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, backgroundColor: "rgba(245,158,11,0.12)", border: "1px solid #f59e0b", borderRadius: 7, padding: "6px 2px", color: "#f59e0b", fontSize: 7, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }} onClick={() => { setShowDashAdmin(true); setGameAdminTab("scores"); setAdminMsg(""); setAdminEditHoles(JSON.parse(JSON.stringify(holes || []))); const sc = {}; scores.forEach(s => { if (!sc[s.player_id]) sc[s.player_id] = {}; sc[s.player_id][s.hole_number] = s.score; }); setAdminEditScores(sc); }}><span style={{ fontSize: 12 }}>⚙️</span>Admin</button>
           </div>
         </div>
 
         {/* Invite Players group */}
-        <div style={{ backgroundColor: "rgba(15,23,42,0.4)", border: "1px solid #334155", borderRadius: 12, padding: "10px 12px", marginBottom: 8 }}>
-          <div style={{ fontSize: 9, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 1, fontWeight: 700, marginBottom: 8 }}>Invite Players</div>
+        <div style={{ backgroundColor: "rgba(15,23,42,0.4)", border: "1px solid #334155", borderRadius: 10, padding: "8px 10px", marginBottom: 6 }}>
           {!showJoinQR ? (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div>
-                <div style={{ fontSize: 11, color: "#94a3b8" }}>{isSpectator ? "Round code" : "Join code"}</div>
-                <div style={{ fontSize: 16, color: "#22c55e", fontWeight: 800, letterSpacing: 2, marginTop: 2 }}>{round.code}</div>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                <span style={{ fontSize: 9, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 1, fontWeight: 700 }}>{isSpectator ? "Round code" : "Join code"}</span>
+                <span style={{ fontSize: 14, color: "#22c55e", fontWeight: 800, letterSpacing: 2 }}>{round.code}</span>
               </div>
               <div style={{ display: "flex", gap: 8 }}>
-                {!isSpectator && <button onClick={() => setShowSpectatorQR(true)} style={{ backgroundColor: "rgba(30,41,59,0.6)", border: "1px solid #334155", color: "#94a3b8", borderRadius: 8, padding: "8px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>👀 Spectate</button>}
-                <button onClick={() => setShowJoinQR(true)} style={{ backgroundColor: "rgba(34,197,94,0.15)", border: "1px solid #22c55e", color: "#22c55e", borderRadius: 8, padding: "8px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Show QR</button>
+                {!isSpectator && <button onClick={() => setShowSpectatorQR(true)} style={{ backgroundColor: "rgba(30,41,59,0.6)", border: "1px solid #334155", color: "#94a3b8", borderRadius: 7, padding: "6px 10px", fontSize: 10, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>👀 Spectate</button>}
+                <button onClick={() => setShowJoinQR(true)} style={{ backgroundColor: "rgba(34,197,94,0.15)", border: "1px solid #22c55e", color: "#22c55e", borderRadius: 7, padding: "6px 10px", fontSize: 10, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Show QR</button>
               </div>
             </div>
           ) : (
@@ -3153,7 +3152,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
         </div>
 
         {/* Spacer for breathing room before Start Game */}
-        <div style={{ minHeight: 24 }} />
+        <div style={{ minHeight: 60 }} />
 
         <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
           <button style={{ ...S.btnPrimary, flex: 1, fontSize: 17, marginBottom: 0, padding: "18px" }} onClick={onViewScorecard}>▶️ Start Game</button>
@@ -6049,8 +6048,8 @@ const S = {
   scoreInfoCell: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minWidth: 48, width: 48, flex: "0 0 auto", padding: "4px 0", overflow: "visible" },
   scoreInfoCellNumber: { fontSize: 9, color: "#64748b", fontWeight: 700, marginBottom: 2 },
   scoreInfoCellValue: { fontSize: 14, fontWeight: 800, color: "#22c55e" },
-  lbRow: { display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 10, border: "1px solid #334155", backgroundColor: "#1e293b", marginBottom: 6 },
-  lbRowMe: { border: "1px solid rgba(34,197,94,0.6)", borderRadius: 10, padding: "12px 14px", backgroundColor: "#1e293b", marginBottom: 6 },
+  lbRow: { display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 10, border: "1px solid #334155", backgroundColor: "rgba(15,23,42,0.4)", marginBottom: 6 },
+  lbRowMe: { border: "1px solid rgba(34,197,94,0.6)", borderRadius: 10, padding: "12px 14px", backgroundColor: "rgba(15,23,42,0.4)", marginBottom: 6 },
   lbPos: { fontSize: 18, fontWeight: 800, color: "#475569", width: 28, flexShrink: 0 },
   lbName: { flex: 1, fontSize: 16, fontWeight: 600, color: "#f8fafc" },
   lbHcp: { fontSize: 11, color: "#f8fafc", fontWeight: 400, marginLeft: 8 },
