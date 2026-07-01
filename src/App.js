@@ -1056,7 +1056,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.48</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.49</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
           </div>
@@ -3008,6 +3008,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
   const [showComplete, setShowComplete] = useState(false);
   const [showAddGuest, setShowAddGuest] = useState(false);
   const [showDashAdmin, setShowDashAdmin] = useState(false);
+  const [showJoinQR, setShowJoinQR] = useState(false);
   const isCreator = me?.name === round.created_by;
 
   const askRules = async (question) => {
@@ -3099,35 +3100,63 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
             <div style={{ fontSize: 15, fontWeight: 700, color: "#f8fafc" }}>{round.course_name}</div>
             <div style={{ fontSize: 11, color: "#f8fafc" }}>{GAME_TYPES[round.game_type]?.label}{round.use_handicap === false ? " · Scratch" : ""} · {me?.name} (HCP {me?.handicap})</div>
           </div>
-          <button onClick={() => { setShowDashAdmin(true); setGameAdminTab("scores"); setAdminMsg(""); setAdminEditHoles(JSON.parse(JSON.stringify(holes || []))); const sc = {}; scores.forEach(s => { if (!sc[s.player_id]) sc[s.player_id] = {}; sc[s.player_id][s.hole_number] = s.score; }); setAdminEditScores(sc); }} style={{ backgroundColor: "#0f172a", border: "1px solid #f59e0b", borderRadius: 8, color: "#f59e0b", fontSize: 13, fontWeight: 700, cursor: "pointer", padding: "8px 10px", fontFamily: "inherit", flexShrink: 0 }}>⚙️</button>
-        </div>
-        <div style={{ display: "flex", gap: 8, padding: "0 16px 10px" }}>
-          {!isSpectator && <button style={{ flex: 1, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 11, fontWeight: 600, cursor: "pointer", padding: "8px 4px", fontFamily: "inherit" }} onClick={() => { saveRoundToHistory(round, players, scores, holes); alert("Round saved!"); }}>💾 Save Round</button>}
-          {!isSpectator && round.is_scanned && <button style={{ flex: 1, backgroundColor: "#22c55e", border: "none", borderRadius: 8, color: "#0f172a", fontSize: 11, fontWeight: 700, cursor: "pointer", padding: "8px 4px", fontFamily: "inherit" }} onClick={() => { saveRoundToHistory(round, players, scores, holes); setShowComplete(true); }}>✅ Complete</button>}
-          <button style={{ flex: 1, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 11, fontWeight: 600, cursor: "pointer", padding: "8px 4px", fontFamily: "inherit" }} onClick={async () => { try { await exportScorecardPDF(round, players, scores, holes); } catch(e) { alert("Please allow popups to export scorecard"); } }}>📄 Scorecard</button>
-          <button style={{ flex: 1, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#f8fafc", fontSize: 11, fontWeight: 700, cursor: "pointer", padding: "8px 4px", fontFamily: "inherit" }} onClick={() => setShowRules(true)}>📖 Rules</button>
+          <div style={{ width: 40, flexShrink: 0 }} />
         </div>
       </div>
 
       <div style={S.content}>
-        <div style={{ textAlign: "center", marginBottom: 20, padding: 16, backgroundColor: "#1e293b", borderRadius: 12, border: "1px solid #334155" }}>
-          {isSpectator
-            ? <div style={{ display: "inline-block", backgroundColor: "#fff", borderRadius: 8, padding: 8, marginBottom: 8 }}>
-                <QRCodeSVG value={window.location.origin + window.location.pathname + "?watch=" + round.code} size={72} bgColor="#ffffff" fgColor="#0f172a" />
-              </div>
-            : <div style={{ display: "inline-block", backgroundColor: "#fff", borderRadius: 10, padding: 12, marginBottom: 8 }}>
-                <QRCodeSVG value={window.location.origin + window.location.pathname + "?join=" + round.code} size={100} bgColor="#ffffff" fgColor="#0f172a" />
-              </div>}
-          <div style={{ fontSize: 13, color: "#94a3b8" }}>{isSpectator ? "Round code: " : "Scan to join · Code: "}<span style={{ color: "#22c55e", fontWeight: 700, letterSpacing: 2 }}>{round.code}</span></div>
-          {isSpectator
-            ? <button onClick={(e) => { navigator.clipboard.writeText(window.location.origin + window.location.pathname + "?watch=" + round.code); const btn = e.target; btn.textContent = "✓ Copied!"; btn.style.color = "#22c55e"; btn.style.borderColor = "#22c55e"; setTimeout(() => { btn.textContent = "👀 Copy Watch Link"; btn.style.color = "#94a3b8"; btn.style.borderColor = "#334155"; }, 1500); }} style={{ marginTop: 10, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 12, fontWeight: 600, cursor: "pointer", padding: "8px 16px", fontFamily: "inherit" }}>👀 Copy Watch Link</button>
-            : <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                <button onClick={(e) => { navigator.clipboard.writeText(window.location.origin + window.location.pathname + "?join=" + round.code); const btn = e.target; btn.textContent = "✓ Copied!"; btn.style.color = "#22c55e"; btn.style.borderColor = "#22c55e"; setTimeout(() => { btn.textContent = "🏌️ Players Link"; btn.style.color = "#94a3b8"; btn.style.borderColor = "#334155"; }, 1500); }} style={{ flex: 1, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 11, fontWeight: 600, cursor: "pointer", padding: "8px 10px", fontFamily: "inherit" }}>🏌️ Players Link</button>
-                <button onClick={() => setShowSpectatorQR(true)} style={{ flex: 1, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 11, fontWeight: 600, cursor: "pointer", padding: "8px 10px", fontFamily: "inherit" }}>👀 Spectators</button>
-              </div>}
+        {/* Round Tools group */}
+        <div style={{ backgroundColor: "rgba(15,23,42,0.4)", border: "1px solid #334155", borderRadius: 16, padding: 16, marginBottom: 16 }}>
+          <div style={{ fontSize: 10, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 1, fontWeight: 700, marginBottom: 10 }}>Round Tools</div>
+          <div style={{ display: "flex", gap: 10 }}>
+            {!isSpectator && <button style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, backgroundColor: "rgba(30,41,59,0.6)", border: "none", borderRadius: 10, padding: "10px 4px", color: "#94a3b8", fontSize: 9, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }} onClick={() => { saveRoundToHistory(round, players, scores, holes); alert("Round saved!"); }}><span style={{ fontSize: 18 }}>💾</span>Save</button>}
+            {!isSpectator && round.is_scanned && <button style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, backgroundColor: "rgba(34,197,94,0.15)", border: "1px solid #22c55e", borderRadius: 10, padding: "10px 4px", color: "#22c55e", fontSize: 9, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }} onClick={() => { saveRoundToHistory(round, players, scores, holes); setShowComplete(true); }}><span style={{ fontSize: 18 }}>✅</span>Complete</button>}
+            <button style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, backgroundColor: "rgba(30,41,59,0.6)", border: "none", borderRadius: 10, padding: "10px 4px", color: "#94a3b8", fontSize: 9, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }} onClick={async () => { try { await exportScorecardPDF(round, players, scores, holes); } catch(e) { alert("Please allow popups to export scorecard"); } }}><span style={{ fontSize: 18 }}>📄</span>Scorecard</button>
+            <button style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, backgroundColor: "rgba(30,41,59,0.6)", border: "none", borderRadius: 10, padding: "10px 4px", color: "#f8fafc", fontSize: 9, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }} onClick={() => setShowRules(true)}><span style={{ fontSize: 18 }}>📖</span>Rules</button>
+            <button style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, backgroundColor: "rgba(245,158,11,0.12)", border: "1px solid #f59e0b", borderRadius: 10, padding: "10px 4px", color: "#f59e0b", fontSize: 9, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }} onClick={() => { setShowDashAdmin(true); setGameAdminTab("scores"); setAdminMsg(""); setAdminEditHoles(JSON.parse(JSON.stringify(holes || []))); const sc = {}; scores.forEach(s => { if (!sc[s.player_id]) sc[s.player_id] = {}; sc[s.player_id][s.hole_number] = s.score; }); setAdminEditScores(sc); }}><span style={{ fontSize: 18 }}>⚙️</span>Admin</button>
+          </div>
         </div>
-        <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-          <button style={{ ...S.btnPrimary, flex: 1, fontSize: 17, marginBottom: 0 }} onClick={onViewScorecard}>⛳ Live Scoring</button>
+
+        {/* Invite Players group */}
+        <div style={{ backgroundColor: "rgba(15,23,42,0.4)", border: "1px solid #334155", borderRadius: 16, padding: 16, marginBottom: 16 }}>
+          <div style={{ fontSize: 10, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 1, fontWeight: 700, marginBottom: 10 }}>Invite Players</div>
+          {!showJoinQR ? (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div>
+                <div style={{ fontSize: 11, color: "#94a3b8" }}>{isSpectator ? "Round code" : "Join code"}</div>
+                <div style={{ fontSize: 16, color: "#22c55e", fontWeight: 800, letterSpacing: 2, marginTop: 2 }}>{round.code}</div>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                {!isSpectator && <button onClick={() => setShowSpectatorQR(true)} style={{ backgroundColor: "rgba(30,41,59,0.6)", border: "1px solid #334155", color: "#94a3b8", borderRadius: 8, padding: "8px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>👀 Spectate</button>}
+                <button onClick={() => setShowJoinQR(true)} style={{ backgroundColor: "rgba(34,197,94,0.15)", border: "1px solid #22c55e", color: "#22c55e", borderRadius: 8, padding: "8px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Show QR</button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ textAlign: "center" }}>
+              {isSpectator
+                ? <div style={{ display: "inline-block", backgroundColor: "#fff", borderRadius: 8, padding: 8, marginBottom: 8 }}>
+                    <QRCodeSVG value={window.location.origin + window.location.pathname + "?watch=" + round.code} size={72} bgColor="#ffffff" fgColor="#0f172a" />
+                  </div>
+                : <div style={{ display: "inline-block", backgroundColor: "#fff", borderRadius: 10, padding: 12, marginBottom: 8 }}>
+                    <QRCodeSVG value={window.location.origin + window.location.pathname + "?join=" + round.code} size={100} bgColor="#ffffff" fgColor="#0f172a" />
+                  </div>}
+              <div style={{ fontSize: 13, color: "#94a3b8" }}>{isSpectator ? "Round code: " : "Scan to join · Code: "}<span style={{ color: "#22c55e", fontWeight: 700, letterSpacing: 2 }}>{round.code}</span></div>
+              {isSpectator
+                ? <button onClick={(e) => { navigator.clipboard.writeText(window.location.origin + window.location.pathname + "?watch=" + round.code); const btn = e.target; btn.textContent = "✓ Copied!"; btn.style.color = "#22c55e"; btn.style.borderColor = "#22c55e"; setTimeout(() => { btn.textContent = "👀 Copy Watch Link"; btn.style.color = "#94a3b8"; btn.style.borderColor = "#334155"; }, 1500); }} style={{ marginTop: 10, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 12, fontWeight: 600, cursor: "pointer", padding: "8px 16px", fontFamily: "inherit" }}>👀 Copy Watch Link</button>
+                : <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                    <button onClick={(e) => { navigator.clipboard.writeText(window.location.origin + window.location.pathname + "?join=" + round.code); const btn = e.target; btn.textContent = "✓ Copied!"; btn.style.color = "#22c55e"; btn.style.borderColor = "#22c55e"; setTimeout(() => { btn.textContent = "🏌️ Players Link"; btn.style.color = "#94a3b8"; btn.style.borderColor = "#334155"; }, 1500); }} style={{ flex: 1, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 11, fontWeight: 600, cursor: "pointer", padding: "8px 10px", fontFamily: "inherit" }}>🏌️ Players Link</button>
+                    <button onClick={() => setShowSpectatorQR(true)} style={{ flex: 1, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 11, fontWeight: 600, cursor: "pointer", padding: "8px 10px", fontFamily: "inherit" }}>👀 Spectators</button>
+                  </div>}
+              <button onClick={() => setShowJoinQR(false)} style={{ marginTop: 10, background: "none", border: "none", color: "#64748b", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Hide QR</button>
+            </div>
+          )}
+        </div>
+
+        {/* Spacer for breathing room before Start Game */}
+        <div style={{ minHeight: 24 }} />
+
+        <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+          <button style={{ ...S.btnPrimary, flex: 1, fontSize: 17, marginBottom: 0, padding: "18px" }} onClick={onViewScorecard}>▶️ Start Game</button>
           {!isSpectator && (me?.name === round.created_by || round.is_scanned) && <button onClick={() => setShowAddGuest(true)} style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, color: "#94a3b8", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", padding: "0 14px", flexShrink: 0 }}>+ Guest</button>}
         </div>
 
@@ -3276,52 +3305,60 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
             </div>
           );
         })() : (
-          lb.map((p, i) => (
-            <div key={p.id}>
-              <div style={{ ...S.lbRow, ...(p.id === me?.id ? S.lbRowMe : {}) }}>
-                <div style={{ ...S.lbPos, color: i === 0 ? "#f59e0b" : i === 1 ? "#94a3b8" : i === 2 ? "#cd7c2f" : "#475569" }}>{i + 1}</div>
-                <div style={S.lbName}>{p.name}<span style={S.lbHcp}>HCP {p.handicap}</span></div>
-                <div style={S.lbRight}>
-                  <div style={S.lbScore}>
-                    {(() => {
-                      const gross = p.grossTotal || 0;
-                      const gtp = p.toPar || 0;
-                      const gtpColor = gtp < 0 ? "#22c55e" : gtp > 0 ? "#ef4444" : "#3b82f6";
-                      const gtpStr = formatToPar(gtp);
-                      if (round.game_type === "stableford") return <>
-                        <div style={{ fontSize: 11, color: "#f8fafc" }}>{gross} · <span style={{ color: gtpColor }}>{gtpStr}</span></div>
-                        <div style={{ fontSize: 16, fontWeight: 800, color: "#22c55e" }}>{p.total} pts</div>
-                      </>;
-                      if (round.game_type === "matchplay") return <>
-                        <div style={{ fontSize: 11, color: "#f8fafc" }}>{gross} · <span style={{ color: gtpColor }}>{gtpStr}</span></div>
-                        <div style={{ fontSize: 16, fontWeight: 800, color: "#22c55e" }}>{p.total === 0 ? "0 pts" : p.total + (p.total === 1 ? " pt" : " pts")}</div>
-                      </>;
-                      if (round.game_type === "banker") return <>
-                        <div style={{ fontSize: 11, color: "#f8fafc" }}>{gross} · <span style={{ color: gtpColor }}>{gtpStr}</span></div>
-                        <div style={{ fontSize: 16, fontWeight: 800, color: p.total > 0 ? "#22c55e" : p.total < 0 ? "#ef4444" : "#94a3b8" }}>{p.total >= 0 ? "+$" : "-$"}{Math.abs(p.total)}</div>
-                      </>;
-                      return <>
-                        <div style={{ fontSize: 11, color: "#f8fafc" }}>{gross}{isHandicap ? " \u00b7 N " + (p.netTotal || 0) : ""}</div>
-                        <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-                          <span style={{ fontSize: 16, fontWeight: 800, color: gtpColor }}>{gtpStr}</span>
-                          {isHandicap && <span style={{ fontSize: 16, fontWeight: 800, color: (p.toPar - parseInt(p.handicap||0)) < 0 ? "#22c55e" : (p.toPar - parseInt(p.handicap||0)) > 0 ? "#ef4444" : "#3b82f6" }}>{formatToPar(p.toPar - parseInt(p.handicap||0))}</span>}
-                        </div>
-                      </>;
-                    })()}
+          lb.map((p, i) => {
+            const gross = p.grossTotal || 0;
+            const gtp = p.toPar || 0;
+            const gtpColor = gtp < 0 ? "#22c55e" : gtp > 0 ? "#ef4444" : "#3b82f6";
+            const gtpStr = formatToPar(gtp);
+            const nettStr = isHandicap ? "N" + (p.netTotal || 0) : "—";
+            let bigVal, bigLbl, bigColor;
+            if (round.game_type === "stableford") { bigVal = p.total + " pts"; bigLbl = "Stableford"; bigColor = "#22c55e"; }
+            else if (round.game_type === "matchplay") { bigVal = p.total === 0 ? "0 pts" : p.total + (p.total === 1 ? " pt" : " pts"); bigLbl = "Match Points"; bigColor = "#22c55e"; }
+            else if (round.game_type === "banker") { bigVal = (p.total >= 0 ? "+$" : "-$") + Math.abs(p.total); bigLbl = "Balance"; bigColor = p.total > 0 ? "#22c55e" : p.total < 0 ? "#ef4444" : "#94a3b8"; }
+            else { const netToPar = p.toPar - parseInt(p.handicap||0); bigVal = isHandicap ? formatToPar(netToPar) : gtpStr; bigLbl = isHandicap ? "To Par (Net)" : "To Par"; bigColor = isHandicap ? (netToPar < 0 ? "#22c55e" : netToPar > 0 ? "#ef4444" : "#3b82f6") : gtpColor; }
+            return (
+              <div key={p.id} style={{ ...S.lbRow, ...(p.id === me?.id ? S.lbRowMe : {}), flexDirection: "column", alignItems: "stretch", padding: "12px 14px" }}>
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 10 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                    <div style={{ fontSize: 16, fontWeight: 900, color: i === 0 ? "#f59e0b" : i === 1 ? "#94a3b8" : i === 2 ? "#cd7c2f" : "#475569", width: 18, flexShrink: 0 }}>{i + 1}</div>
+                    <div style={{ minWidth: 0 }}>
+                      <span style={{ fontSize: 15, fontWeight: 700, color: "#f8fafc" }}>{p.name.replace(" (Guest)", "")}</span>
+                      <span style={{ fontSize: 11, color: "#f8fafc", marginLeft: 6, fontWeight: 500 }}>HCP {p.handicap}</span>
+                    </div>
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <div style={S.lbHoles}>{p.holesPlayed}/18</div>
+                  <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
+                    <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: 8, padding: "4px 8px", textAlign: "center", minWidth: 34 }}>
+                      <div style={{ fontSize: 12, fontWeight: 800, color: "#22c55e", lineHeight: 1.1 }}>{gross || "—"}</div>
+                      <div style={{ fontSize: 6, color: "#cbd5e1", textTransform: "uppercase" }}>Gross</div>
+                    </div>
+                    <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: 8, padding: "4px 8px", textAlign: "center", minWidth: 34 }}>
+                      <div style={{ fontSize: 12, fontWeight: 800, color: "#fff", lineHeight: 1.1 }}>{gross ? gtpStr : "—"}</div>
+                      <div style={{ fontSize: 6, color: "#cbd5e1", textTransform: "uppercase" }}>Par</div>
+                    </div>
+                    <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: 8, padding: "4px 8px", textAlign: "center", minWidth: 34 }}>
+                      <div style={{ fontSize: 12, fontWeight: 800, color: "#fff", lineHeight: 1.1 }}>{gross ? nettStr : "—"}</div>
+                      <div style={{ fontSize: 6, color: "#cbd5e1", textTransform: "uppercase" }}>Nett</div>
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 11, color: "#94a3b8" }}>{p.holesPlayed}/18 holes</span>
                     {!isSpectator && (me?.name === round.created_by || round.is_scanned) && p.id !== me?.id && (round.is_scanned || scores.filter(s => s.score > 0).length === 0) && (
                       <>
                         <span onClick={() => { setEditingPlayerId(p.id); setEditPlayerName(p.name?.replace(" (Guest)", "") || p.name); setEditPlayerHcp(String(p.handicap)); }} style={{ fontSize: 12, cursor: "pointer", padding: "2px 4px" }}>✏️</span>
-                        <span onClick={async () => { await supabase.from("players").delete().eq("id", p.id); refresh(); }} style={{ fontSize: 12, cursor: "pointer", color: "#ef4444", padding: "2px 4px", fontWeight: 700, fontSize: 14 }}>✕</span>
+                        <span onClick={async () => { await supabase.from("players").delete().eq("id", p.id); refresh(); }} style={{ fontSize: 12, cursor: "pointer", color: "#ef4444", padding: "2px 4px", fontWeight: 700 }}>✕</span>
                       </>
                     )}
                   </div>
+                  <div style={{ textAlign: "right" }}>
+                    <span style={{ fontSize: 22, fontWeight: 900, color: bigColor }}>{bigVal}</span>
+                    <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600, marginLeft: 6 }}>{bigLbl}</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
 
         {/* Edit player form - outside map, no hooks in loops */}
@@ -3954,6 +3991,25 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
 // =============================================================================
 // SCORECARD
 // =============================================================================
+function centreHoleNav(holeNumber, attempt) {
+  attempt = attempt || 0;
+  const master = document.getElementById("ff-master-scroll");
+  const btn = document.getElementById("ff-hole-btn-" + holeNumber);
+  if (!master || !btn) {
+    if (attempt < 5) setTimeout(() => centreHoleNav(holeNumber, attempt + 1), 60);
+    return;
+  }
+  const containerWidth = master.clientWidth;
+  if (containerWidth === 0) {
+    if (attempt < 5) setTimeout(() => centreHoleNav(holeNumber, attempt + 1), 60);
+    return;
+  }
+  const btnLeft = btn.offsetLeft;
+  const btnWidth = btn.offsetWidth;
+  const pos = Math.max(0, btnLeft - (containerWidth / 2) + (btnWidth / 2));
+  document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { el.scrollLeft = pos; });
+}
+
 function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
   const isHandicap = round.use_handicap !== false && round.use_handicap !== "false" && round.use_handicap !== 0;
   const [myScores, setMyScores] = useState({}), [myBets, setMyBets] = useState({});
@@ -3963,15 +4019,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
   
   const [activeHole, setActiveHole] = useState(1);
   useEffect(() => {
-    requestAnimationFrame(() => {
-      const master = document.getElementById("ff-master-scroll");
-      if (master) {
-        const btnWidth = 44;
-        const containerWidth = master.clientWidth;
-        const pos = Math.max(0, (activeHole - 1) * btnWidth - (containerWidth / 2) + (btnWidth / 2));
-        document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { el.scrollLeft = pos; });
-      }
-    });
+    requestAnimationFrame(() => centreHoleNav(activeHole));
   }, [activeHole]);
   const [showChat, setShowChat] = useState(false);
   const [unreadChat, setUnreadChat] = useState(0);
@@ -4097,10 +4145,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
           const myCurrentHoleScore = s.find((x) => x.player_id === me.id && x.hole_number === activeHole && x.score > 0);
           if (myCurrentHoleScore) {
             setActiveHole(bankerData.current_hole);
-            setTimeout(() => {
-              const pos = Math.max(0, (bankerData.current_hole - 1) * 44 - 120);
-              document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { el.scrollLeft = pos; });
-            }, 50);
+            setTimeout(() => centreHoleNav(bankerData.current_hole), 50);
           }
         }
         // Recalculate current banker from all scores (hole by hole rotation)
@@ -4198,10 +4243,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
           try { await dbSaveCurrentHole(round.id, holeNum + 1); } catch(e) { console.error(e); }
           const next = holeNum + 1;
           setActiveHole(next);
-          setTimeout(() => {
-            const pos = Math.max(0, (next - 1) * 48 - 120);
-            document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { el.scrollLeft = pos; });
-          }, 100);
+          setTimeout(() => centreHoleNav(next), 100);
         }
         setAllScores(freshFromDB);
       }
@@ -4220,10 +4262,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
         if (myGuests.length === 0 || allLocalGuestsScored) {
           const next = holeNum + 1;
           setActiveHole(next);
-          setTimeout(() => {
-            const pos = Math.max(0, (next - 1) * 48 - 120);
-            document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { el.scrollLeft = pos; });
-          }, 50);
+          setTimeout(() => centreHoleNav(next), 50);
         }
         // else guests on this device haven't all scored yet - tryAdvance will fire when they do
       }
@@ -4245,10 +4284,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
     if (allLocalGuestsScored) {
       const next = holeNum + 1;
       setActiveHole(next);
-      setTimeout(() => {
-        const pos = Math.max(0, (next - 1) * 48 - 120);
-        document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { el.scrollLeft = pos; });
-      }, 50);
+      setTimeout(() => centreHoleNav(next), 50);
     }
   };
 
@@ -4292,10 +4328,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
         try { await dbSaveCurrentHole(round.id, holeNum + 1); } catch(e) { console.error(e); }
         const next = holeNum + 1;
         setActiveHole(next);
-        setTimeout(() => {
-          const pos = Math.max(0, (next - 1) * 48 - 120);
-          document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { el.scrollLeft = pos; });
-        }, 100);
+        setTimeout(() => centreHoleNav(next), 100);
         setAllScores(freshScores);
       }
     } else {
@@ -4608,17 +4641,9 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
               const isActive = h.hole_number === activeHole;
               const isDone = !!myScores[h.hole_number] && !isActive;
               return (
-                <button key={h.hole_number} onClick={() => {
+                <button id={"ff-hole-btn-" + h.hole_number} key={h.hole_number} onClick={() => {
                   setActiveHole(h.hole_number);
-                  requestAnimationFrame(() => {
-                    const master = document.getElementById("ff-master-scroll");
-                    if (master) {
-                      const btnWidth = 44; // 40 button + 4 gap
-                      const containerWidth = master.clientWidth;
-                      const pos = Math.max(0, (h.hole_number - 1) * btnWidth - (containerWidth / 2) + (btnWidth / 2));
-                      document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { el.scrollLeft = pos; });
-                    }
-                  });
+                  requestAnimationFrame(() => centreHoleNav(h.hole_number));
                 }}
                   style={{
                     minWidth: 40, width: 40, height: 40, borderRadius: 8, border: "none",
@@ -5007,8 +5032,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
                     return (
                       <div key={"ci"+h.hole_number} onClick={() => {
                         setActiveHole(h.hole_number);
-                        const pos = Math.max(0, (h.hole_number - 1) * 54 - 20);
-                        document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { el.scrollLeft = pos; });
+                        requestAnimationFrame(() => centreHoleNav(h.hole_number));
                       }}
                         style={{ minWidth: 48, width: 48, flex: "0 0 auto", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: "pointer",
                           backgroundColor: isActive ? "#022c22" : "transparent", borderRadius: 8, padding: "6px 0", gap: 1,
