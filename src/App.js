@@ -3151,8 +3151,8 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
           )}
         </div>
 
-        {/* Spacer for breathing room before Start Game */}
-        <div style={{ minHeight: 60 }} />
+        {/* Spacer for breathing room before Start Game - sized against viewport since content area scrolls */}
+        <div style={{ minHeight: "18vh" }} />
 
         <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
           <button style={{ ...S.btnPrimary, flex: 1, fontSize: 17, marginBottom: 0, padding: "18px" }} onClick={onViewScorecard}>▶️ Start Game</button>
@@ -3990,6 +3990,8 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
 // =============================================================================
 // SCORECARD
 // =============================================================================
+let _centreHoleNavAnimId = null;
+
 function centreHoleNav(holeNumber, attempt) {
   attempt = attempt || 0;
   const master = document.getElementById("ff-master-scroll");
@@ -4005,8 +4007,34 @@ function centreHoleNav(holeNumber, attempt) {
   }
   const btnLeft = btn.offsetLeft;
   const btnWidth = btn.offsetWidth;
-  const pos = Math.max(0, btnLeft - (containerWidth / 2) + (btnWidth / 2));
-  document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { el.scrollLeft = pos; });
+  const targetPos = Math.max(0, btnLeft - (containerWidth / 2) + (btnWidth / 2));
+
+  // Cancel any in-progress animation so movements never stack or fight each other
+  if (_centreHoleNavAnimId !== null) {
+    cancelAnimationFrame(_centreHoleNavAnimId);
+    _centreHoleNavAnimId = null;
+  }
+
+  const els = document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll");
+  const startPos = master.scrollLeft;
+  const distance = targetPos - startPos;
+  const duration = 280; // ms - single controlled glide
+  const startTime = performance.now();
+
+  function step(now) {
+    const elapsed = now - startTime;
+    const t = Math.min(1, elapsed / duration);
+    // ease-out cubic for a smooth tempo feel
+    const eased = 1 - Math.pow(1 - t, 3);
+    const current = startPos + distance * eased;
+    els.forEach((el) => { el.scrollLeft = current; });
+    if (t < 1) {
+      _centreHoleNavAnimId = requestAnimationFrame(step);
+    } else {
+      _centreHoleNavAnimId = null;
+    }
+  }
+  _centreHoleNavAnimId = requestAnimationFrame(step);
 }
 
 function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
@@ -6023,7 +6051,7 @@ const S = {
   gameName: { fontSize: 15, fontWeight: 700, color: "#f8fafc" },
   gameDesc: { fontSize: 12, color: "#64748b", marginTop: 2 },
   roundInfo: { display: "flex", alignItems: "center", gap: 12, backgroundColor: "#022c22", border: "1px solid #22c55e", borderRadius: 12, padding: "14px 16px", marginBottom: 20 },
-  holeNav: { display: "flex", gap: 4, overflowX: "auto", scrollbarWidth: "none", msOverflowStyle: "none", scrollBehavior: "smooth" },
+  holeNav: { display: "flex", gap: 4, overflowX: "auto", scrollbarWidth: "none", msOverflowStyle: "none" },
   holeNavBtn: { minWidth: 40, width: 40, height: 36, borderRadius: 8, border: "none", outline: "1px solid #334155", outlineOffset: -1, backgroundColor: "#0f172a", color: "#94a3b8", fontSize: 13, fontWeight: 600, cursor: "pointer", flexShrink: 0, fontFamily: "inherit", WebkitAppearance: "none" },
   holeNavActive: { outline: "2px solid #22c55e", outlineOffset: -1, color: "#22c55e", backgroundColor: "#022c22", fontSize: 15, fontWeight: 900, zIndex: 1 },
   holeNavDone: { backgroundColor: "#1e3a1e", color: "#22c55e", border: "1px solid #22c55e" },
