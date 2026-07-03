@@ -1056,7 +1056,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.52</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.54</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
           </div>
@@ -1071,6 +1071,9 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Content */}
         <div style={{ flex: 1, padding: "0 20px", display: "flex", flexDirection: "column" }}>
+
+          {/* Spacer above pushes the button block down, weighted 2.5:1 against the spacer below */}
+          <div style={{ flex: 2.5 }} />
 
           {/* Divider */}
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
@@ -1289,6 +1292,36 @@ function AdminDashboardScreen({ onLogout }) {
   const [courses, setCourses] = useState([]);
   const [newName, setNewName] = useState(""), [editing, setEditing] = useState(null), [holes, setHoles] = useState([]);
   const [saving, setSaving] = useState(false), [msg, setMsg] = useState(""), [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [adScanning, setAdScanning] = useState(false);
+  const [adScanError, setAdScanError] = useState("");
+  const adFileInputRef = useRef(null);
+
+  // Same scan flow as Super Admin: up to 2 photos, opens the editor for review
+  const handleAdScanScorecard = async (files) => {
+    if (!files || files.length === 0) return;
+    setAdScanning(true); setAdScanError("");
+    try {
+      // Send images to Netlify function (keeps API key server-side)
+      const response = await fetch("/.netlify/functions/scan-scorecard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ images: await Promise.all(Array.from(files).slice(0, 2).map(async (f) => ({
+          media_type: f.type || "image/jpeg",
+          data: await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result.split(",")[1]); r.onerror = rej; r.readAsDataURL(f); })
+        }))) })
+      });
+      const parsed = await response.json();
+      if (!response.ok) throw new Error(parsed.error || "Scan failed");
+      if (!parsed.name || !parsed.holes || parsed.holes.length !== 18) throw new Error("Invalid scorecard data");
+      const newCourse = { id: genId(), name: parsed.name, par: parsed.holes.reduce((s, h) => s + h.par, 0), holes: parsed.holes.map((h) => ({ hole_number: h.hole_number, par: h.par, stroke_index: h.stroke_index })) };
+      setEditing(newCourse);
+      setHoles(newCourse.holes);
+    } catch(e) {
+      console.error("Scan error:", e);
+      setAdScanError("Error: " + (e.message || "Unknown error. Check browser console for details."));
+    }
+    setAdScanning(false);
+  };
 
   useEffect(() => {
     (async () => {
@@ -1360,7 +1393,12 @@ function AdminDashboardScreen({ onLogout }) {
             ))}
             <div style={{ ...S.stepWrap, marginTop: 24 }}>
               <h4 style={S.stepTitle}>Add New Course</h4>
-
+              {/* Scan Scorecard button - same as Super Admin */}
+              <input ref={adFileInputRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={(e) => handleAdScanScorecard(e.target.files)} />
+              <button onClick={() => adFileInputRef.current?.click()} disabled={adScanning} style={{ width: "100%", backgroundColor: "#1e293b", border: "2px dashed #22c55e", borderRadius: 10, padding: "12px", fontSize: 13, fontWeight: 700, color: adScanning ? "#475569" : "#22c55e", cursor: adScanning ? "not-allowed" : "pointer", fontFamily: "inherit", marginBottom: 8 }}>
+                {adScanning ? "📷 Reading scorecard..." : "📷 Scan Scorecard (1-2 photos)"}
+              </button>
+              {adScanError && <div style={{ fontSize: 12, color: "#ef4444", marginBottom: 8 }}>{adScanError}</div>}
               <div style={{ textAlign: "center", color: "#f8fafc", fontSize: 13, margin: "8px 0" }}>or add manually</div>
               <input style={S.input} placeholder="Course name" value={newName} onChange={(e) => setNewName(e.target.value)} />
               <button style={newName ? S.btnPrimary : S.btnDisabled} disabled={!newName} onClick={startNew}>Create Course Manually</button>
@@ -2651,23 +2689,24 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
             </div>
             <div style={{ maxHeight: "calc(100vh - 280px)", overflowY: "auto" }}>
 
-            <input ref={crFileInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={async (e) => {
+            <input ref={crFileInputRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={async (e) => {
               const files = e.target.files;
               if (!files || files.length === 0) return;
               setCrScanning(true); setCrScanErr("");
               try {
-                const imageFile = Array.from(files)[0];
-                const base64Data = await new Promise((res, rej) => {
-                  const reader = new FileReader();
-                  reader.onload = () => { const result = reader.result; if (typeof result !== "string" || !result.includes(",")) { rej(new Error("Image could not be read.")); return; } res(result.split(",")[1]); };
-                  reader.onerror = () => rej(new Error("Failed to read image."));
-                  reader.readAsDataURL(imageFile);
+                // Same scan flow as Super Admin: up to 2 photos
+                const response = await fetch("/.netlify/functions/scan-scorecard", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ images: await Promise.all(Array.from(files).slice(0, 2).map(async (f) => ({
+                    media_type: f.type || "image/jpeg",
+                    data: await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result.split(",")[1]); r.onerror = rej; r.readAsDataURL(f); })
+                  }))) })
                 });
-                const mediaType = imageFile.type && imageFile.type.includes("png") ? "image/png" : "image/jpeg";
-                const response = await fetch("/.netlify/functions/scan-scorecard", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ images: [{ media_type: mediaType, data: base64Data }] }) });
                 const parsed = await response.json();
                 if (!response.ok) throw new Error(parsed.error || "Scan failed");
-                const newCourse = { id: genId(), name: parsed.course_name || "Scanned Course", par: parsed.holes?.reduce((s, h) => s + (h.par || 0), 0) || 72, holes: parsed.holes };
+                if (!parsed.name || !parsed.holes || parsed.holes.length !== 18) throw new Error("Invalid scorecard data");
+                const newCourse = { id: genId(), name: parsed.name, par: parsed.holes.reduce((s, h) => s + h.par, 0), holes: parsed.holes.map((h) => ({ hole_number: h.hole_number, par: h.par, stroke_index: h.stroke_index })) };
                 await supabase.from("courses").insert([{ id: newCourse.id, name: newCourse.name, par: newCourse.par, holes: newCourse.holes }]);
                 setCourses(prev => [...prev, newCourse].sort((a, b) => a.name.localeCompare(b.name)));
                 setCourse(newCourse);
@@ -2681,7 +2720,7 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
                   + Add a Course Manually
                 </button>
                 <button onClick={() => { setCrScanErr(""); crFileInputRef.current?.click(); }} disabled={crScanning} style={{ width: "100%", backgroundColor: "#022c22", border: "2px dashed #22c55e", borderRadius: 10, padding: "12px 12px 10px", cursor: crScanning ? "not-allowed" : "pointer", fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: crScanning ? "#475569" : "#22c55e" }}>{crScanning ? "📷 Reading scorecard..." : "📷 Scan a Scorecard to Add Course"}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: crScanning ? "#475569" : "#22c55e" }}>{crScanning ? "📷 Reading scorecard..." : "📷 Scan Scorecard (1-2 photos)"}</span>
                   {!crScanning && <span style={{ fontSize: 11, color: "#94a3b8" }}>Take a photo of a physical card or screenshot from online</span>}
                 </button>
               </div>
