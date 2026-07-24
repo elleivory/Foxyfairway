@@ -114,10 +114,29 @@ function getHolesForRound(round) {
 // =============================================================================
 // GOLF LOGIC
 // =============================================================================
+function parseHcp(v) {
+  // "+2" means plus handicap (better than scratch), stored internally as -2
+  if (v == null || v === "") return 0;
+  const str = String(v).trim();
+  if (str.startsWith("+")) return -(parseFloat(str.slice(1)) || 0);
+  return parseFloat(str) || 0;
+}
+
+function fmtHcp(h) {
+  // Display: -2 stored -> "+2" shown. Plain handicaps unchanged.
+  const n = parseFloat(h) || 0;
+  return n < 0 ? "+" + String(Math.abs(n)) : String(n);
+}
+
 function getHcpStrokes(handicap, strokeIndex, useHandicap = true) {
   if (!useHandicap) return 0; // Scratch mode
   if (!handicap || handicap === 0) return 0;
   const hcpFloat = parseFloat(handicap);
+  if (hcpFloat < 0) {
+    // Plus handicapper gives strokes back on the easiest holes (highest stroke indexes)
+    const give = Math.round(Math.abs(hcpFloat));
+    return parseInt(strokeIndex) > 18 - give ? -1 : 0;
+  }
   const hcpWhole = Math.floor(hcpFloat);
   const fraction = hcpFloat - hcpWhole;
   const si = parseInt(strokeIndex);
@@ -642,7 +661,7 @@ async function exportScorecardPDF(round, players, scores, holes) {
     return `
       <div style="margin-bottom:20px;page-break-inside:avoid">
         <div style="background:#1a2a3a;color:white;padding:8px 12px;font-weight:bold;font-size:14px;border-radius:4px 4px 0 0">
-          ${player.name} (HCP ${player.handicap}) · ${setLabel} · ${GAME_TYPES[round.game_type]?.label}
+          ${player.name} (HCP ${fmtHcp(player.handicap)}) · ${setLabel} · ${GAME_TYPES[round.game_type]?.label}
         </div>
         <table style="width:100%;border-collapse:collapse;font-family:sans-serif">
           <tr><td style="border:1px solid #ccc;padding:5px;background:#e8e8e8;font-weight:bold;font-size:11px">Hole</td>${holeRow}<td style="border:1px solid #ccc;padding:5px;background:#e8e8e8;font-weight:bold;text-align:center;font-size:11px">Total</td></tr>
@@ -694,7 +713,7 @@ async function exportScorecardPDF_OLD(round, players, scores, holes) {
       return `<td style="background:${bg};color:#fff;text-align:center;padding:6px 4px;border:1px solid #0f172a;font-weight:bold">${score || "—"}</td>`;
     }).join("");
     const gross9 = holeSet.reduce((s, h) => s + (scores.find((sc) => sc.player_id === player.id && sc.hole_number === h.hole_number)?.score || 0), 0);
-    return `<tr><td style="padding:6px 10px;background:#1e293b;color:#f8fafc;font-weight:bold;border:1px solid #0f172a">${player.name} (${player.handicap})</td>${cells}<td style="padding:6px 4px;background:#022c22;color:#22c55e;text-align:center;font-weight:bold;border:1px solid #0f172a">${gross9 || "—"}</td></tr>`;
+    return `<tr><td style="padding:6px 10px;background:#1e293b;color:#f8fafc;font-weight:bold;border:1px solid #0f172a">${player.name} (${fmtHcp(player.handicap)})</td>${cells}<td style="padding:6px 4px;background:#022c22;color:#22c55e;text-align:center;font-weight:bold;border:1px solid #0f172a">${gross9 || "—"}</td></tr>`;
   };
   
   const buildHalfTable = (holeSet, title) => {
@@ -783,7 +802,7 @@ function exportScorecardImage(round, players, scores, holes) {
   players.forEach((p, pi) => {
     const y = tableTop + rowH * (pi + 2);
     const bg = pi % 2 === 0 ? "#0f172a" : "#111827";
-    drawCell(p.name + " (" + p.handicap + ")", padding, y, leftW, rowH, bg, "#f8fafc", true);
+    drawCell(p.name + " (" + fmtHcp(p.handicap) + ")", padding, y, leftW, rowH, bg, "#f8fafc", true);
     let gross = 0, toPar = 0;
     holes.forEach((h, hi) => {
       const s = scores.find((sc) => sc.player_id === p.id && sc.hole_number === h.hole_number);
@@ -1056,7 +1075,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.54</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.56</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
           </div>
@@ -1492,6 +1511,49 @@ function AdminDashboardScreen({ onLogout }) {
 // =============================================================================
 function SuperAdminScreen({ onLogout, onEnterRound }) {
   const [tab, setTab] = useState("rounds");
+  // Ask Card: chat with Claude about a scanned completed scorecard
+  const [acImages, setAcImages] = useState([]); // [{media_type, data}]
+  const [acMsgs, setAcMsgs] = useState([]); // [{role, content}]
+  const [acInput, setAcInput] = useState("");
+  const [acBusy, setAcBusy] = useState(false);
+  const [acErr, setAcErr] = useState("");
+  const acFileRef = useRef(null);
+
+  const handleAcPhotos = async (fileArr) => {
+    if (!fileArr || fileArr.length === 0) return;
+    setAcErr("");
+    try {
+      const imgs = await Promise.all(fileArr.slice(0, 2).map(async (f) => ({
+        media_type: f.type && f.type.includes("png") ? "image/png" : "image/jpeg",
+        data: await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result.split(",")[1]); r.onerror = rej; r.readAsDataURL(f); })
+      })));
+      setAcImages(imgs);
+      setAcMsgs([]); // new card = fresh conversation
+    } catch(e) { setAcErr("Could not read photo: " + (e.message || "unknown error")); }
+  };
+
+  const handleAcAsk = async () => {
+    const q = acInput.trim();
+    if (!q || acBusy || acImages.length === 0) return;
+    setAcBusy(true); setAcErr(""); setAcInput("");
+    const history = acMsgs;
+    setAcMsgs(prev => [...prev, { role: "user", content: q }]);
+    try {
+      const response = await fetch("/.netlify/functions/ask-scorecard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ images: acImages, question: q, history })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Request failed");
+      setAcMsgs(prev => [...prev, { role: "assistant", content: data.answer }]);
+    } catch(e) {
+      setAcErr("Error: " + (e.message || "unknown") + ". If this mentions credits or billing, top up at console.anthropic.com.");
+      setAcMsgs(prev => prev.slice(0, -1)); // roll back the unanswered question
+      setAcInput(q);
+    }
+    setAcBusy(false);
+  };
   const [rounds, setRounds] = useState([]);
   const [blocked, setBlocked] = useState([]);
   const [allPlayers, setAllPlayers] = useState([]);
@@ -1605,7 +1667,7 @@ function SuperAdminScreen({ onLogout, onEnterRound }) {
       const round = await dbCreateRound({ code, course_name: course.name, course_id: course.id, game_type: srGameType, holes: course.holes, use_handicap: srUseHandicap, created_at: new Date().toISOString(), created_by: "Super Admin", is_scanned: true });
       for (const sp of players) {
         const team = srGameType === "matchplay_teams" ? (srTeams[sp.tempId] || "A") : null;
-        const p = await dbCreatePlayer({ name: sp.name, handicap: srUseHandicap ? (parseFloat(sp.handicap)||0) : 0, round_id: round.id, team, is_placeholder: false });
+        const p = await dbCreatePlayer({ name: sp.name, handicap: srUseHandicap ? (parseHcp(sp.handicap)) : 0, round_id: round.id, team, is_placeholder: false });
         for (const hs of sp.scores) {
           if (hs.score && parseInt(hs.score) > 0) {
             // Use plain insert for scanned rounds - these are new scores, not updates
@@ -1703,7 +1765,7 @@ function SuperAdminScreen({ onLogout, onEnterRound }) {
           ))}
         </div>
         <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
-          {[["tournaments","Tournaments"],["courses","Courses"],["stats","Stats"]].map(([key,label]) => (
+          {[["tournaments","Tournaments"],["courses","Courses"],["stats","Stats"],["askcard","\ud83e\udd16 Ask Card"]].map(([key,label]) => (
             <button key={key} onClick={() => setTab(key)} style={{ flex: 1, padding: "8px 4px", borderRadius: 8, border: "none", backgroundColor: tab === key ? "#22c55e" : "#1e293b", color: tab === key ? "#0f172a" : "#94a3b8", fontWeight: 700, fontSize: 10, cursor: "pointer", fontFamily: "inherit", outline: "none" }}>{label}</button>
           ))}
         </div>
@@ -1742,7 +1804,7 @@ function SuperAdminScreen({ onLogout, onEnterRound }) {
                 <div key={p.id} style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 10, padding: "10px 14px", marginBottom: 6, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 600, color: "#f8fafc" }}>{p.name}</div>
-                    <div style={{ fontSize: 11, color: "#64748b" }}>HCP {p.handicap} · {new Date(p.created_at).toLocaleDateString("en-NZ")} {new Date(p.created_at).toLocaleTimeString("en-NZ", { hour: "2-digit", minute: "2-digit" })}</div>
+                    <div style={{ fontSize: 11, color: "#64748b" }}>HCP {fmtHcp(p.handicap)} · {new Date(p.created_at).toLocaleDateString("en-NZ")} {new Date(p.created_at).toLocaleTimeString("en-NZ", { hour: "2-digit", minute: "2-digit" })}</div>
                     {playerRound && <div style={{ fontSize: 11, color: "#22c55e", fontWeight: 600, marginTop: 2 }}>{playerRound.code} · {playerRound.course_name}</div>}
                   </div>
                   {playerRound && (
@@ -1943,7 +2005,7 @@ function SuperAdminScreen({ onLogout, onEnterRound }) {
                       <div style={{ fontSize: 18, fontWeight: 800, color: i === 0 ? "#f59e0b" : "#475569", width: 24 }}>{i+1}</div>
                       <div>
                         <div style={{ fontSize: 14, fontWeight: 700, color: "#f8fafc" }}>{p.name}</div>
-                        <div style={{ fontSize: 11, color: "#94a3b8" }}>HCP {p.handicap} · {p.holesPlayed} holes</div>
+                        <div style={{ fontSize: 11, color: "#94a3b8" }}>HCP {fmtHcp(p.handicap)} · {p.holesPlayed} holes</div>
                       </div>
                     </div>
                     <div style={{ textAlign: "right" }}>
@@ -2015,7 +2077,7 @@ function SuperAdminScreen({ onLogout, onEnterRound }) {
                       <div key={p.tempId} style={{ backgroundColor: "#1e293b", border: "1px solid #22c55e", borderRadius: 10, padding: "10px 14px", marginBottom: 6, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <div>
                           <div style={{ fontSize: 13, fontWeight: 700, color: "#f8fafc" }}>{p.name}</div>
-                          <div style={{ fontSize: 11, color: "#94a3b8" }}>HCP {p.handicap} · {p.scores.filter(s => s.score && s.score !== "").length} holes</div>
+                          <div style={{ fontSize: 11, color: "#94a3b8" }}>HCP {fmtHcp(p.handicap)} · {p.scores.filter(s => s.score && s.score !== "").length} holes</div>
                         </div>
                         <button onClick={() => setSrPlayers(prev => prev.filter(x => x.tempId !== p.tempId))} style={{ background: "none", border: "1px solid #334155", borderRadius: 6, color: "#ef4444", fontSize: 10, fontWeight: 600, padding: "4px 8px", cursor: "pointer", fontFamily: "inherit" }}>Remove</button>
                       </div>
@@ -2078,7 +2140,7 @@ function SuperAdminScreen({ onLogout, onEnterRound }) {
                 <h3 style={S.stepTitle}>Confirm Handicap</h3>
                 <div style={{ fontSize: 12, color: "#f8fafc", marginBottom: 8 }}>Player: <strong style={{ color: "#f8fafc" }}>{srEditName}</strong></div>
                 <div style={{ fontSize: 12, color: "#f8fafc", marginBottom: 16 }}>Edit if the handicap looks wrong.</div>
-                <input style={{ ...S.input, fontSize: 16, fontWeight: 700, marginBottom: 16 }} value={srEditHcp} onChange={(e) => setSrEditHcp(e.target.value)} placeholder="Handicap (e.g. 14)" type="number" autoFocus />
+                <input style={{ ...S.input, fontSize: 16, fontWeight: 700, marginBottom: 16 }} value={srEditHcp} onChange={(e) => setSrEditHcp(e.target.value)} placeholder="Handicap (e.g. 14 or +2)" type="text" autoFocus />
                 <button style={S.btnPrimary} onClick={() => setSrStep("confirm-scores")}>Confirm Handicap</button>
                 <button style={S.btnSecondary} onClick={() => setSrStep("confirm-name")}>Back</button>
               </div>
@@ -2130,13 +2192,13 @@ function SuperAdminScreen({ onLogout, onEnterRound }) {
                   })}
                 </div>
                 <button style={S.btnPrimary} onClick={() => {
-                  const player = { tempId: genId(), name: srEditName.trim(), handicap: parseFloat(srEditHcp) || 0, scores: srEditScores };
+                  const player = { tempId: genId(), name: srEditName.trim(), handicap: parseHcp(srEditHcp), scores: srEditScores };
                   setSrPlayers(prev => [...prev, player]);
                   setSrEditName(""); setSrEditHcp(""); setSrEditScores(Array.from({length:18},(_,i)=>({hole_number:i+1,score:""})));
                   setSrCurrentScan(null); setSrStep("scan");
                 }}>Add Player + Scan Next</button>
                 <button style={{ ...S.btnPrimary, backgroundColor: "#0f172a", border: "1px solid #22c55e", color: "#22c55e", marginTop: 8 }} onClick={() => {
-                  const player = { tempId: genId(), name: srEditName.trim(), handicap: parseFloat(srEditHcp) || 0, scores: srEditScores };
+                  const player = { tempId: genId(), name: srEditName.trim(), handicap: parseHcp(srEditHcp), scores: srEditScores };
                   const allPlayers = [...srPlayers, player];
                   setSrPlayers(allPlayers);
                   setSrEditName(""); setSrEditHcp(""); setSrEditScores(Array.from({length:18},(_,i)=>({hole_number:i+1,score:""})));
@@ -2149,6 +2211,34 @@ function SuperAdminScreen({ onLogout, onEnterRound }) {
             )}
           </div>
         )}
+        {tab === "askcard" && !loading && (
+          <div>
+            <input ref={acFileRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={(e) => { const fl = Array.from(e.target.files || []); e.target.value = ""; handleAcPhotos(fl); }} />
+            <button onClick={() => acFileRef.current?.click()} style={{ width: "100%", backgroundColor: "#1e293b", border: "2px dashed #22c55e", borderRadius: 10, padding: "12px", fontSize: 13, fontWeight: 700, color: "#22c55e", cursor: "pointer", fontFamily: "inherit", marginBottom: 8 }}>
+              {acImages.length === 0 ? "\ud83d\udcf7 Load Scorecard (1-2 photos)" : "\ud83d\udcf7 Card loaded (" + acImages.length + (acImages.length === 1 ? " photo" : " photos") + ") \u00b7 tap to change"}
+            </button>
+            {acImages.length === 0 && <div style={{ fontSize: 12, color: "#94a3b8", textAlign: "center", marginBottom: 12 }}>Load a completed card, then ask anything: totals, a partner's score, stableford points, who won.</div>}
+            {acErr && <div style={{ fontSize: 12, color: "#ef4444", marginBottom: 10 }}>{acErr}</div>}
+            {acImages.length > 0 && (
+              <div>
+                <div style={{ backgroundColor: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 12, padding: 12, marginBottom: 10, minHeight: 120, maxHeight: 360, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
+                  {acMsgs.length === 0 && <div style={{ fontSize: 12, color: "#475569", textAlign: "center", margin: "auto" }}>Ask your first question about this card</div>}
+                  {acMsgs.map((m, i) => (
+                    <div key={i} style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start" }}>
+                      <div style={{ backgroundColor: m.role === "user" ? "#22c55e" : "#0f172a", color: m.role === "user" ? "#0f172a" : "#f8fafc", border: m.role === "user" ? "none" : "1px solid #334155", borderRadius: m.role === "user" ? "14px 14px 4px 14px" : "14px 14px 14px 4px", padding: "9px 12px", fontSize: 13, maxWidth: "85%", whiteSpace: "pre-wrap", lineHeight: 1.45 }}>{m.content}</div>
+                    </div>
+                  ))}
+                  {acBusy && <div style={{ fontSize: 12, color: "#94a3b8" }}>Reading the card...</div>}
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input style={{ ...S.input, flex: 1, marginBottom: 0 }} placeholder="e.g. What's my total? Stableford points?" value={acInput} onChange={(e) => setAcInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleAcAsk(); }} />
+                  <button onClick={handleAcAsk} disabled={acBusy || !acInput.trim()} style={{ backgroundColor: acBusy || !acInput.trim() ? "#334155" : "#22c55e", color: acBusy || !acInput.trim() ? "#64748b" : "#0f172a", border: "none", borderRadius: 10, padding: "0 18px", fontSize: 14, fontWeight: 700, cursor: acBusy || !acInput.trim() ? "not-allowed" : "pointer", fontFamily: "inherit", flexShrink: 0 }}>Ask</button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {tab === "stats" && !loading && (
           <div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
@@ -2658,8 +2748,8 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
     try {
       const code = Math.random().toString(36).substr(2, 6).toUpperCase();
       const round = await dbCreateRound({ code, course_name: course.name, course_id: course.id, game_type: gameType, holes: course.holes, use_handicap: useHandicap, created_at: new Date().toISOString(), created_by: name });
-      const me = await dbCreatePlayer({ name, handicap: useHandicap ? (parseFloat(hcp) || 0) : 0, round_id: round.id, team: gameType === "matchplay_teams" ? team : null, is_placeholder: false });
-      savePlayerProfile(name, parseFloat(hcp) || 0);
+      const me = await dbCreatePlayer({ name, handicap: useHandicap ? (parseHcp(hcp)) : 0, round_id: round.id, team: gameType === "matchplay_teams" ? team : null, is_placeholder: false });
+      savePlayerProfile(name, parseHcp(hcp));
       const fullRound = { ...round, holes: course.holes };
       saveLastRound(fullRound, me);
       if (selectedTournament) {
@@ -2854,7 +2944,7 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
             <label style={{ ...S.label, color: "#f8fafc" }}>Your name</label>
             <input style={S.input} placeholder="e.g. Jamie" value={name} onChange={(e) => setName(e.target.value)} />
             {useHandicap && <label style={{ ...S.label, color: "#f8fafc" }}>Your handicap</label>}
-            {useHandicap && <input style={S.input} type="number" step="0.1" placeholder="0" value={hcp} onChange={(e) => setHcp(e.target.value)} />}
+            {useHandicap && <input style={S.input} type="text" placeholder="e.g. 8 or +2" value={hcp} onChange={(e) => setHcp(e.target.value)} />}
             {useHandicap && <p style={{ ...S.hint, color: "#f8fafc" }}>Decimals OK e.g. 9.2</p>}
             <label style={{ ...S.label, color: "#f8fafc" }}>Handicap scoring</label>
             <div style={{ display: "flex", backgroundColor: "#1e293b", borderRadius: 10, padding: 4, gap: 4 }}>
@@ -2984,8 +3074,8 @@ function JoinRoundScreen({ onBack, onJoined, prefillCode }) {
       const blocked = await dbIsPlayerBlocked(name);
       if (blocked) { setErr("This name has been blocked. Please contact the organiser."); setLoading(false); return; }
       const existing = await dbFindPlayerByName(round.id, name);
-      const me = existing || await dbCreatePlayer({ name, handicap: round.use_handicap === false ? 0 : (parseFloat(hcp) || 0), round_id: round.id, team: round.game_type === "matchplay_teams" ? team : null, is_placeholder: false });
-      savePlayerProfile(name, parseFloat(hcp) || 0);
+      const me = existing || await dbCreatePlayer({ name, handicap: round.use_handicap === false ? 0 : (parseHcp(hcp)), round_id: round.id, team: round.game_type === "matchplay_teams" ? team : null, is_placeholder: false });
+      savePlayerProfile(name, parseHcp(hcp));
       const fullRound = { ...round, holes: round.holes?.length ? round.holes : getHolesForRound(round) };
       saveLastRound(fullRound, me);
       onJoined(fullRound, me);
@@ -3022,7 +3112,7 @@ function JoinRoundScreen({ onBack, onJoined, prefillCode }) {
             <label style={S.label}>Your name</label>
             <input style={S.input} placeholder="e.g. Chris" value={name} onChange={(e) => setName(e.target.value)} />
             {round.use_handicap !== false && <label style={S.label}>Your handicap</label>}
-            {round.use_handicap !== false && <input style={S.input} type="number" placeholder="0" value={hcp} onChange={(e) => setHcp(e.target.value)} />}
+            {round.use_handicap !== false && <input style={S.input} type="text" placeholder="e.g. 8 or +2" value={hcp} onChange={(e) => setHcp(e.target.value)} />}
             {round.use_handicap === false && <p style={{ ...S.hint, color: "#f59e0b" }}>This is a scratch round - no handicaps applied</p>}
             {round.game_type === "matchplay_teams" && (<>
               <label style={S.label}>Your team</label>
@@ -3085,6 +3175,32 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
   const [gameAdminTab, setGameAdminTab] = useState("scores");
   const [adminEditHoles, setAdminEditHoles] = useState([]);
   const [adminEditScores, setAdminEditScores] = useState({});
+  const [scanCardFor, setScanCardFor] = useState(null); // player id being scanned, doubles as busy flag
+  const [scanCardErr, setScanCardErr] = useState("");
+  const scanCardInputRef = useRef(null);
+
+  // Scan a completed player card (1-2 photos) into the Scores tab for review, then Save applies it
+  const handleScanPlayerCard = async (playerId, fileArr) => {
+    if (!playerId || !fileArr || fileArr.length === 0) { setScanCardFor(null); return; }
+    setScanCardErr("");
+    try {
+      const response = await fetch("/.netlify/functions/scan-player-scorecard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ images: await Promise.all(fileArr.slice(0, 2).map(async (f) => ({
+          media_type: f.type && f.type.includes("png") ? "image/png" : "image/jpeg",
+          data: await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result.split(",")[1]); r.onerror = rej; r.readAsDataURL(f); })
+        }))) })
+      });
+      const parsed = await response.json();
+      if (!response.ok) throw new Error(parsed.error || "Scan failed");
+      const map = {};
+      for (let i = 1; i <= 18; i++) { const v = parseInt(parsed.scores?.[i]); if (v > 0) map[i] = v; }
+      if (Object.keys(map).length !== 18) throw new Error("Read " + Object.keys(map).length + " of 18 holes. Please scan a fully completed card (a front 9 and back 9 photo works well).");
+      setAdminEditScores(prev => ({ ...prev, [playerId]: map }));
+    } catch(e) { setScanCardErr(e.message || "Scan failed"); }
+    setScanCardFor(null);
+  };
   const [adminSaving, setAdminSaving] = useState(false);
   const [adminMsg, setAdminMsg] = useState("");
   const [guestName, setGuestName] = useState("");
@@ -3106,7 +3222,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
     if (!guestName.trim()) return;
     setAddingGuest(true);
     try {
-      await dbCreatePlayer({ name: guestName.trim() + " (Guest)", handicap: round.use_handicap === false ? 0 : (parseFloat(guestHcp) || 0), round_id: round.id, team: round.game_type === "matchplay_teams" ? guestTeam : null, is_placeholder: false });
+      await dbCreatePlayer({ name: guestName.trim() + " (Guest)", handicap: round.use_handicap === false ? 0 : (parseHcp(guestHcp)), round_id: round.id, team: round.game_type === "matchplay_teams" ? guestTeam : null, is_placeholder: false });
       setGuestName(""); setGuestHcp(""); setGuestTeam("A"); setShowAddGuest(false);
       const p = await dbGetPlayers(round.id); setPlayers(p);
     } catch(e) { console.error(e); }
@@ -3137,7 +3253,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
           <button style={S.backBtn} onClick={() => { if (isSpectator || window.confirm("Exit round? It stays saved.")) onBack(); }}>← Back</button>
           <div style={{ flex: 1, textAlign: "center" }}>
             <div style={{ fontSize: 15, fontWeight: 700, color: "#f8fafc" }}>{round.course_name}</div>
-            <div style={{ fontSize: 11, color: "#f8fafc" }}>{GAME_TYPES[round.game_type]?.label}{round.use_handicap === false ? " · Scratch" : ""} · {me?.name} (HCP {me?.handicap})</div>
+            <div style={{ fontSize: 11, color: "#f8fafc" }}>{GAME_TYPES[round.game_type]?.label}{round.use_handicap === false ? " · Scratch" : ""} · {me?.name} (HCP {fmtHcp(me?.handicap)})</div>
           </div>
           <div style={{ width: 40, flexShrink: 0 }} />
         </div>
@@ -3240,7 +3356,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
             <input style={{ ...S.input, marginBottom: 10 }} placeholder="e.g. Matt" value={guestName} onChange={(e) => setGuestName(e.target.value)} />
             {round.use_handicap !== false && <>
               <label style={S.label}>Handicap</label>
-              <input style={{ ...S.input, marginBottom: 10 }} type="number" step="0.1" placeholder="0" value={guestHcp} onChange={(e) => setGuestHcp(e.target.value)} />
+              <input style={{ ...S.input, marginBottom: 10 }} type="text" placeholder="e.g. 8 or +2" value={guestHcp} onChange={(e) => setGuestHcp(e.target.value)} />
             </>}
             {round.game_type === "matchplay_teams" && (
               <div style={{ marginBottom: 10 }}>
@@ -3315,7 +3431,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
                       <div style={{ fontSize: 18, fontWeight: 800, color: tc, width: 28, flexShrink: 0 }}>{tl}</div>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 16, fontWeight: 700, color: "#f8fafc", marginBottom: 3 }}>{tt === 0 ? "0 pts" : tt + (tt === 1 ? " pt" : " pts")} won</div>
-                        <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 5 }}>{tp.map((p) => p.name.replace(" (Guest)", "") + " (HCP " + p.handicap + ")").join(" & ")}</div>
+                        <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 5 }}>{tp.map((p) => p.name.replace(" (Guest)", "") + " (HCP " + fmtHcp(p.handicap) + ")").join(" & ")}</div>
                         <div style={{ display: "flex", gap: 3, overflowX: "auto", scrollbarWidth: "none" }}>
                           {holePills.map(({ h, res }) => (
                             <div key={h} style={{ minWidth: 26, background: "#0f172a", borderRadius: 5, padding: "2px 4px", textAlign: "center", border: "1px solid #1e293b", flexShrink: 0 }}>
@@ -3333,7 +3449,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
                     {/* Individual players */}
                     {tp.map((p, pi) => (
                       <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "7px 0", borderBottom: pi < tp.length - 1 ? "1px solid #0f172a" : "none" }}>
-                        <div style={{ flex: 1, fontSize: 14, fontWeight: 600, color: "#f8fafc" }}>{p.name.replace(" (Guest)", "")}{p.name.endsWith("(Guest)") ? <span style={{ fontSize: 10, color: "#475569", marginLeft: 4 }}>(Guest)</span> : ""}<span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 400, marginLeft: 6 }}>HCP {p.handicap}</span></div>
+                        <div style={{ flex: 1, fontSize: 14, fontWeight: 600, color: "#f8fafc" }}>{p.name.replace(" (Guest)", "")}{p.name.endsWith("(Guest)") ? <span style={{ fontSize: 10, color: "#475569", marginLeft: 4 }}>(Guest)</span> : ""}<span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 400, marginLeft: 6 }}>HCP {fmtHcp(p.handicap)}</span></div>
                         <div style={{ fontSize: 14, fontWeight: 700, color: p.total > 0 ? tc : "#94a3b8" }}>{p.total} {p.total === 1 ? "pt" : "pts"}</div>
                       </div>
                     ))}
@@ -3361,7 +3477,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
                     <div style={{ fontSize: 16, fontWeight: 900, color: i === 0 ? "#f59e0b" : i === 1 ? "#94a3b8" : i === 2 ? "#cd7c2f" : "#475569", width: 18, flexShrink: 0 }}>{i + 1}</div>
                     <div style={{ minWidth: 0 }}>
                       <span style={{ fontSize: 15, fontWeight: 700, color: "#f8fafc" }}>{p.name.replace(" (Guest)", "")}</span>
-                      <span style={{ fontSize: 11, color: "#f8fafc", marginLeft: 6, fontWeight: 500 }}>HCP {p.handicap}</span>
+                      <span style={{ fontSize: 11, color: "#f8fafc", marginLeft: 6, fontWeight: 500 }}>HCP {fmtHcp(p.handicap)}</span>
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
@@ -3407,9 +3523,9 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
             <div style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: 14, marginBottom: 16 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: "#f8fafc", marginBottom: 10 }}>Edit {ep.name}</div>
               <input style={{ ...S.input, marginBottom: 8 }} placeholder="Name" value={editPlayerName} onChange={(e) => setEditPlayerName(e.target.value)} />
-              <input style={{ ...S.input, marginBottom: 10 }} type="number" placeholder="Handicap" value={editPlayerHcp} onChange={(e) => setEditPlayerHcp(e.target.value)} />
+              <input style={{ ...S.input, marginBottom: 10 }} type="text" placeholder="Handicap (e.g. 8 or +2)" value={editPlayerHcp} onChange={(e) => setEditPlayerHcp(e.target.value)} />
               <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={async () => { const isGuest = ep.name?.endsWith("(Guest)"); const finalName = isGuest && !editPlayerName.endsWith("(Guest)") ? editPlayerName.trim() + " (Guest)" : editPlayerName.trim(); await supabase.from("players").update({ name: finalName, handicap: parseFloat(editPlayerHcp) || 0 }).eq("id", ep.id); setEditingPlayerId(null); refresh(); }} style={{ flex: 1, backgroundColor: "#22c55e", color: "#0f172a", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Save</button>
+                <button onClick={async () => { const isGuest = ep.name?.endsWith("(Guest)"); const finalName = isGuest && !editPlayerName.endsWith("(Guest)") ? editPlayerName.trim() + " (Guest)" : editPlayerName.trim(); await supabase.from("players").update({ name: finalName, handicap: parseHcp(editPlayerHcp) }).eq("id", ep.id); setEditingPlayerId(null); refresh(); }} style={{ flex: 1, backgroundColor: "#22c55e", color: "#0f172a", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Save</button>
                 <button onClick={() => setEditingPlayerId(null)} style={{ flex: 1, backgroundColor: "transparent", color: "#64748b", border: "1px solid #334155", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
               </div>
             </div>
@@ -3679,10 +3795,15 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
                 {/* SCORES TAB */}
                 {gameAdminTab === "scores" && (
                   <div>
-                    <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 12 }}>Tap any score to edit. Changes save to this round only.</div>
+                    <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 12 }}>Tap any score to edit, or scan a player's completed card. Changes save to this round only.</div>
+                    <input ref={scanCardInputRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={(e) => { const fl = Array.from(e.target.files || []); e.target.value = ""; handleScanPlayerCard(scanCardFor, fl); }} />
+                    {scanCardErr && <div style={{ fontSize: 12, color: "#ef4444", marginBottom: 10 }}>{scanCardErr}</div>}
                     {[...players].map((player) => (
                       <div key={player.id} style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: 12, marginBottom: 12 }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: "#22c55e", marginBottom: 8 }}>{player.name} <span style={{ color: "#475569", fontWeight: 400 }}>HCP {player.handicap}</span></div>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, gap: 8 }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: "#22c55e", minWidth: 0 }}>{player.name} <span style={{ color: "#475569", fontWeight: 400 }}>HCP {fmtHcp(player.handicap)}</span></div>
+                          <button onClick={() => { setScanCardFor(player.id); scanCardInputRef.current?.click(); }} disabled={!!scanCardFor} style={{ backgroundColor: "transparent", border: "1px solid #22c55e", borderRadius: 8, color: scanCardFor === player.id ? "#475569" : "#22c55e", fontSize: 10, fontWeight: 700, padding: "4px 8px", cursor: scanCardFor ? "not-allowed" : "pointer", fontFamily: "inherit", flexShrink: 0 }}>{scanCardFor === player.id ? "Reading..." : "\ud83d\udcf7 Scan Card"}</button>
+                        </div>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                           {[holes.slice(0,9), holes.slice(9,18)].map((nine, ni) => (
                             <div key={ni} style={{ backgroundColor: "#0f172a", borderRadius: 8, padding: 8 }}>
@@ -3733,8 +3854,8 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
                       <div style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: 14, marginBottom: 12 }}>
                         <div style={{ fontSize: 13, fontWeight: 700, color: "#f8fafc", marginBottom: 10 }}>➕ Add Guest Player</div>
                         <input style={{ backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 10, padding: "12px 14px", color: "#f8fafc", fontSize: 14, width: "100%", outline: "none", fontFamily: "inherit", marginBottom: 8, boxSizing: "border-box" }} placeholder="Guest name" value={guestName} onChange={(e) => setGuestName(e.target.value)} />
-                        {round.use_handicap !== false && <input style={{ backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 10, padding: "12px 14px", color: "#f8fafc", fontSize: 14, width: "100%", outline: "none", fontFamily: "inherit", marginBottom: 12, boxSizing: "border-box" }} type="number" placeholder="Handicap" value={guestHcp} onChange={(e) => setGuestHcp(e.target.value)} />}
-                        <button onClick={async () => { if (!guestName.trim()) return; setAddingGuest(true); try { await dbCreatePlayer({ name: guestName.trim() + " (Guest)", handicap: round.use_handicap === false ? 0 : (parseFloat(guestHcp) || 0), round_id: round.id, is_placeholder: false }); setGuestName(""); setGuestHcp(""); const p = await dbGetPlayers(round.id); setPlayers(p); } catch(e) { console.error(e); } setAddingGuest(false); }} disabled={!guestName.trim() || addingGuest} style={{ width: "100%", backgroundColor: guestName.trim() ? "#22c55e" : "#334155", color: guestName.trim() ? "#0f172a" : "#64748b", border: "none", borderRadius: 10, padding: "12px", fontSize: 14, fontWeight: 700, cursor: guestName.trim() ? "pointer" : "not-allowed", fontFamily: "inherit" }}>{addingGuest ? "Adding..." : "Add Guest"}</button>
+                        {round.use_handicap !== false && <input style={{ backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 10, padding: "12px 14px", color: "#f8fafc", fontSize: 14, width: "100%", outline: "none", fontFamily: "inherit", marginBottom: 12, boxSizing: "border-box" }} type="text" placeholder="Handicap (e.g. 8 or +2)" value={guestHcp} onChange={(e) => setGuestHcp(e.target.value)} />}
+                        <button onClick={async () => { if (!guestName.trim()) return; setAddingGuest(true); try { await dbCreatePlayer({ name: guestName.trim() + " (Guest)", handicap: round.use_handicap === false ? 0 : (parseHcp(guestHcp)), round_id: round.id, is_placeholder: false }); setGuestName(""); setGuestHcp(""); const p = await dbGetPlayers(round.id); setPlayers(p); } catch(e) { console.error(e); } setAddingGuest(false); }} disabled={!guestName.trim() || addingGuest} style={{ width: "100%", backgroundColor: guestName.trim() ? "#22c55e" : "#334155", color: guestName.trim() ? "#0f172a" : "#64748b", border: "none", borderRadius: 10, padding: "12px", fontSize: 14, fontWeight: 700, cursor: guestName.trim() ? "pointer" : "not-allowed", fontFamily: "inherit" }}>{addingGuest ? "Adding..." : "Add Guest"}</button>
                       </div>
                     ) : (
                       <div style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: 14, marginBottom: 12 }}>
@@ -3743,7 +3864,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
                     )}
                     {players.map(p => (
                       <div key={p.id} style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "12px 14px", marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                        <div><div style={{ fontSize: 14, fontWeight: 700, color: "#f8fafc" }}>{p.name}</div><div style={{ fontSize: 11, color: "#64748b" }}>HCP {p.handicap}</div></div>
+                        <div><div style={{ fontSize: 14, fontWeight: 700, color: "#f8fafc" }}>{p.name}</div><div style={{ fontSize: 11, color: "#64748b" }}>HCP {fmtHcp(p.handicap)}</div></div>
                         {p.id !== me?.id && <button onClick={async () => { if (!window.confirm("Remove " + p.name + "?")) return; await supabase.from("scores").delete().eq("player_id", p.id).eq("round_id", round.id); await supabase.from("players").delete().eq("id", p.id); const fresh = await dbGetPlayers(round.id); setPlayers(fresh); }} style={{ backgroundColor: "#1c0a0a", border: "1px solid #ef4444", borderRadius: 8, color: "#ef4444", fontSize: 11, fontWeight: 700, cursor: "pointer", padding: "5px 10px", fontFamily: "inherit" }}>Remove</button>}
                       </div>
                     ))}
@@ -3814,7 +3935,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
                 <div style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: 14, marginBottom: 12 }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: "#f8fafc", marginBottom: 10 }}>➕ Add Guest Player</div>
                   <input style={{ ...{ backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 10, padding: "12px 14px", color: "#f8fafc", fontSize: 14, width: "100%", outline: "none", fontFamily: "inherit", marginBottom: 8, boxSizing: "border-box" } }} placeholder="Guest name" value={guestName} onChange={(e) => setGuestName(e.target.value)} />
-                  {round.use_handicap !== false && <input style={{ backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 10, padding: "12px 14px", color: "#f8fafc", fontSize: 14, width: "100%", outline: "none", fontFamily: "inherit", marginBottom: 12, boxSizing: "border-box" }} type="number" placeholder="Handicap" value={guestHcp} onChange={(e) => setGuestHcp(e.target.value)} />}
+                  {round.use_handicap !== false && <input style={{ backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 10, padding: "12px 14px", color: "#f8fafc", fontSize: 14, width: "100%", outline: "none", fontFamily: "inherit", marginBottom: 12, boxSizing: "border-box" }} type="text" placeholder="Handicap (e.g. 8 or +2)" value={guestHcp} onChange={(e) => setGuestHcp(e.target.value)} />}
                   {round.game_type === "matchplay_teams" && (
                     <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
                       {["A","B"].map(t => <button key={t} onClick={() => setGuestTeam(t)} style={{ flex: 1, backgroundColor: guestTeam === t ? "#22c55e" : "#0f172a", color: guestTeam === t ? "#0f172a" : "#94a3b8", border: "1px solid " + (guestTeam === t ? "#22c55e" : "#334155"), borderRadius: 10, padding: "10px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Team {t}</button>)}
@@ -3824,7 +3945,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
                     if (!guestName.trim()) return;
                     setAddingGuest(true);
                     try {
-                      await dbCreatePlayer({ name: guestName.trim() + " (Guest)", handicap: round.use_handicap === false ? 0 : (parseFloat(guestHcp) || 0), round_id: round.id, team: round.game_type === "matchplay_teams" ? guestTeam : null, is_placeholder: false });
+                      await dbCreatePlayer({ name: guestName.trim() + " (Guest)", handicap: round.use_handicap === false ? 0 : (parseHcp(guestHcp)), round_id: round.id, team: round.game_type === "matchplay_teams" ? guestTeam : null, is_placeholder: false });
                       setGuestName(""); setGuestHcp(""); setGuestTeam("A");
                       const p = await dbGetPlayers(round.id); setPlayers(p);
                     } catch(e) { console.error(e); }
@@ -3847,7 +3968,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
                   <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid #1e293b" }}>
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 600, color: "#f8fafc" }}>{p.name}</div>
-                      <div style={{ fontSize: 11, color: "#64748b" }}>HCP {p.handicap}</div>
+                      <div style={{ fontSize: 11, color: "#64748b" }}>HCP {fmtHcp(p.handicap)}</div>
                     </div>
                     {p.id !== me?.id && (
                       <button onClick={async () => {
@@ -3911,7 +4032,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
                       <div style={{ background: "#1e3a5f", borderRadius: "6px 6px 0 0", padding: "6px 8px", border: "1px solid #334155", borderBottom: "none", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <div style={{ display: "flex", alignItems: "baseline", gap: 5, minWidth: 0 }}>
                           <span style={{ fontSize: 11, fontWeight: 800, color: "#f8fafc", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{player.name.replace(" (Guest)", "")}</span>
-                          <span style={{ fontSize: 8, color: "#cbd5e1", fontWeight: 600, whiteSpace: "nowrap" }}>HCP {player.handicap}</span>
+                          <span style={{ fontSize: 8, color: "#cbd5e1", fontWeight: 600, whiteSpace: "nowrap" }}>HCP {fmtHcp(player.handicap)}</span>
                         </div>
                         {pGross > 0 && (
                           <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
@@ -4077,6 +4198,7 @@ function centreHoleNav(holeNumber, attempt) {
 }
 
 function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
+  const swipeState = useRef(null); // thumb slider drag tracking
   const isHandicap = round.use_handicap !== false && round.use_handicap !== "false" && round.use_handicap !== 0;
   const [myScores, setMyScores] = useState({}), [myBets, setMyBets] = useState({});
   const [allScores, setAllScores] = useState([]), [others, setOthers] = useState([]);
@@ -4107,6 +4229,32 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
   const isScorecardCreator = me?.name === round.created_by;
   const [gameAdminTab, setGameAdminTab] = useState("scores");
   const [adminEditScores, setAdminEditScores] = useState({});
+  const [scanCardFor, setScanCardFor] = useState(null); // player id being scanned, doubles as busy flag
+  const [scanCardErr, setScanCardErr] = useState("");
+  const scanCardInputRef = useRef(null);
+
+  // Scan a completed player card (1-2 photos) into the Scores tab for review, then Save applies it
+  const handleScanPlayerCard = async (playerId, fileArr) => {
+    if (!playerId || !fileArr || fileArr.length === 0) { setScanCardFor(null); return; }
+    setScanCardErr("");
+    try {
+      const response = await fetch("/.netlify/functions/scan-player-scorecard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ images: await Promise.all(fileArr.slice(0, 2).map(async (f) => ({
+          media_type: f.type && f.type.includes("png") ? "image/png" : "image/jpeg",
+          data: await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result.split(",")[1]); r.onerror = rej; r.readAsDataURL(f); })
+        }))) })
+      });
+      const parsed = await response.json();
+      if (!response.ok) throw new Error(parsed.error || "Scan failed");
+      const map = {};
+      for (let i = 1; i <= 18; i++) { const v = parseInt(parsed.scores?.[i]); if (v > 0) map[i] = v; }
+      if (Object.keys(map).length !== 18) throw new Error("Read " + Object.keys(map).length + " of 18 holes. Please scan a fully completed card (a front 9 and back 9 photo works well).");
+      setAdminEditScores(prev => ({ ...prev, [playerId]: map }));
+    } catch(e) { setScanCardErr(e.message || "Scan failed"); }
+    setScanCardFor(null);
+  };
   const [adminEditHoles, setAdminEditHoles] = useState([]);
   const [adminSaving, setAdminSaving] = useState(false);
   const [adminMsg, setAdminMsg] = useState("");
@@ -4508,10 +4656,15 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
                 {/* SCORES TAB */}
                 {gameAdminTab === "scores" && (
                   <div>
-                    <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 12 }}>Tap any score to edit. Changes save to this round only.</div>
+                    <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 12 }}>Tap any score to edit, or scan a player's completed card. Changes save to this round only.</div>
+                    <input ref={scanCardInputRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={(e) => { const fl = Array.from(e.target.files || []); e.target.value = ""; handleScanPlayerCard(scanCardFor, fl); }} />
+                    {scanCardErr && <div style={{ fontSize: 12, color: "#ef4444", marginBottom: 10 }}>{scanCardErr}</div>}
                     {[...others, me].map((player) => (
                       <div key={player.id} style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: 12, marginBottom: 12 }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: "#22c55e", marginBottom: 8 }}>{player.name} <span style={{ color: "#475569", fontWeight: 400 }}>HCP {player.handicap}</span></div>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, gap: 8 }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: "#22c55e", minWidth: 0 }}>{player.name} <span style={{ color: "#475569", fontWeight: 400 }}>HCP {fmtHcp(player.handicap)}</span></div>
+                          <button onClick={() => { setScanCardFor(player.id); scanCardInputRef.current?.click(); }} disabled={!!scanCardFor} style={{ backgroundColor: "transparent", border: "1px solid #22c55e", borderRadius: 8, color: scanCardFor === player.id ? "#475569" : "#22c55e", fontSize: 10, fontWeight: 700, padding: "4px 8px", cursor: scanCardFor ? "not-allowed" : "pointer", fontFamily: "inherit", flexShrink: 0 }}>{scanCardFor === player.id ? "Reading..." : "\ud83d\udcf7 Scan Card"}</button>
+                        </div>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                           {[holes.slice(0,9), holes.slice(9,18)].map((nine, ni) => (
                             <div key={ni} style={{ backgroundColor: "#0f172a", borderRadius: 8, padding: 8 }}>
@@ -4592,15 +4745,15 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
                         <input style={{ backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 10, padding: "12px 14px", color: "#f8fafc", fontSize: 14, width: "100%", outline: "none", fontFamily: "inherit", marginBottom: 8, boxSizing: "border-box" }}
                           placeholder="Name" value={adminEditPlayerName} onChange={(e) => setAdminEditPlayerName(e.target.value)} />
                         <input style={{ backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 10, padding: "12px 14px", color: "#f8fafc", fontSize: 14, width: "100%", outline: "none", fontFamily: "inherit", marginBottom: 12, boxSizing: "border-box" }}
-                          type="number" placeholder="Handicap" value={adminEditPlayerHcp} onChange={(e) => setAdminEditPlayerHcp(e.target.value)} />
+                          type="text" placeholder="Handicap (e.g. 8 or +2)" value={adminEditPlayerHcp} onChange={(e) => setAdminEditPlayerHcp(e.target.value)} />
                         <div style={{ display: "flex", gap: 8 }}>
                           <button onClick={async () => {
                             setAdminSaving(true);
                             try {
                               const isGuest = adminEditingPlayer.name?.endsWith("(Guest)");
                               const finalName = isGuest && !adminEditPlayerName.endsWith("(Guest)") ? adminEditPlayerName.trim() + " (Guest)" : adminEditPlayerName.trim();
-                              await supabase.from("players").update({ name: finalName, handicap: parseFloat(adminEditPlayerHcp) || 0 }).eq("id", adminEditingPlayer.id);
-                              setOthers(prev => prev.map(p => p.id === adminEditingPlayer.id ? { ...p, name: finalName, handicap: parseFloat(adminEditPlayerHcp) || 0 } : p));
+                              await supabase.from("players").update({ name: finalName, handicap: parseHcp(adminEditPlayerHcp) }).eq("id", adminEditingPlayer.id);
+                              setOthers(prev => prev.map(p => p.id === adminEditingPlayer.id ? { ...p, name: finalName, handicap: parseHcp(adminEditPlayerHcp) } : p));
                               setAdminEditingPlayer(null);
                               setAdminMsg("Player updated!");
                               setTimeout(() => setAdminMsg(""), 2000);
@@ -4615,7 +4768,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
                         <div key={player.id} style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "12px 14px", marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                           <div>
                             <div style={{ fontSize: 14, fontWeight: 700, color: "#f8fafc" }}>{player.name}</div>
-                            <div style={{ fontSize: 11, color: "#64748b" }}>HCP {player.handicap}</div>
+                            <div style={{ fontSize: 11, color: "#64748b" }}>HCP {fmtHcp(player.handicap)}</div>
                           </div>
                           <div style={{ display: "flex", gap: 6 }}>
                             <button onClick={() => { setAdminEditingPlayer(player); setAdminEditPlayerName(player.name?.replace(" (Guest)", "") || player.name); setAdminEditPlayerHcp(String(player.handicap)); }}
@@ -5045,7 +5198,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
                     <div key={player.id} style={{ display: "flex", alignItems: "center", gap: 5, padding: "7px 0", borderBottom: "1px solid #0f172a" }}>
                       <div style={{ width: 48, flexShrink: 0 }}>
                         <div style={{ fontSize: 10, fontWeight: 800, color: isMe ? "#22c55e" : "#94a3b8", lineHeight: 1.2 }}>{shortName}</div>
-                        {pHcpS > 0 && <div style={{ display: "inline-block", backgroundColor: "#f59e0b", color: "#0f172a", fontSize: 8, fontWeight: 800, padding: "1px 5px", borderRadius: 20, marginTop: 2 }}>+{pHcpS}</div>}
+                        {pHcpS !== 0 && <div style={{ display: "inline-block", backgroundColor: "#f59e0b", color: "#0f172a", fontSize: 8, fontWeight: 800, padding: "1px 5px", borderRadius: 20, marginTop: 2 }}>{pHcpS > 0 ? "+" + pHcpS : pHcpS}</div>}
                       </div>
                       <div style={{ display: "flex", gap: 3, flex: 1 }}>
                         {[curHole.par-1,curHole.par,curHole.par+1,curHole.par+2,curHole.par+3].map(s => (
@@ -5104,8 +5257,18 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
             </div>
           )}
 
-          {/* Thumb swipe slider - pure navigation, no data duplication */}
-          <div style={{ margin: "14px 0 4px", backgroundColor: "rgba(15,23,42,0.5)", border: "1px solid #334155", borderRadius: 14, padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          {/* Thumb swipe slider - pure navigation, no data duplication. Drag anywhere on the bar to scrub holes */}
+          <div
+            onTouchStart={(e) => { swipeState.current = { x: e.touches[0].clientX, base: activeHole }; }}
+            onTouchMove={(e) => {
+              if (!swipeState.current) return;
+              const dx = e.touches[0].clientX - swipeState.current.x;
+              const steps = Math.round(-dx / 28); // drag left = later holes, matches scroll direction
+              const target = Math.max(1, Math.min(holes.length, swipeState.current.base + steps));
+              if (target !== activeHole) { setActiveHole(target); requestAnimationFrame(() => centreHoleNav(target)); }
+            }}
+            onTouchEnd={() => { swipeState.current = null; }}
+            style={{ margin: "14px 0 4px", backgroundColor: "rgba(15,23,42,0.5)", border: "1px solid #334155", borderRadius: 14, padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", touchAction: "pan-y" }}>
             <button onClick={() => { if (activeHole > 1) { const prev = activeHole - 1; setActiveHole(prev); requestAnimationFrame(() => centreHoleNav(prev)); } }}
               style={{ background: "none", border: "none", color: activeHole > 1 ? "#94a3b8" : "#334155", fontSize: 20, fontWeight: 900, cursor: activeHole > 1 ? "pointer" : "default", padding: "4px 8px", fontFamily: "inherit" }}>‹</button>
             <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 4, overflow: "hidden" }}>
@@ -5248,7 +5411,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
                   return (
                     <div key={player.id} style={{ ...S.playerCard, marginBottom: 8, overflow: "hidden", ...(isMe ? { border: "1px solid #22c55e33" } : {}) }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                        <div style={{ ...S.playerCardName, color: isMe ? "#22c55e" : "#f8fafc" }}>{player.name} (HCP {player.handicap}) {isMe && <span style={{ fontSize: 9, color: "#22c55e", fontWeight: 600 }}>YOU</span>}</div>
+                        <div style={{ ...S.playerCardName, color: isMe ? "#22c55e" : "#f8fafc" }}>{player.name} (HCP {fmtHcp(player.handicap)}) {isMe && <span style={{ fontSize: 9, color: "#22c55e", fontWeight: 600 }}>YOU</span>}</div>
                         <div style={{ fontSize: 11, color: "#64748b" }}>
                           G: <span style={{ color: myGrossTotal2 === 0 ? "#94a3b8" : myGrossTotal2 > 0 ? "#ef4444" : "#22c55e", fontWeight: 700 }}>{formatToPar(myGrossTotal2)}</span>
                           {isHandicap && <>{" "}N: <span style={{ color: myNetTotal2 === 0 ? "#94a3b8" : myNetTotal2 > 0 ? "#ef4444" : "#22c55e", fontWeight: 700 }}>{formatToPar(myNetTotal2)}</span></>}
@@ -5324,7 +5487,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
           return (
             <div style={{ ...S.playerCard, border: "1px solid #22c55e33", marginBottom: 10 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                <div style={{ ...S.playerCardName, color: "#22c55e" }}>{me.name} (HCP {me.handicap}) <span style={{ fontSize: 9, color: "#22c55e", fontWeight: 600 }}>YOU</span></div>
+                <div style={{ ...S.playerCardName, color: "#22c55e" }}>{me.name} (HCP {fmtHcp(me.handicap)}) <span style={{ fontSize: 9, color: "#22c55e", fontWeight: 600 }}>YOU</span></div>
                 <div style={{ fontSize: 10, color: "#64748b", fontWeight: 600 }}>
                   {(() => { const gross = holes.reduce((sum, h) => sum + (myScores[h.hole_number] || 0), 0); const grossPar = holes.reduce((sum, h) => myScores[h.hole_number] ? sum + h.par : sum, 0); const gtp = gross - grossPar; const net = holes.reduce((sum, h) => { const g = myScores[h.hole_number]; if (!g) return sum; return sum + (g - getHcpStrokes(me.handicap, h.stroke_index)); }, 0); const ntp = net - grossPar; const f = (v) => v === 0 ? "E" : v > 0 ? "+" + v : "" + v; return gross > 0 ? <>{gross} · {f(gtp)}{isHandicap ? <> · N {f(ntp)}</> : null}</> : "—"; })()}
                 </div>
@@ -5424,7 +5587,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
             return (
               <div key={player.id} style={S.playerCard}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                  <div style={S.playerCardName}>{player.name} (HCP {player.handicap})</div>
+                  <div style={S.playerCardName}>{player.name} (HCP {fmtHcp(player.handicap)})</div>
                   <div style={{ fontSize: 10, color: "#64748b", fontWeight: 600 }}>
                     {(() => { const gross = ps.reduce((sum, s) => sum + s.score, 0); const grossPar = holes.reduce((sum, h) => { const s = ps.find((x) => x.hole_number === h.hole_number); return s ? sum + h.par : sum; }, 0); const gtp = gross - grossPar; const net = holes.reduce((sum, h) => { const s = ps.find((x) => x.hole_number === h.hole_number); if (!s) return sum; return sum + (s.score - getHcpStrokes(player.handicap, h.stroke_index)); }, 0); const ntp = net - grossPar; const f = (v) => v === 0 ? "E" : v > 0 ? "+" + v : "" + v; return gross > 0 ? <>{gross} · {f(gtp)}{isHandicap ? <> · N {f(ntp)}</> : null}</> : "—"; })()}
                   </div>
@@ -5665,7 +5828,7 @@ function PastRoundDetailScreen({ round, onBack }) {
         {lb.map((p, i) => (
           <div key={p.id} style={{ ...S.lbRow }}>
             <div style={{ ...S.lbPos, color: i === 0 ? "#f59e0b" : i === 1 ? "#94a3b8" : i === 2 ? "#cd7c2f" : "#475569" }}>{i + 1}</div>
-            <div style={S.lbName}>{p.name}<span style={S.lbHcp}>HCP {p.handicap}</span></div>
+            <div style={S.lbName}>{p.name}<span style={S.lbHcp}>HCP {fmtHcp(p.handicap)}</span></div>
             <div style={{ fontSize: 14, fontWeight: 700, color: metricColor(p) }}>{metricValue(p)}</div>
           </div>
         ))}
@@ -5689,7 +5852,7 @@ function PastRoundDetailScreen({ round, onBack }) {
                     const net = holes.reduce((sum, h) => { const s = ps2.find((x) => x.hole_number === h.hole_number); if (!s) return sum; return sum + (s.score - getHcpStrokes(player.handicap, h.stroke_index)); }, 0);
                     const ntp = net - grossPar;
                     const f = (v) => v === 0 ? "E" : v > 0 ? "+" + v : "" + v;
-                    return gross > 0 ? `${gross} · ${f(gtp)} · N ${f(ntp)}` : `HCP ${player.handicap}`;
+                    return gross > 0 ? `${gross} · ${f(gtp)} · N ${f(ntp)}` : `HCP ${fmtHcp(player.handicap)}`;
                   })()}
                 </span>
               </div>
