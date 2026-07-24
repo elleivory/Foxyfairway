@@ -1075,7 +1075,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.57</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.58</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
           </div>
@@ -3464,12 +3464,14 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
             const gtp = p.toPar || 0;
             const gtpColor = gtp < 0 ? "#22c55e" : gtp > 0 ? "#ef4444" : "#3b82f6";
             const gtpStr = formatToPar(gtp);
-            const nettStr = isHandicap ? "N" + (p.netTotal || 0) : "—";
+            // NETT = net to par using only strokes earned on holes played (matches the scorecard header)
+            const lbNetToPar = Object.values(p.holeScores || {}).reduce((sum, hs) => sum + (hs.net - hs.par), 0);
+            const nettStr = isHandicap ? formatToPar(lbNetToPar) : "—";
             let bigVal, bigLbl, bigColor;
             if (round.game_type === "stableford") { bigVal = p.total + " pts"; bigLbl = "Stableford"; bigColor = "#22c55e"; }
             else if (round.game_type === "matchplay") { bigVal = p.total === 0 ? "0 pts" : p.total + (p.total === 1 ? " pt" : " pts"); bigLbl = "Match Points"; bigColor = "#22c55e"; }
             else if (round.game_type === "banker") { bigVal = (p.total >= 0 ? "+$" : "-$") + Math.abs(p.total); bigLbl = "Balance"; bigColor = p.total > 0 ? "#22c55e" : p.total < 0 ? "#ef4444" : "#94a3b8"; }
-            else { const netToPar = p.toPar - parseInt(p.handicap||0); bigVal = isHandicap ? formatToPar(netToPar) : gtpStr; bigLbl = isHandicap ? "To Par (Net)" : "To Par"; bigColor = isHandicap ? (netToPar < 0 ? "#22c55e" : netToPar > 0 ? "#ef4444" : "#3b82f6") : gtpColor; }
+            else { bigVal = null; bigLbl = null; bigColor = null; } // Stroke play: Gross/Par/Nett badges say it all
             return (
               <div key={p.id} style={{ ...S.lbRow, ...(p.id === me?.id ? S.lbRowMe : {}), flexDirection: "column", alignItems: "stretch", padding: "12px 14px" }}>
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 10 }}>
@@ -3505,10 +3507,12 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
                       </>
                     )}
                   </div>
-                  <div style={{ textAlign: "right" }}>
-                    <span style={{ fontSize: 22, fontWeight: 900, color: bigColor }}>{bigVal}</span>
-                    <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600, marginLeft: 6 }}>{bigLbl}</span>
-                  </div>
+                  {bigVal && (
+                    <div style={{ textAlign: "right" }}>
+                      <span style={{ fontSize: 22, fontWeight: 900, color: bigColor }}>{bigVal}</span>
+                      <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600, marginLeft: 6 }}>{bigLbl}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             );
