@@ -1075,7 +1075,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.56</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.57</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
           </div>
@@ -2434,7 +2434,7 @@ function RoundDetailScreen({ roundStub, onBack }) {
   );
 
   if (viewingScorecard) {
-    return <ScorecardScreen round={round} me={{ id: "spectator", name: "Spectator", handicap: 0 }} onViewDashboard={() => setViewingScorecard(false)} isSpectator={true} />;
+    return <ScorecardScreen round={round} me={{ id: "spectator", name: "Spectator", handicap: 0 }} onViewDashboard={() => setViewingScorecard(false)} isSpectator={true} onRoundUpdate={(r) => { setRound(r); }} />;
   }
 
   return <PlayerDashboardScreen round={round} me={{ id: "spectator", name: "Spectator", handicap: 0 }} onViewScorecard={() => setViewingScorecard(true)} onBack={onBack} isSpectator={true} />;
@@ -3132,7 +3132,7 @@ function JoinRoundScreen({ onBack, onJoined, prefillCode }) {
 // =============================================================================
 // PLAYER DASHBOARD
 // =============================================================================
-function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator }) {
+function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator, onRoundUpdate }) {
   const [players, setPlayers] = useState([]), [scores, setScores] = useState([]), [showShare, setShowShare] = useState(false), [showSpectatorQR, setShowSpectatorQR] = useState(false);
   const [showComplete, setShowComplete] = useState(false);
   const [showAddGuest, setShowAddGuest] = useState(false);
@@ -3894,7 +3894,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
                         </div>
                       ))}
                     </div>
-                    <button disabled={adminSaving} onClick={async () => { setAdminSaving(true); try { const updated = adminEditHoles||holes; await supabase.from("rounds").update({ holes: updated }).eq("id", round.id); setAdminMsg("Pars saved!"); setTimeout(() => setAdminMsg(""), 2000); } catch(e) { setAdminMsg("Error: " + e.message); } setAdminSaving(false); }} style={{ backgroundColor: "#22c55e", color: "#0f172a", border: "none", borderRadius: 12, padding: "14px", fontSize: 15, fontWeight: 700, cursor: "pointer", width: "100%", fontFamily: "inherit", opacity: adminSaving ? 0.6 : 1 }}>{adminSaving ? "Saving..." : "Save Pars"}</button>
+                    <button disabled={adminSaving} onClick={async () => { setAdminSaving(true); try { const updated = adminEditHoles||holes; await supabase.from("rounds").update({ holes: updated }).eq("id", round.id); onRoundUpdate && onRoundUpdate({ ...round, holes: updated }); setAdminMsg("Pars saved!"); setTimeout(() => setAdminMsg(""), 2000); } catch(e) { setAdminMsg("Error: " + e.message); } setAdminSaving(false); }} style={{ backgroundColor: "#22c55e", color: "#0f172a", border: "none", borderRadius: 12, padding: "14px", fontSize: 15, fontWeight: 700, cursor: "pointer", width: "100%", fontFamily: "inherit", opacity: adminSaving ? 0.6 : 1 }}>{adminSaving ? "Saving..." : "Save Pars"}</button>
                   </div>
                 )}
                 {/* INDEXES TAB */}
@@ -3921,7 +3921,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
                         </div>
                       ))}
                     </div>
-                    <button disabled={adminSaving} onClick={async () => { setAdminSaving(true); try { const updated = adminEditHoles||holes; await supabase.from("rounds").update({ holes: updated }).eq("id", round.id); setAdminMsg("Indexes saved!"); setTimeout(() => setAdminMsg(""), 2000); } catch(e) { setAdminMsg("Error: " + e.message); } setAdminSaving(false); }} style={{ backgroundColor: "#22c55e", color: "#0f172a", border: "none", borderRadius: 12, padding: "14px", fontSize: 15, fontWeight: 700, cursor: "pointer", width: "100%", fontFamily: "inherit", opacity: adminSaving ? 0.6 : 1 }}>{adminSaving ? "Saving..." : "Save Indexes"}</button>
+                    <button disabled={adminSaving} onClick={async () => { setAdminSaving(true); try { const updated = adminEditHoles||holes; await supabase.from("rounds").update({ holes: updated }).eq("id", round.id); onRoundUpdate && onRoundUpdate({ ...round, holes: updated }); setAdminMsg("Indexes saved!"); setTimeout(() => setAdminMsg(""), 2000); } catch(e) { setAdminMsg("Error: " + e.message); } setAdminSaving(false); }} style={{ backgroundColor: "#22c55e", color: "#0f172a", border: "none", borderRadius: 12, padding: "14px", fontSize: 15, fontWeight: 700, cursor: "pointer", width: "100%", fontFamily: "inherit", opacity: adminSaving ? 0.6 : 1 }}>{adminSaving ? "Saving..." : "Save Indexes"}</button>
                   </div>
                 )}
               </div>
@@ -4197,7 +4197,7 @@ function centreHoleNav(holeNumber, attempt) {
   _centreHoleNavAnimId = requestAnimationFrame(step);
 }
 
-function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
+function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdate }) {
   const swipeState = useRef(null); // thumb slider drag tracking
   const isHandicap = round.use_handicap !== false && round.use_handicap !== "false" && round.use_handicap !== 0;
   const [myScores, setMyScores] = useState({}), [myBets, setMyBets] = useState({});
@@ -4809,7 +4809,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
                       setAdminSaving(true); setAdminMsg("");
                       try {
                         await supabase.from("rounds").update({ holes: adminEditHoles }).eq("id", round.id);
-                        round.holes = adminEditHoles;
+                        onRoundUpdate && onRoundUpdate({ ...round, holes: adminEditHoles });
                         setAdminMsg("Pars updated for this round!");
                         setTimeout(() => setAdminMsg(""), 2000);
                       } catch(e) { setAdminMsg("Error: " + e.message); }
@@ -4845,7 +4845,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator }) {
                       setAdminSaving(true); setAdminMsg("");
                       try {
                         await supabase.from("rounds").update({ holes: adminEditHoles }).eq("id", round.id);
-                        round.holes = adminEditHoles;
+                        onRoundUpdate && onRoundUpdate({ ...round, holes: adminEditHoles });
                         setAdminMsg("Indexes updated for this round!");
                         setTimeout(() => setAdminMsg(""), 2000);
                       } catch(e) { setAdminMsg("Error: " + e.message); }
@@ -6149,16 +6149,16 @@ export default function GolfApp() {
       }} />}
       {screen === "tournaments" && <TournamentScreen onBack={() => setScreen("home")} />}
       {screen === "watch" && <WatchRoundScreen onBack={() => setScreen("home")} onWatch={(r) => { setSpectatorRound(r); setRound(r); setMe({ id: "spectator", name: "Spectator", handicap: 0 }); setScreen("dashboard_spectator"); }} prefillCode={joinCode} />}
-      {screen === "dashboard_spectator" && round && <PlayerDashboardScreen round={round} me={{ id: "spectator", name: "Spectator", handicap: 0 }} onViewScorecard={() => setScreen("scorecard_spectator")} onBack={() => { setScreen("home"); setRound(null); setSpectatorRound(null); }} isSpectator={true} />}
-      {screen === "scorecard_spectator" && round && <ScorecardScreen round={round} me={{ id: "spectator", name: "Spectator", handicap: 0 }} onViewDashboard={() => setScreen("dashboard_spectator")} isSpectator={true} />}
+      {screen === "dashboard_spectator" && round && <PlayerDashboardScreen round={round} me={{ id: "spectator", name: "Spectator", handicap: 0 }} onViewScorecard={() => setScreen("scorecard_spectator")} onBack={() => { setScreen("home"); setRound(null); setSpectatorRound(null); }} isSpectator={true} onRoundUpdate={setRound} />}
+      {screen === "scorecard_spectator" && round && <ScorecardScreen round={round} me={{ id: "spectator", name: "Spectator", handicap: 0 }} onViewDashboard={() => setScreen("dashboard_spectator")} isSpectator={true} onRoundUpdate={setRound} />}
       {screen === "view_round" && viewingRound && <PastRoundDetailScreen round={viewingRound} onBack={() => setScreen("history")} />}
             {screen === "admin_login" && <AdminLoginScreen onBack={() => setScreen("home")} onLoginSuccess={(level) => { setAdminLevel(level); setScreen("admin"); }} />}
       {screen === "admin" && adminLevel === "super" && <SuperAdminScreen onLogout={() => { localStorage.removeItem("ff_admin"); setScreen("home"); }} onEnterRound={(r, p) => { setRound(r); setMe(p); setScreen(p.id === "spectator" ? "dashboard_spectator" : "dashboard"); }} />}
       {screen === "admin" && adminLevel !== "super" && <AdminDashboardScreen onLogout={() => { localStorage.removeItem("ff_admin"); setScreen("home"); }} />}
       {screen === "create" && <CreateRoundScreen onBack={() => setScreen("home")} onRoundCreated={(r, p) => { setRound(r); setMe(p); setScreen("dashboard"); }} />}
       {screen === "join" && <JoinRoundScreen onBack={() => { setJoinCode(null); setScreen("home"); }} onJoined={(r, p) => { setRound(r); setMe(p); setJoinCode(null); setScreen("dashboard"); }} prefillCode={joinCode} />}
-      {screen === "dashboard" && round && me && <PlayerDashboardScreen round={round} me={me} onViewScorecard={() => setScreen("scorecard")} onBack={() => { setScreen("home"); setRound(null); setMe(null); setLastRound(loadLastRound()); setSavedRounds(getSavedRounds()); }} />}
-      {screen === "scorecard" && round && me && <ScorecardScreen round={round} me={me} onViewDashboard={() => setScreen("dashboard")} />}
+      {screen === "dashboard" && round && me && <PlayerDashboardScreen round={round} me={me} onViewScorecard={() => setScreen("scorecard")} onBack={() => { setScreen("home"); setRound(null); setMe(null); setLastRound(loadLastRound()); setSavedRounds(getSavedRounds()); }} onRoundUpdate={setRound} />}
+      {screen === "scorecard" && round && me && <ScorecardScreen round={round} me={me} onViewDashboard={() => setScreen("dashboard")} onRoundUpdate={setRound} />}
     </div>
   );
 }
