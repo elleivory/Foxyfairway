@@ -148,6 +148,70 @@ function getHcpStrokes(handicap, strokeIndex, useHandicap = true) {
   return strokes;
 }
 
+// Decide which bird (if any) a gross score earns against par. Real golf meaning,
+// measured on actual strokes vs par, before handicap. Ace always wins.
+function scoreCelebration(score, par) {
+  const g = parseInt(score), p = parseInt(par);
+  if (!g || g < 1 || !p) return null;
+  if (g === 1 && p >= 3) return "ace";      // hole in one on a par 3+
+  const diff = p - g;                        // how far under par
+  if (diff >= 4) return "condor";
+  if (diff === 3) return "albatross";
+  if (diff === 2) return "eagle";
+  if (diff === 1) return "birdie";
+  return null;
+}
+
+const CELEBRATIONS = {
+  birdie:    { emoji: "🐦", label: "BIRDIE",      colour: "#4ade80", count: 2, duration: 2000, party: true,  msg: "Nice one!" },
+  eagle:     { emoji: "🦅", label: "EAGLE",       colour: "#38bdf8", count: 2, duration: 2100, party: false, msg: "" },
+  albatross: { emoji: "🕊️", label: "ALBATROSS",   colour: "#a78bfa", count: 3, duration: 2500, party: true,  msg: "Incredible!" },
+  condor:    { emoji: "🦅", label: "CONDOR!",     colour: "#fbbf24", count: 4, duration: 2800, party: true,  giant: true, msg: "Once in a lifetime!" },
+  ace:       { emoji: "🏌️", label: "HOLE IN ONE", colour: "#f472b6", count: 0, duration: 3000, party: true,  ace: true,   msg: "Legend!" },
+};
+
+function ScoreCelebration({ data, onDone }) {
+  const c = CELEBRATIONS[data?.kind];
+  useEffect(() => {
+    if (!c) return;
+    const t = setTimeout(() => onDone && onDone(), c.duration + 400);
+    return () => clearTimeout(t);
+  }, [data?.id]);
+  if (!c) return null;
+  const birds = [];
+  for (let i = 0; i < c.count; i++) {
+    birds.push(
+      <div key={"b" + i} style={{ position: "absolute", top: (22 + i * 14) + "vh", fontSize: c.giant ? 96 : 64, animation: "ffFly " + (c.duration / 1000) + "s linear " + (i * 0.18) + "s both" }}>
+        <span style={{ display: "inline-block", animation: "ffFlap 0.4s ease-in-out infinite" }}>{c.emoji}</span>
+      </div>
+    );
+  }
+  const sparks = [];
+  if (c.party) {
+    const glyphs = ["✨", "⭐", "🎉", "💫", "🌟"];
+    const n = c.ace ? 18 : (data.kind === "birdie" ? 8 : 12);
+    for (let s = 0; s < n; s++) {
+      const ang = Math.random() * Math.PI * 2, dist = 120 + Math.random() * 140;
+      sparks.push(
+        <div key={"s" + s} style={{ position: "absolute", fontSize: 22, left: (50 + (Math.random() * 40 - 20)) + "vw", top: (42 + (Math.random() * 20 - 10)) + "vh", "--dx": Math.cos(ang) * dist + "px", "--dy": Math.sin(ang) * dist + "px", animation: "ffSpark " + (1 + Math.random() * 0.8) + "s ease-out " + (Math.random() * 0.3) + "s both" }}>{glyphs[s % glyphs.length]}</div>
+      );
+    }
+  }
+  return (
+    <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 9999, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <style>{"@keyframes ffFly{0%{transform:translateX(-60vw) translateY(0);opacity:0}12%{opacity:1}88%{opacity:1}100%{transform:translateX(60vw) translateY(-30px);opacity:0}}@keyframes ffFlap{0%,100%{margin-top:0}50%{margin-top:-26px}}@keyframes ffPop{0%{opacity:0;transform:scale(0.4)}18%{opacity:1;transform:scale(1.12)}30%{transform:scale(1)}80%{opacity:1;transform:scale(1)}100%{opacity:0}}@keyframes ffSpark{0%{opacity:0;transform:translate(0,0) scale(0.3)}20%{opacity:1}100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(1.1)}}@keyframes ffRise{0%{transform:translateY(40px) scale(0.5);opacity:0}25%{transform:translateY(0) scale(1.15);opacity:1}40%{transform:translateY(0) scale(1)}80%{opacity:1}100%{transform:translateY(-20px) scale(1);opacity:0}}"}</style>
+      {c.ace && <div style={{ position: "absolute", top: "30vh", fontSize: 72, animation: "ffRise " + (c.duration / 1000) + "s ease-out both" }}>⛳</div>}
+      {birds}
+      {sparks}
+      <div style={{ position: "absolute", top: "34%", textAlign: "center", color: c.colour, fontWeight: 900, textShadow: "0 2px 20px rgba(0,0,0,0.6)", whiteSpace: "nowrap", animation: "ffPop " + (c.duration / 1000) + "s ease-out both" }}>
+        <span style={{ fontSize: 46, display: "block" }}>{c.ace ? "🏌️" : c.emoji}</span>
+        <span style={{ fontSize: 46, display: "block" }}>{c.label}</span>
+        {c.msg && <span style={{ fontSize: 16, display: "block", marginTop: 4, letterSpacing: 2, textTransform: "uppercase" }}>{c.msg}</span>}
+      </div>
+    </div>
+  );
+}
+
 function stablefordPoints(gross, par, hcpS) {
   return Math.max(0, par - (gross - hcpS) + 2);
 }
@@ -956,9 +1020,9 @@ function RulesScreen({ onBack }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, backgroundColor: "#0f172a", zIndex: 100, display: "flex", flexDirection: "column" }}>
-      <div style={{ backgroundColor: "#0f172a", borderBottom: "1px solid #334155", padding: "calc(env(safe-area-inset-top,44px) + 8px) 16px 12px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ backgroundColor: "#0f172a", borderBottom: "1px solid #334155", padding: "calc(env(safe-area-inset-top,44px) + 8px) 16px 12px", display: "flex", alignItems: "center", gap: 12 }}>
+        <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: "6px 12px", fontFamily: "inherit" }}>← Close</button>
         <div style={{ fontSize: 16, fontWeight: 800, color: "#f8fafc" }}>📖 USGA Rules of Golf</div>
-        <button onClick={onBack} style={{ background: "none", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: "6px 12px", fontFamily: "inherit" }}>Close</button>
       </div>
 
       <div style={{ display: "flex", gap: 6, padding: "10px 16px", backgroundColor: "#0f172a" }}>
@@ -1074,7 +1138,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.61</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.62</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
           </div>
@@ -3263,15 +3327,14 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
       </div>
 
       <div style={S.content}>
-        {/* Round Tools group */}
-        <div style={{ backgroundColor: "rgba(15,23,42,0.4)", border: "1px solid #334155", borderRadius: 10, padding: "7px 9px", marginBottom: 6 }}>
-          <div style={{ fontSize: 8, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 1, fontWeight: 700, marginBottom: 6 }}>Round Tools</div>
+        {/* Round Tools group - compact utility strip */}
+        <div style={{ marginBottom: 8, marginTop: 2 }}>
           <div style={{ display: "flex", gap: 5 }}>
-            {!isSpectator && <button style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, backgroundColor: "rgba(30,41,59,0.6)", border: "none", borderRadius: 7, padding: "6px 2px", color: "#94a3b8", fontSize: 7, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }} onClick={() => { saveRoundToHistory(round, players, scores, holes); alert("Round saved!"); }}><span style={{ fontSize: 12 }}>💾</span>Save</button>}
-            {!isSpectator && round.is_scanned && <button style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, backgroundColor: "rgba(34,197,94,0.15)", border: "1px solid #22c55e", borderRadius: 7, padding: "6px 2px", color: "#22c55e", fontSize: 7, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }} onClick={() => { saveRoundToHistory(round, players, scores, holes); setShowComplete(true); }}><span style={{ fontSize: 12 }}>✅</span>Complete</button>}
-            <button style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, backgroundColor: "rgba(30,41,59,0.6)", border: "none", borderRadius: 7, padding: "6px 2px", color: "#94a3b8", fontSize: 7, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }} onClick={async () => { try { await exportScorecardPDF(round, players, scores, holes); } catch(e) { alert("Please allow popups to export scorecard"); } }}><span style={{ fontSize: 12 }}>📄</span>Card</button>
-            <button style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, backgroundColor: "rgba(30,41,59,0.6)", border: "none", borderRadius: 7, padding: "6px 2px", color: "#f8fafc", fontSize: 7, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }} onClick={() => setShowRules(true)}><span style={{ fontSize: 12 }}>📖</span>Rules</button>
-            <button style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, backgroundColor: "rgba(245,158,11,0.12)", border: "1px solid #f59e0b", borderRadius: 7, padding: "6px 2px", color: "#f59e0b", fontSize: 7, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }} onClick={() => { setShowDashAdmin(true); setGameAdminTab("scores"); setAdminMsg(""); setAdminEditHoles(JSON.parse(JSON.stringify(holes || []))); const sc = {}; scores.forEach(s => { if (!sc[s.player_id]) sc[s.player_id] = {}; sc[s.player_id][s.hole_number] = s.score; }); setAdminEditScores(sc); }}><span style={{ fontSize: 12 }}>⚙️</span>Admin</button>
+            {!isSpectator && <button style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, backgroundColor: "rgba(30,41,59,0.6)", border: "none", borderRadius: 7, padding: "4px 2px", color: "#94a3b8", fontSize: 7, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }} onClick={() => { saveRoundToHistory(round, players, scores, holes); alert("Round saved!"); }}><span style={{ fontSize: 12 }}>💾</span>Save</button>}
+            {!isSpectator && round.is_scanned && <button style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, backgroundColor: "rgba(34,197,94,0.15)", border: "1px solid #22c55e", borderRadius: 7, padding: "4px 2px", color: "#22c55e", fontSize: 7, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }} onClick={() => { saveRoundToHistory(round, players, scores, holes); setShowComplete(true); }}><span style={{ fontSize: 12 }}>✅</span>Complete</button>}
+            <button style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, backgroundColor: "rgba(30,41,59,0.6)", border: "none", borderRadius: 7, padding: "4px 2px", color: "#94a3b8", fontSize: 7, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }} onClick={async () => { try { await exportScorecardPDF(round, players, scores, holes); } catch(e) { alert("Please allow popups to export scorecard"); } }}><span style={{ fontSize: 12 }}>📄</span>Card</button>
+            <button style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, backgroundColor: "rgba(30,41,59,0.6)", border: "none", borderRadius: 7, padding: "4px 2px", color: "#f8fafc", fontSize: 7, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }} onClick={() => setShowRules(true)}><span style={{ fontSize: 12 }}>📖</span>Rules</button>
+            <button style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, backgroundColor: "rgba(245,158,11,0.12)", border: "1px solid #f59e0b", borderRadius: 7, padding: "4px 2px", color: "#f59e0b", fontSize: 7, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }} onClick={() => { setShowDashAdmin(true); setGameAdminTab("scores"); setAdminMsg(""); setAdminEditHoles(JSON.parse(JSON.stringify(holes || []))); const sc = {}; scores.forEach(s => { if (!sc[s.player_id]) sc[s.player_id] = {}; sc[s.player_id][s.hole_number] = s.score; }); setAdminEditScores(sc); }}><span style={{ fontSize: 12 }}>⚙️</span>Admin</button>
           </div>
         </div>
 
@@ -3300,11 +3363,11 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
               <div style={{ fontSize: 13, color: "#94a3b8" }}>{isSpectator ? "Round code: " : "Scan to join · Code: "}<span style={{ color: "#22c55e", fontWeight: 700, letterSpacing: 2 }}>{round.code}</span></div>
               {isSpectator
                 ? <button onClick={(e) => { navigator.clipboard.writeText(window.location.origin + window.location.pathname + "?watch=" + round.code); const btn = e.target; btn.textContent = "✓ Copied!"; btn.style.color = "#22c55e"; btn.style.borderColor = "#22c55e"; setTimeout(() => { btn.textContent = "👀 Copy Watch Link"; btn.style.color = "#94a3b8"; btn.style.borderColor = "#334155"; }, 1500); }} style={{ marginTop: 10, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 12, fontWeight: 600, cursor: "pointer", padding: "8px 16px", fontFamily: "inherit" }}>👀 Copy Watch Link</button>
-                : <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                    <button onClick={(e) => { navigator.clipboard.writeText(window.location.origin + window.location.pathname + "?join=" + round.code); const btn = e.target; btn.textContent = "✓ Copied!"; btn.style.color = "#22c55e"; btn.style.borderColor = "#22c55e"; setTimeout(() => { btn.textContent = "🏌️ Players Link"; btn.style.color = "#94a3b8"; btn.style.borderColor = "#334155"; }, 1500); }} style={{ flex: 1, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 11, fontWeight: 600, cursor: "pointer", padding: "8px 10px", fontFamily: "inherit" }}>🏌️ Players Link</button>
-                    <button onClick={() => setShowSpectatorQR(true)} style={{ flex: 1, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 11, fontWeight: 600, cursor: "pointer", padding: "8px 10px", fontFamily: "inherit" }}>👀 Spectators</button>
+                : <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                    <button onClick={(e) => { navigator.clipboard.writeText(window.location.origin + window.location.pathname + "?join=" + round.code); const btn = e.target; btn.textContent = "✓ Copied!"; setTimeout(() => { btn.textContent = "🏌️ Players Link"; }, 1500); }} style={{ flex: 1, backgroundColor: "rgba(34,197,94,0.15)", border: "1px solid #22c55e", borderRadius: 9, color: "#22c55e", fontSize: 13, fontWeight: 800, cursor: "pointer", padding: "11px 10px", fontFamily: "inherit" }}>🏌️ Players Link</button>
+                    <button onClick={() => setShowSpectatorQR(true)} style={{ flex: 1, backgroundColor: "rgba(59,130,246,0.15)", border: "1px solid #3b82f6", borderRadius: 9, color: "#60a5fa", fontSize: 13, fontWeight: 800, cursor: "pointer", padding: "11px 10px", fontFamily: "inherit" }}>👀 Spectators</button>
                   </div>}
-              <button onClick={() => setShowJoinQR(false)} style={{ marginTop: 10, background: "none", border: "none", color: "#64748b", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Hide QR</button>
+              <button onClick={() => setShowJoinQR(false)} style={{ marginTop: 12, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: "rgba(30,41,59,0.9)", border: "1px solid #475569", borderRadius: 9, color: "#e2e8f0", fontSize: 13, fontWeight: 700, cursor: "pointer", padding: "11px 10px", fontFamily: "inherit" }}><span style={{ fontSize: 14 }}>▲</span> Hide QR</button>
             </div>
           )}
         </div>
@@ -3655,9 +3718,9 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
       {/* RULES PANEL */}
       {showRules && (
         <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.9)", zIndex: 100, display: "flex", flexDirection: "column" }}>
-          <div style={{ backgroundColor: "#0f172a", borderBottom: "1px solid #334155", padding: "calc(env(safe-area-inset-top,44px) + 8px) 16px 12px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ backgroundColor: "#0f172a", borderBottom: "1px solid #334155", padding: "calc(env(safe-area-inset-top,44px) + 8px) 16px 12px", display: "flex", alignItems: "center", gap: 12 }}>
+            <button onClick={() => { setShowRules(false); setRulesAnswer(null); setRulesQuestion(""); setRulesImages([]); }} style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: "6px 12px", fontFamily: "inherit" }}>← Close</button>
             <div style={{ fontSize: 16, fontWeight: 800, color: "#f8fafc" }}>📖 USGA Rules of Golf</div>
-            <button onClick={() => { setShowRules(false); setRulesAnswer(null); setRulesQuestion(""); setRulesImages([]); }} style={{ background: "none", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: "6px 12px", fontFamily: "inherit" }}>Close</button>
           </div>
 
           {/* Tabs */}
@@ -3784,9 +3847,9 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
       {/* DASHBOARD ADMIN PANEL */}
       {showDashAdmin && (
         <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.85)", zIndex: 100, display: "flex", flexDirection: "column" }}>
-          <div style={{ backgroundColor: "#0f172a", borderBottom: "1px solid #334155", padding: "calc(env(safe-area-inset-top,44px) + 8px) 16px 12px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ backgroundColor: "#0f172a", borderBottom: "1px solid #334155", padding: "calc(env(safe-area-inset-top,44px) + 8px) 16px 12px", display: "flex", alignItems: "center", gap: 12 }}>
+            <button onClick={() => setShowDashAdmin(false)} style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: "6px 12px", fontFamily: "inherit" }}>← Close</button>
             <div style={{ fontSize: 16, fontWeight: 800, color: "#f8fafc" }}>⚙️ Round Admin</div>
-            <button onClick={() => setShowDashAdmin(false)} style={{ background: "none", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: "6px 12px", fontFamily: "inherit" }}>Close</button>
           </div>
 
           {isCreator ? (
@@ -4244,6 +4307,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
   const [guestCustomScores, setGuestCustomScores] = useState({}); // { [playerId]: string } for custom input
   
   const [activeHole, setActiveHole] = useState(1);
+  const [celebration, setCelebration] = useState(null);
   const [navPadding, setNavPadding] = useState(150);
   useEffect(() => {
     const measure = () => {
@@ -4481,7 +4545,14 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
       console.error("saveScore error:", e);
       return; // Don't advance if save failed
     }
-    
+
+    // Celebration for a good gross score (real golf birds: vs par, before handicap)
+    try {
+      const celHole = holes.find((h) => h.hole_number === holeNum);
+      const kind = scoreCelebration(score, celHole?.par);
+      if (kind) { setCelebration({ kind, id: Date.now() }); }
+    } catch (e) { /* never block scoring on a celebration */ }
+
     // Banker rotation - fetch fresh scores from Supabase to ensure we have everyone's score
     if (round.game_type === "banker") {
       const allPlayersList2 = isSpectator ? [...others] : [...others, me];
@@ -4639,6 +4710,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
 
   return (
     <BgScreen bg={BG_OTHER}>
+      {celebration && <ScoreCelebration data={celebration} onDone={() => setCelebration(null)} />}
       <div style={{ position: "sticky", top: 0, zIndex: 30, backgroundColor: "#1e293b", borderBottom: "1px solid #334155", padding: "calc(env(safe-area-inset-top,44px) + 8px) 16px 12px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <button style={{ ...S.backBtn, flexShrink: 0, width: 120 }} onClick={onViewDashboard}>← Dashboard</button>
         <div style={{ textAlign: "center", flex: 1 }}>
@@ -4659,9 +4731,9 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
       {/* IN-GAME ADMIN PANEL */}
       {showGameAdmin && (
         <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.85)", zIndex: 100, display: "flex", flexDirection: "column" }}>
-          <div style={{ backgroundColor: "#0f172a", borderBottom: "1px solid #334155", padding: "calc(env(safe-area-inset-top,44px) + 8px) 16px 12px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ backgroundColor: "#0f172a", borderBottom: "1px solid #334155", padding: "calc(env(safe-area-inset-top,44px) + 8px) 16px 12px", display: "flex", alignItems: "center", gap: 12 }}>
+            <button onClick={() => { setShowGameAdmin(false); setGameAdminAuthed(false); setAdminMsg(""); }} style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: "6px 12px", fontFamily: "inherit" }}>← Close</button>
             <div style={{ fontSize: 16, fontWeight: 800, color: "#f8fafc" }}>⚙️ Game Admin</div>
-            <button onClick={() => { setShowGameAdmin(false); setGameAdminAuthed(false); setAdminMsg(""); }} style={{ background: "none", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: "6px 12px", fontFamily: "inherit" }}>Close</button>
           </div>
 
           {!gameAdminAuthed ? (
@@ -4912,7 +4984,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
       )}
 
       {/* Hole nav - master scroll, drives all score rows */}
-      <div style={{ backgroundColor: "#1e293b", borderBottom: "1px solid #334155", padding: "10px 16px", position: "sticky", top: 88, zIndex: 20 }}>
+      <div style={{ backgroundColor: "#1e293b", borderBottom: "1px solid #334155", padding: "10px 16px", position: "sticky", top: "calc(env(safe-area-inset-top, 44px) + 44px)", zIndex: 20 }}>
         <div id="ff-master-scroll" style={S.holeNav} onScroll={(e) => {
           document.querySelectorAll(".ff-slave-scroll").forEach((el) => { if (el !== e.target) el.scrollLeft = e.target.scrollLeft; });
         }}>
