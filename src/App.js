@@ -505,6 +505,19 @@ async function dbGetAllRounds() {
   return (data || []).filter((r) => !deletedIds.includes(r.id));
 }
 
+// Rounds this player created, pulled from the live rounds table (not just saved
+// history), so created-but-unfinished rounds still appear in Past Rounds.
+async function dbGetMyCreatedRounds(playerName) {
+  if (!playerName) return [];
+  const { data } = await supabase.from("rounds")
+    .select("id, code, course_name, game_type, holes, created_at, created_by")
+    .ilike("created_by", playerName.trim())
+    .order("created_at", { ascending: false })
+    .limit(30);
+  const deletedIds = JSON.parse(localStorage.getItem("ff_deleted_rounds") || "[]");
+  return (data || []).filter((r) => !deletedIds.includes(r.id));
+}
+
 async function dbDeleteRound(roundId) {
   await supabase.from("scores").delete().eq("round_id", roundId);
   await supabase.from("players").delete().eq("round_id", roundId);
@@ -624,7 +637,12 @@ function saveActiveRoundRef(round, me) {
 }
 
 function getActiveRoundRefs() {
-  try { return JSON.parse(localStorage.getItem("ff_active_rounds") || "[]"); } catch { return []; }
+  try {
+    const all = JSON.parse(localStorage.getItem("ff_active_rounds") || "[]");
+    const deviceId = getDeviceId();
+    // In-progress rounds for THIS device only, and not already finished
+    return all.filter((r) => (!r.device_id || r.device_id === deviceId) && r.status !== "completed");
+  } catch { return []; }
 }
 
 function markRoundCompleted(roundId) {
@@ -1157,7 +1175,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.72</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.75</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
           </div>
@@ -3341,7 +3359,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
 
   return (
     <BgScreen bg={BG_GAME}>
-      <div style={{ backgroundColor: "#1e293b", borderBottom: "1px solid #334155", position: "sticky", top: 0, zIndex: 10 }}>
+      <div style={{ backgroundColor: "rgba(16,25,40,0.72)", borderBottom: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", position: "sticky", top: 0, zIndex: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 8px" }}>
           <button style={S.backBtn} onClick={() => { if (isSpectator || window.confirm("Exit round? It stays saved.")) onBack(); }}>← Back</button>
           <div style={{ flex: 1, textAlign: "center" }}>
@@ -3459,7 +3477,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
         )}
 
         {/* Sheet panel with Leaderboard / Scorecards tabs (Option C) */}
-        <div style={{ backgroundColor: "rgba(15,26,46,0.9)", borderRadius: "18px 18px 0 0", marginTop: 8, marginLeft: -20, marginRight: -20, padding: "14px 20px 20px", boxShadow: "0 -8px 24px rgba(0,0,0,0.3)", border: "1px solid rgba(120,160,110,0.18)", borderBottom: "none" }}>
+        <div style={{ backgroundColor: "rgba(20,32,50,0.68)", borderRadius: 18, marginTop: 10, marginLeft: -8, marginRight: -8, padding: "14px 16px 20px", boxShadow: "0 8px 28px rgba(0,0,0,0.32)", border: "1px solid rgba(255,255,255,0.09)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)" }}>
           <div style={{ width: 38, height: 4, borderRadius: 2, backgroundColor: "#334155", margin: "0 auto 14px" }} />
           <div style={{ display: "flex", backgroundColor: "rgba(11,18,32,0.6)", border: "1px solid #243049", borderRadius: 10, padding: 3, marginBottom: 14 }}>
             {[["leaderboard", "Leaderboard"], ["scorecards", "Scorecards"]].map(([key, lbl]) => (
@@ -4750,7 +4768,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
   return (
     <BgScreen bg={BG_OTHER}>
       {celebration && <ScoreCelebration data={celebration} onDone={() => setCelebration(null)} />}
-      <div style={{ position: "sticky", top: 0, zIndex: 30, backgroundImage: "linear-gradient(to bottom, rgba(8,14,24,0.45), rgba(11,19,28,0.72)), url('/IMG_8877.jpeg')", backgroundSize: "cover", backgroundPosition: "center 30%", borderBottom: "1px solid rgba(120,160,110,0.25)", padding: "calc(env(safe-area-inset-top,44px) + 8px) 16px 12px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ position: "sticky", top: 0, zIndex: 30, backgroundImage: "linear-gradient(to bottom, rgba(8,14,24,0.5), rgba(11,19,28,0.78)), url('/IMG_8877.jpeg')", backgroundSize: "cover", backgroundPosition: "center 30%", borderBottom: "1px solid rgba(255,255,255,0.08)", padding: "calc(env(safe-area-inset-top,44px) + 8px) 16px 12px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <button style={{ ...S.backBtn, flexShrink: 0, width: 120 }} onClick={onViewDashboard}>← Dashboard</button>
         <div style={{ textAlign: "center", flex: 1 }}>
           <div style={{ fontSize: 20, fontWeight: 900, color: "#f8fafc", lineHeight: 1, letterSpacing: -0.5 }}>
@@ -5023,7 +5041,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
       )}
 
       {/* Hole nav - master scroll, drives all score rows */}
-      <div style={{ backgroundImage: "linear-gradient(to bottom, rgba(11,19,28,0.62), rgba(11,19,28,0.82)), url('/IMG_8877.jpeg')", backgroundSize: "cover", backgroundPosition: "center 42%", borderBottom: "1px solid rgba(120,160,110,0.22)", padding: "10px 16px", position: "sticky", top: "calc(env(safe-area-inset-top, 44px) + 44px)", zIndex: 20 }}>
+      <div style={{ backgroundImage: "linear-gradient(to bottom, rgba(11,19,28,0.6), rgba(11,19,28,0.82)), url('/IMG_8877.jpeg')", backgroundSize: "cover", backgroundPosition: "center 42%", border: "1px solid rgba(255,255,255,0.09)", borderRadius: 18, margin: "10px 12px 0", padding: "12px 16px", position: "sticky", top: "calc(env(safe-area-inset-top, 44px) + 44px)", zIndex: 20, boxShadow: "0 8px 24px rgba(0,0,0,0.3)" }}>
         <div id="ff-master-scroll" style={S.holeNav} onScroll={(e) => {
           if (window._ffCentring) return;
           document.querySelectorAll(".ff-slave-scroll").forEach((el) => { if (el !== e.target) el.scrollLeft = e.target.scrollLeft; });
@@ -6188,7 +6206,16 @@ function PastRoundsScreen({ onBack, onViewRound }) {
         const remote = await getSavedRoundsFromSupabase(profile.name);
         const local = getSavedRounds().map(r => ({ ...r, status: "completed" }));
         const active = getActiveRoundRefs().filter(a => !local.some(s => s.id === a.id) && !remote.some(s => s.id === a.id));
-        const merged = [...remote.map(r => ({ ...r, status: "completed" })), ...local.filter(l => !remote.some(r => r.id === l.id)), ...active];
+        const completedIds = new Set([...remote, ...local].map(r => r.id));
+        // Rounds I created but never saved/finished — show them as in-progress too
+        let created = [];
+        try {
+          const mine = await dbGetMyCreatedRounds(profile.name);
+          created = mine
+            .filter(r => !completedIds.has(r.id) && !active.some(a => a.id === r.id))
+            .map(r => ({ id: r.id, code: r.code, course_name: r.course_name, game_type: r.game_type, holes: r.holes || [], players: [], scores: [], status: "in_progress", createdBy: r.created_by, savedAt: new Date(r.created_at).getTime(), date: new Date(r.created_at).toLocaleString("en-NZ", { day: "numeric", month: "long", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true }) }));
+        } catch(e) {}
+        const merged = [...remote.map(r => ({ ...r, status: "completed" })), ...local.filter(l => !remote.some(r => r.id === l.id)), ...active, ...created];
         setRounds(merged.sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0)));
       }
     })();
@@ -6197,7 +6224,9 @@ function PastRoundsScreen({ onBack, onViewRound }) {
   const handleDelete = (roundId, courseName) => {
     if (window.confirm("Remove " + courseName + " from your history?")) {
       deleteSavedRound(roundId);
-      setRounds(getSavedRounds());
+      const saved = getSavedRounds().map(r => ({ ...r, status: "completed" }));
+      const active = getActiveRoundRefs().filter(a => !saved.some(s => s.id === a.id));
+      setRounds([...saved, ...active].sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0)));
     }
   };
 
@@ -6376,7 +6405,7 @@ const S = {
   tagline: { fontSize: 16, color: "#94a3b8", margin: "8px 0 0" },
   homeButtons: { width: "100%", maxWidth: 320, display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 },
   adminLink: { background: "none", border: "none", color: "#64748b", fontSize: 12, cursor: "pointer", padding: 0, textDecoration: "underline", fontFamily: "inherit" },
-  header: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 20px 16px", backgroundColor: "#1e293b", borderBottom: "1px solid #334155", position: "sticky", top: 0, zIndex: 10 },
+  header: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 20px 16px", backgroundColor: "rgba(16,25,40,0.72)", borderBottom: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", position: "sticky", top: 0, zIndex: 10 },
   headerLeft: { display: "flex", flexDirection: "column" },
   headerCourse: { fontSize: 14, fontWeight: 600, color: "#f8fafc" },
   headerGame: { fontSize: 12, color: "#64748b" },
@@ -6422,7 +6451,7 @@ const S = {
   holeNavBtn: { minWidth: 40, width: 40, height: 36, borderRadius: 8, border: "none", outline: "1px solid #334155", outlineOffset: -1, backgroundColor: "#0f172a", color: "#94a3b8", fontSize: 13, fontWeight: 600, cursor: "pointer", flexShrink: 0, fontFamily: "inherit", WebkitAppearance: "none" },
   holeNavActive: { outline: "2px solid #22c55e", outlineOffset: -1, color: "#22c55e", backgroundColor: "#022c22", fontSize: 15, fontWeight: 900, zIndex: 1 },
   holeNavDone: { backgroundColor: "#1e3a1e", color: "#22c55e", border: "1px solid #22c55e" },
-  holeCard: { margin: "16px", backgroundColor: "rgba(21,33,52,0.72)", borderRadius: 16, padding: "20px", border: "1px solid rgba(120,160,110,0.22)", backdropFilter: "blur(3px)", WebkitBackdropFilter: "blur(3px)", boxShadow: "0 6px 24px rgba(0,0,0,0.25)" },
+  holeCard: { margin: "14px 12px", backgroundColor: "rgba(20,32,50,0.6)", borderRadius: 18, padding: "20px", border: "1px solid rgba(255,255,255,0.09)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", boxShadow: "0 8px 28px rgba(0,0,0,0.32)" },
   holeTop: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 },
   holeNum: { fontSize: 24, fontWeight: 800, color: "#f8fafc" },
   holeMeta: { fontSize: 12, color: "#f8fafc", marginTop: 4 },
@@ -6443,8 +6472,8 @@ const S = {
   scoreInfoCell: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minWidth: 48, width: 48, flex: "0 0 auto", padding: "4px 0", overflow: "visible" },
   scoreInfoCellNumber: { fontSize: 9, color: "#64748b", fontWeight: 700, marginBottom: 2 },
   scoreInfoCellValue: { fontSize: 14, fontWeight: 800, color: "#22c55e" },
-  lbRow: { display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 10, border: "1px solid #334155", backgroundColor: "rgba(15,23,42,0.4)", marginBottom: 6 },
-  lbRowMe: { border: "1px solid rgba(34,197,94,0.6)", borderRadius: 10, padding: "12px 14px", backgroundColor: "rgba(15,23,42,0.4)", marginBottom: 6 },
+  lbRow: { display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 14, border: "1px solid rgba(255,255,255,0.08)", backgroundColor: "rgba(20,32,50,0.72)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)", marginBottom: 6 },
+  lbRowMe: { border: "1px solid rgba(34,197,94,0.6)", borderRadius: 14, padding: "12px 14px", backgroundColor: "rgba(20,32,50,0.72)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)", marginBottom: 6 },
   lbPos: { fontSize: 18, fontWeight: 800, color: "#475569", width: 28, flexShrink: 0 },
   lbName: { flex: 1, fontSize: 16, fontWeight: 600, color: "#f8fafc" },
   lbHcp: { fontSize: 11, color: "#f8fafc", fontWeight: 400, marginLeft: 8 },
@@ -6460,7 +6489,7 @@ const S = {
   urlBox: { backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, padding: "10px 14px", fontSize: 12, color: "#64748b", wordBreak: "break-all", width: "100%", boxSizing: "border-box", marginBottom: 12 },
   otherPlayersSection: { margin: "16px", backgroundColor: "#1e293b", borderRadius: 12, padding: "16px", border: "1px solid #334155" },
   otherPlayersTitle: { fontSize: 14, fontWeight: 700, color: "#f8fafc", marginBottom: 12, textTransform: "uppercase", letterSpacing: 0.5 },
-  playerCard: { backgroundColor: "rgba(17,28,46,0.68)", border: "1px solid rgba(120,160,110,0.2)", borderRadius: 8, padding: "12px", marginBottom: 12, backdropFilter: "blur(2px)", WebkitBackdropFilter: "blur(2px)" },
+  playerCard: { backgroundColor: "rgba(20,32,50,0.72)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, padding: "12px", marginBottom: 12, backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)", boxShadow: "0 6px 20px rgba(0,0,0,0.28)" },
   playerCardName: { fontSize: 12, fontWeight: 700, color: "#f8fafc", textTransform: "uppercase", letterSpacing: 0.5 },
   playerScoresRow: { display: "flex", gap: 6, overflowX: "auto", paddingBottom: 4, paddingTop: 4, scrollbarWidth: "none" },
   playerHoleCell: { display: "flex", flexDirection: "column", alignItems: "center", minWidth: 44, flex: "0 0 auto", overflow: "visible" },
