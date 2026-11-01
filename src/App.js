@@ -1138,7 +1138,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.64</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.65</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
           </div>
@@ -4356,6 +4356,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
   const [adminConfirmRemove, setAdminConfirmRemove] = useState(null);
   const [lastMsgCount, setLastMsgCount] = useState(0);
   const [showCustomFor, setShowCustomFor] = useState(null); // player id or "me"
+  const [customInput, setCustomInput] = useState("");
   const [initialBankerId, setInitialBankerId] = useState(null);
   const [currentBankerId, setCurrentBankerId] = useState(null);
   const [pendingBets, setPendingBets] = useState({}); // unsubmitted bet amounts
@@ -5323,9 +5324,10 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
                           </button>
                         ))}
                       </div>
-                      <button onClick={() => setShowCustomFor(isMe ? "me" : player.id)} style={{ width: 46, height: 40, flexShrink: 0, backgroundColor: "#f8fafc", border: customVal ? "2px solid #22c55e" : "none", borderRadius: 8, cursor: "pointer", fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2, padding: "7px 1px 5px", boxSizing: "border-box" }}>
-                        <span style={{ fontSize: customVal ? 16 : 13, fontWeight: 900, lineHeight: 1, color: "#0f172a" }}>{customVal || "123"}</span>
-                        <span style={{ fontSize: 7, fontWeight: 600, textTransform: "uppercase", color: "#475569" }}>Other</span>
+                      <button onClick={() => { setCustomInput(customVal ? String(customVal) : ""); setShowCustomFor(isMe ? "me" : player.id); }} style={{ width: 46, height: 40, flexShrink: 0, backgroundColor: "#f8fafc", border: customVal ? "2px solid #22c55e" : "none", borderRadius: 8, cursor: "pointer", fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2, padding: "7px 1px 5px", boxSizing: "border-box" }}>
+                        {customVal
+                          ? <><span style={{ fontSize: 16, fontWeight: 900, lineHeight: 1, color: "#0f172a" }}>{customVal}</span><span style={{ fontSize: 7, fontWeight: 600, textTransform: "uppercase", color: "#475569" }}>Other</span></>
+                          : <span style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", color: "#475569", letterSpacing: 0.3 }}>Other</span>}
                       </button>
                       <div style={{ width: 28, flexShrink: 0, textAlign: "right" }}>
                         {pScore ? <span style={{ fontSize: 10, fontWeight: 700, color: "#22c55e" }}>{scoreLabel(pScore, curHole?.par)}</span> : <span style={{ fontSize: 12, color: "#334155" }}>—</span>}
@@ -5339,39 +5341,41 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
           </div>
 
           {/* Custom score modal */}
-          {showCustomFor && curHole && (
-            <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.7)", zIndex: 50, display: "flex", alignItems: "flex-end", justifyContent: "center" }} onClick={() => setShowCustomFor(null)}>
-              <div style={{ backgroundColor: "#1e293b", borderRadius: "16px 16px 0 0", padding: 20, width: "100%", maxWidth: 480 }} onClick={e => e.stopPropagation()}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: "#f8fafc", marginBottom: 4 }}>
-                  Custom Score — {showCustomFor === "me" ? me.name : others.find(p => p.id === showCustomFor)?.name?.replace(" (Guest)", "")}
+          {showCustomFor && curHole && (() => {
+            const submitCustom = () => {
+              const val = parseInt(customInput);
+              if (!(val >= 1 && val <= 20)) return;
+              if (showCustomFor === "me") { saveScore(activeHole, val); }
+              else {
+                const guest = others.find(p => p.id === showCustomFor);
+                if (guest) { saveGuestScore(guest, activeHole, val); setGuestCustomScores(prev => ({...prev, [showCustomFor]: String(val)})); }
+              }
+              setShowCustomFor(null); setCustomInput("");
+            };
+            const valid = (() => { const v = parseInt(customInput); return v >= 1 && v <= 20; })();
+            return (
+              <div style={{ position: "fixed", inset: 0, zIndex: 120, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onClick={() => { setShowCustomFor(null); setCustomInput(""); }}>
+                <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.55)", backdropFilter: "blur(5px)", WebkitBackdropFilter: "blur(5px)", zIndex: -1 }} />
+                <div style={{ width: "100%", maxWidth: 320, backgroundColor: "#111c2e", border: "1px solid #334155", borderRadius: 16, padding: 18, boxShadow: "0 20px 60px rgba(0,0,0,0.6)" }} onClick={e => e.stopPropagation()}>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: "#f8fafc", marginBottom: 2 }}>
+                    Custom score — {showCustomFor === "me" ? me.name : others.find(p => p.id === showCustomFor)?.name?.replace(" (Guest)", "")}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 14 }}>Hole {curHole.hole_number} · Par {curHole.par} · Type the score, then tap Submit</div>
+                  <input autoFocus type="number" inputMode="numeric" min="1" max="20" placeholder="e.g. 13"
+                    value={customInput}
+                    onChange={(e) => setCustomInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") submitCustom(); }}
+                    style={{ width: "100%", backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 12, padding: 14, color: "#f8fafc", fontSize: 28, fontWeight: 800, textAlign: "center", outline: "none", marginBottom: 12, fontFamily: "inherit", boxSizing: "border-box" }}
+                  />
+                  <button onClick={submitCustom} disabled={!valid} style={{ width: "100%", backgroundColor: valid ? "#22c55e" : "#334155", color: valid ? "#0f172a" : "#64748b", border: "none", borderRadius: 11, padding: "14px", fontSize: 15, fontWeight: 800, cursor: valid ? "pointer" : "not-allowed", fontFamily: "inherit", marginBottom: 8 }}>Submit</button>
+                  <button onClick={() => { setShowCustomFor(null); setCustomInput(""); }} style={{ width: "100%", backgroundColor: "transparent", color: "#64748b", border: "1px solid #334155", borderRadius: 11, padding: "11px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
                 </div>
-                <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 14 }}>Hole {curHole.hole_number} · Par {curHole.par} · Type score and press Done</div>
-                <input autoFocus type="number" min="1" max="20" placeholder="e.g. 10"
-                  defaultValue={showCustomFor === "me"
-                    ? (myScores[activeHole] && ![curHole.par-1,curHole.par,curHole.par+1,curHole.par+2,curHole.par+3].includes(myScores[activeHole]) ? myScores[activeHole] : "")
-                    : (guestCustomScores[showCustomFor] || "")}
-                  id="customScoreInput"
-                  style={{ width: "100%", backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 12, padding: 14, color: "#f8fafc", fontSize: 28, fontWeight: 800, textAlign: "center", outline: "none", marginBottom: 12, fontFamily: "inherit" }}
-                  onChange={(e) => {
-                    const val = parseInt(e.target.value);
-                    if (val >= 1 && val <= 20) {
-                      if (showCustomFor === "me") { saveScore(activeHole, val); }
-                      else {
-                        const guest = others.find(p => p.id === showCustomFor);
-                        if (guest) { saveGuestScore(guest, activeHole, val); setGuestCustomScores(prev => ({...prev, [showCustomFor]: String(val)})); }
-                      }
-                      setTimeout(() => setShowCustomFor(null), 300);
-                    }
-                  }}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === "Done") setShowCustomFor(null); }}
-                />
-                <button onClick={() => setShowCustomFor(null)} style={{ width: "100%", backgroundColor: "transparent", color: "#64748b", border: "1px solid #334155", borderRadius: 12, padding: "12px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Thumb swipe slider - drag the handle; it follows your thumb (left=left, right=right) */}
-          <style>{"@keyframes ffHoleNudge{0%,100%{transform:translateX(0)}25%{transform:translateX(-16px)}60%{transform:translateX(16px)}}"}</style>
+          <style>{"@keyframes ffHoleNudge{0%,100%{transform:translateX(0)}25%{transform:translateX(-26px)}60%{transform:translateX(26px)}}"}</style>
           <div
             onTouchStart={(e) => { swipeState.current = { x: e.touches[0].clientX, base: activeHole }; }}
             onTouchMove={(e) => {
@@ -5388,10 +5392,10 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
             <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 4, overflow: "hidden", animation: sliderNudge ? "ffHoleNudge 1.5s ease-in-out 0.5s 1" : "none" }}>
               {holes.map((h) => (
                 h.hole_number === activeHole ? (
-                  <div key={"dot"+h.hole_number} style={{ width: 30, height: 20, borderRadius: 7, backgroundColor: "#22c55e", cursor: "grab", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 3, boxShadow: "0 1px 4px rgba(0,0,0,0.4)", transition: "width 0.2s" }}>
-                    <span style={{ width: 2.5, height: 10, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.55)" }} />
-                    <span style={{ width: 2.5, height: 10, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.55)" }} />
-                    <span style={{ width: 2.5, height: 10, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.55)" }} />
+                  <div key={"dot"+h.hole_number} style={{ width: 42, height: 26, borderRadius: 9, backgroundColor: "#22c55e", cursor: "grab", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 4, boxShadow: "0 2px 6px rgba(0,0,0,0.45)", transition: "width 0.2s" }}>
+                    <span style={{ width: 3, height: 13, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.55)" }} />
+                    <span style={{ width: 3, height: 13, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.55)" }} />
+                    <span style={{ width: 3, height: 13, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.55)" }} />
                   </div>
                 ) : (
                   <div key={"dot"+h.hole_number} onClick={() => { setActiveHole(h.hole_number); requestAnimationFrame(() => centreHoleNav(h.hole_number)); }}
