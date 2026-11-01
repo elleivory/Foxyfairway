@@ -572,7 +572,26 @@ async function dbIsPlayerBlocked(name) {
 
 async function dbFindPlayerByName(roundId, name) {
   const players = await dbGetPlayers(roundId);
-  return players.find((p) => p.name.toLowerCase() === name.toLowerCase()) || null;
+  const target = (name || "").trim().toLowerCase();
+  return players.find((p) => (p.name || "").trim().toLowerCase() === target) || null;
+}
+// Remember which player YOU are in a given round, on this device, so a rejoin
+// after swiping the app shut reuses the same player instead of making a duplicate.
+function rememberMyPlayer(roundCode, playerId) {
+  try { localStorage.setItem("ff_me_" + roundCode, playerId); } catch {}
+}
+async function findMyPlayer(round, name) {
+  // 1) device memory: the exact player id I used last time in this round
+  try {
+    const savedId = localStorage.getItem("ff_me_" + round.code);
+    if (savedId) {
+      const players = await dbGetPlayers(round.id);
+      const hit = players.find((p) => p.id === savedId);
+      if (hit) return hit;
+    }
+  } catch {}
+  // 2) fall back to a trimmed, case-insensitive name match
+  return await dbFindPlayerByName(round.id, name);
 }
 
 // Save/load last round from localStorage
@@ -1138,7 +1157,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.70</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.72</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
           </div>
@@ -2817,7 +2836,8 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
     try {
       const code = Math.random().toString(36).substr(2, 6).toUpperCase();
       const round = await dbCreateRound({ code, course_name: course.name, course_id: course.id, game_type: gameType, holes: course.holes, use_handicap: useHandicap, created_at: new Date().toISOString(), created_by: name });
-      const me = await dbCreatePlayer({ name, handicap: useHandicap ? (parseHcp(hcp)) : 0, round_id: round.id, team: gameType === "matchplay_teams" ? team : null, is_placeholder: false });
+      const me = await dbCreatePlayer({ name: (name || "").trim(), handicap: useHandicap ? (parseHcp(hcp)) : 0, round_id: round.id, team: gameType === "matchplay_teams" ? team : null, is_placeholder: false });
+      rememberMyPlayer(round.code, me.id);
       savePlayerProfile(name, parseHcp(hcp));
       const fullRound = { ...round, holes: course.holes };
       saveLastRound(fullRound, me);
@@ -3140,8 +3160,9 @@ function JoinRoundScreen({ onBack, onJoined, prefillCode }) {
     try {
       const blocked = await dbIsPlayerBlocked(name);
       if (blocked) { setErr("This name has been blocked. Please contact the organiser."); setLoading(false); return; }
-      const existing = await dbFindPlayerByName(round.id, name);
-      const me = existing || await dbCreatePlayer({ name, handicap: round.use_handicap === false ? 0 : (parseHcp(hcp)), round_id: round.id, team: round.game_type === "matchplay_teams" ? team : null, is_placeholder: false });
+      const existing = await findMyPlayer(round, name);
+      const me = existing || await dbCreatePlayer({ name: (name || "").trim(), handicap: round.use_handicap === false ? 0 : (parseHcp(hcp)), round_id: round.id, team: round.game_type === "matchplay_teams" ? team : null, is_placeholder: false });
+      rememberMyPlayer(round.code, me.id);
       savePlayerProfile(name, parseHcp(hcp));
       const fullRound = { ...round, holes: round.holes?.length ? round.holes : getHolesForRound(round) };
       saveLastRound(fullRound, me);
@@ -5441,8 +5462,10 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
       {/* Compact leaderboard strip - replaces the old match play banner */}
       {(() => {
         const allP = [me, ...others];
-        const holesPlayed = Object.keys(myScores).length;
-        if (holesPlayed === 0) return null;
+        // Show the summary as soon as ANYONE has a score, so it's visible here
+        // without going back to the dashboard (most players never do).
+        const anyScores = Object.keys(myScores).length > 0 || (allScores && allScores.length > 0);
+        if (!anyScores) return null;
 
         const getScore = (player) => {
           const ps = allScores.filter((s) => s.player_id === player.id);
@@ -6233,7 +6256,7 @@ function PastRoundsScreen({ onBack, onViewRound }) {
                         try {
                           const fullRound = await dbGetRound(r.code);
                           const profile = getPlayerProfile();
-                          const existing = profile.name ? await dbFindPlayerByName(fullRound.id, profile.name) : null;
+                          const existing = await findMyPlayer(fullRound, profile.name);
                           if (existing) {
                             onViewRound({ ...r, _rejoinPlayer: existing, _rejoinRound: fullRound });
                           } else {
