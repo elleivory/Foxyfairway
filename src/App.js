@@ -509,13 +509,18 @@ async function dbGetAllRounds() {
 // history), so created-but-unfinished rounds still appear in Past Rounds.
 async function dbGetMyCreatedRounds(playerName) {
   if (!playerName) return [];
+  // Use the same query the admin screen uses (known to return all rounds), then
+  // filter to this player's rounds on the client to avoid any server-filter gaps.
   const { data } = await supabase.from("rounds")
     .select("id, code, course_name, game_type, holes, created_at, created_by")
-    .ilike("created_by", playerName.trim())
     .order("created_at", { ascending: false })
-    .limit(30);
+    .limit(100);
   const deletedIds = JSON.parse(localStorage.getItem("ff_deleted_rounds") || "[]");
-  return (data || []).filter((r) => !deletedIds.includes(r.id));
+  const target = playerName.trim().toLowerCase();
+  return (data || [])
+    .filter((r) => !deletedIds.includes(r.id))
+    .filter((r) => (r.created_by || "").trim().toLowerCase() === target)
+    .slice(0, 30);
 }
 
 async function dbDeleteRound(roundId) {
@@ -1175,7 +1180,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.75</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.76</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
           </div>
