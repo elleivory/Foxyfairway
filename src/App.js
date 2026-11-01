@@ -1180,7 +1180,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.76</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.77</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
           </div>
@@ -3482,7 +3482,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
         )}
 
         {/* Sheet panel with Leaderboard / Scorecards tabs (Option C) */}
-        <div style={{ backgroundColor: "rgba(20,32,50,0.68)", borderRadius: 18, marginTop: 10, marginLeft: -8, marginRight: -8, padding: "14px 16px 20px", boxShadow: "0 8px 28px rgba(0,0,0,0.32)", border: "1px solid rgba(255,255,255,0.09)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)" }}>
+        <div style={{ backgroundColor: "rgba(18,29,46,0.9)", borderRadius: 18, marginTop: 10, marginLeft: -8, marginRight: -8, padding: "14px 16px 20px", boxShadow: "0 8px 28px rgba(0,0,0,0.32)", border: "1px solid rgba(255,255,255,0.09)" }}>
           <div style={{ width: 38, height: 4, borderRadius: 2, backgroundColor: "#334155", margin: "0 auto 14px" }} />
           <div style={{ display: "flex", backgroundColor: "rgba(11,18,32,0.6)", border: "1px solid #243049", borderRadius: 10, padding: 3, marginBottom: 14 }}>
             {[["leaderboard", "Leaderboard"], ["scorecards", "Scorecards"]].map(([key, lbl]) => (
@@ -4382,8 +4382,13 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
     return () => window.removeEventListener("resize", measure);
   }, []);
   useEffect(() => {
-    requestAnimationFrame(() => centreHoleNav(activeHole));
-  }, [activeHole, navPadding]);
+    // Re-centre on hole change AND when scores/layout shift (live refresh adds
+    // check marks that change cell widths), with a settle so it measures final layout.
+    const run = () => centreHoleNav(activeHole);
+    requestAnimationFrame(() => requestAnimationFrame(run));
+    const t = setTimeout(run, 140);
+    return () => clearTimeout(t);
+  }, [activeHole, navPadding, allScores.length]);
   const [showChat, setShowChat] = useState(false);
   const [unreadChat, setUnreadChat] = useState(0);
   const [showGameAdmin, setShowGameAdmin] = useState(false);
