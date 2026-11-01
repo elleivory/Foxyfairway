@@ -1138,7 +1138,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.63</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.64</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
           </div>
@@ -2836,9 +2836,7 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
           <div style={{ display: "flex", flexDirection: "column" }}>
             <div style={{ padding: "0 0 8px" }}>
               <h3 style={S.stepTitle}>Where are you playing?</h3>
-              <button style={course ? S.btnPrimary : S.btnDisabled} disabled={!course} onClick={() => setStep(2)}>
-                {course ? "Next → " + course.name : "Select a course to continue"}
-              </button>
+              <p style={{ ...S.hint, color: "#94a3b8", marginTop: 0 }}>Tap a course to continue</p>
             </div>
             <div style={{ maxHeight: "calc(100vh - 280px)", overflowY: "auto" }}>
 
@@ -2976,7 +2974,7 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
 
             <div style={S.courseList}>
               {courses.map((c) => (
-                <button key={c.id} style={{ ...S.courseCard, ...(course?.id === c.id ? S.courseCardSelected : {}) }} onClick={() => setCourse(c)}>
+                <button key={c.id} style={{ ...S.courseCard, ...(course?.id === c.id ? S.courseCardSelected : {}) }} onClick={() => { setCourse(c); setStep(2); }}>
                   <span style={S.courseIcon}>⛳</span>
                   <div style={{ flex: 1 }}>
                     <div style={S.courseName}>{c.name}</div>
@@ -2993,12 +2991,11 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
             <h3 style={S.stepTitle}>What game are you playing?</h3>
             <div style={S.gameList}>
               {Object.entries(GAME_TYPES).map(([key, g]) => (
-                <button key={key} style={{ ...S.gameCard, ...(gameType === key ? S.gameCardSelected : {}) }} onClick={() => setGameType(key)}>
+                <button key={key} style={{ ...S.gameCard, ...(gameType === key ? S.gameCardSelected : {}) }} onClick={() => { setGameType(key); setStep(3); }}>
                   <div style={S.gameName}>{g.label}</div><div style={S.gameDesc}>{g.description}</div>
                 </button>
               ))}
             </div>
-            <button style={S.btnPrimary} onClick={() => setStep(3)}>Next</button>
           </div>
         )}
         {step === 3 && (
@@ -3336,19 +3333,6 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
           <button style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1, background: "none", border: "none", padding: "2px 4px", color: "#c69749", fontSize: 8, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }} onClick={() => { setShowDashAdmin(true); setGameAdminTab("scores"); setAdminMsg(""); setAdminEditHoles(JSON.parse(JSON.stringify(holes || []))); const sc = {}; scores.forEach(s => { if (!sc[s.player_id]) sc[s.player_id] = {}; sc[s.player_id][s.hole_number] = s.score; }); setAdminEditScores(sc); }}><span style={{ fontSize: 14 }}>⚙️</span>Admin</button>
         </div>
 
-        {/* Invite Players - big green button opens a blurred popup */}
-        {!isSpectator ? (
-          <button onClick={() => setShowJoinQR(true)} style={{ ...S.btnPrimary, width: "100%", fontSize: 16, marginBottom: 6, padding: "15px", display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>➕ Invite Players</button>
-        ) : (
-          <div style={{ backgroundColor: "rgba(15,23,42,0.4)", border: "1px solid #334155", borderRadius: 10, padding: "10px 12px", marginBottom: 6, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-              <span style={{ fontSize: 9, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 1, fontWeight: 700 }}>Round code</span>
-              <span style={{ fontSize: 14, color: "#22c55e", fontWeight: 800, letterSpacing: 2 }}>{round.code}</span>
-            </div>
-            <button onClick={() => setShowJoinQR(true)} style={{ backgroundColor: "rgba(34,197,94,0.15)", border: "1px solid #22c55e", color: "#22c55e", borderRadius: 7, padding: "6px 10px", fontSize: 10, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Show QR</button>
-          </div>
-        )}
-
         {/* Invite / QR popup */}
         {showJoinQR && (
           <div style={{ position: "fixed", inset: 0, zIndex: 120, overflowY: "auto", WebkitOverflowScrolling: "touch" }} onClick={(e) => { if (e.target === e.currentTarget) { setShowJoinQR(false); setShowAddGuest(false); } }}>
@@ -3390,8 +3374,21 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
           </div>
         )}
 
-        {/* Spacer for breathing room before Start Game - sized against viewport since content area scrolls */}
+        {/* Spacer for breathing room - gap sits above the button pair */}
         <div style={{ minHeight: "18vh" }} />
+
+        {/* Invite Players sits directly above Start Game, same size. Start Game stays put. */}
+        {!isSpectator ? (
+          <button onClick={() => setShowJoinQR(true)} style={{ ...S.btnPrimary, width: "100%", fontSize: 17, marginBottom: 10, padding: "18px", display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>➕ Invite Players</button>
+        ) : (
+          <div style={{ backgroundColor: "rgba(15,23,42,0.4)", border: "1px solid #334155", borderRadius: 10, padding: "10px 12px", marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+              <span style={{ fontSize: 9, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 1, fontWeight: 700 }}>Round code</span>
+              <span style={{ fontSize: 14, color: "#22c55e", fontWeight: 800, letterSpacing: 2 }}>{round.code}</span>
+            </div>
+            <button onClick={() => setShowJoinQR(true)} style={{ backgroundColor: "rgba(34,197,94,0.15)", border: "1px solid #22c55e", color: "#22c55e", borderRadius: 7, padding: "6px 10px", fontSize: 10, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Show QR</button>
+          </div>
+        )}
 
         <div style={{ marginBottom: 20 }}>
           <button style={{ ...S.btnPrimary, width: "100%", fontSize: 17, marginBottom: 0, padding: "18px" }} onClick={onViewScorecard}>▶️ Start Game</button>
@@ -4299,6 +4296,8 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
   
   const [activeHole, setActiveHole] = useState(1);
   const [celebration, setCelebration] = useState(null);
+  const [sliderNudge, setSliderNudge] = useState(true);
+  useEffect(() => { const t = setTimeout(() => setSliderNudge(false), 2800); return () => clearTimeout(t); }, []);
   const [navPadding, setNavPadding] = useState(150);
   useEffect(() => {
     const measure = () => {
@@ -5324,8 +5323,9 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
                           </button>
                         ))}
                       </div>
-                      <button onClick={() => setShowCustomFor(isMe ? "me" : player.id)} style={{ width: 30, height: 40, flexShrink: 0, backgroundColor: customVal ? "#0f172a" : "#1e293b", border: customVal ? "1px solid #22c55e" : "1px solid #334155", borderRadius: 8, color: customVal ? "#22c55e" : "#64748b", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>
-                        {customVal || "···"}
+                      <button onClick={() => setShowCustomFor(isMe ? "me" : player.id)} style={{ width: 46, height: 40, flexShrink: 0, backgroundColor: "#f8fafc", border: customVal ? "2px solid #22c55e" : "none", borderRadius: 8, cursor: "pointer", fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2, padding: "7px 1px 5px", boxSizing: "border-box" }}>
+                        <span style={{ fontSize: customVal ? 16 : 13, fontWeight: 900, lineHeight: 1, color: "#0f172a" }}>{customVal || "123"}</span>
+                        <span style={{ fontSize: 7, fontWeight: 600, textTransform: "uppercase", color: "#475569" }}>Other</span>
                       </button>
                       <div style={{ width: 28, flexShrink: 0, textAlign: "right" }}>
                         {pScore ? <span style={{ fontSize: 10, fontWeight: 700, color: "#22c55e" }}>{scoreLabel(pScore, curHole?.par)}</span> : <span style={{ fontSize: 12, color: "#334155" }}>—</span>}
@@ -5370,30 +5370,39 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
             </div>
           )}
 
-          {/* Thumb swipe slider - pure navigation, no data duplication. Drag anywhere on the bar to scrub holes */}
+          {/* Thumb swipe slider - drag the handle; it follows your thumb (left=left, right=right) */}
+          <style>{"@keyframes ffHoleNudge{0%,100%{transform:translateX(0)}25%{transform:translateX(-16px)}60%{transform:translateX(16px)}}"}</style>
           <div
             onTouchStart={(e) => { swipeState.current = { x: e.touches[0].clientX, base: activeHole }; }}
             onTouchMove={(e) => {
               if (!swipeState.current) return;
               const dx = e.touches[0].clientX - swipeState.current.x;
-              const steps = Math.round(-dx / 28); // drag left = later holes, matches scroll direction
+              const steps = Math.round(dx / 28); // handle follows thumb: drag left = earlier holes, right = later
               const target = Math.max(1, Math.min(holes.length, swipeState.current.base + steps));
               if (target !== activeHole) { setActiveHole(target); requestAnimationFrame(() => centreHoleNav(target)); }
             }}
             onTouchEnd={() => { swipeState.current = null; }}
-            style={{ margin: "14px 0 4px", backgroundColor: "rgba(15,23,42,0.5)", border: "1px solid #334155", borderRadius: 14, padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", touchAction: "pan-y" }}>
+            style={{ margin: "14px 0 4px", backgroundColor: "rgba(15,23,42,0.5)", border: "1px solid #334155", borderRadius: 14, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", touchAction: "pan-y" }}>
             <button onClick={() => { if (activeHole > 1) { const prev = activeHole - 1; setActiveHole(prev); requestAnimationFrame(() => centreHoleNav(prev)); } }}
               style={{ background: "none", border: "none", color: activeHole > 1 ? "#94a3b8" : "#334155", fontSize: 20, fontWeight: 900, cursor: activeHole > 1 ? "pointer" : "default", padding: "4px 8px", fontFamily: "inherit" }}>‹</button>
-            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 4, overflow: "hidden" }}>
+            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 4, overflow: "hidden", animation: sliderNudge ? "ffHoleNudge 1.5s ease-in-out 0.5s 1" : "none" }}>
               {holes.map((h) => (
-                <div key={"dot"+h.hole_number} onClick={() => { setActiveHole(h.hole_number); requestAnimationFrame(() => centreHoleNav(h.hole_number)); }}
-                  style={{ width: h.hole_number === activeHole ? 16 : 5, height: 5, borderRadius: 3, backgroundColor: h.hole_number === activeHole ? "#22c55e" : "#334155", cursor: "pointer", flexShrink: 0, transition: "width 0.2s" }} />
+                h.hole_number === activeHole ? (
+                  <div key={"dot"+h.hole_number} style={{ width: 30, height: 20, borderRadius: 7, backgroundColor: "#22c55e", cursor: "grab", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 3, boxShadow: "0 1px 4px rgba(0,0,0,0.4)", transition: "width 0.2s" }}>
+                    <span style={{ width: 2.5, height: 10, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.55)" }} />
+                    <span style={{ width: 2.5, height: 10, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.55)" }} />
+                    <span style={{ width: 2.5, height: 10, borderRadius: 2, backgroundColor: "rgba(15,23,42,0.55)" }} />
+                  </div>
+                ) : (
+                  <div key={"dot"+h.hole_number} onClick={() => { setActiveHole(h.hole_number); requestAnimationFrame(() => centreHoleNav(h.hole_number)); }}
+                    style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: "#334155", cursor: "pointer", flexShrink: 0, transition: "width 0.2s" }} />
+                )
               ))}
             </div>
             <button onClick={() => { if (activeHole < holes.length) { const next = activeHole + 1; setActiveHole(next); requestAnimationFrame(() => centreHoleNav(next)); } }}
               style={{ background: "none", border: "none", color: activeHole < holes.length ? "#94a3b8" : "#334155", fontSize: 20, fontWeight: 900, cursor: activeHole < holes.length ? "pointer" : "default", padding: "4px 8px", fontFamily: "inherit" }}>›</button>
           </div>
-          <div style={{ textAlign: "center", fontSize: 9, color: "#475569", fontWeight: 600, letterSpacing: 0.5, marginBottom: 8 }}>‹ SWIPE TO CHANGE HOLE ›</div>
+          <div style={{ textAlign: "center", fontSize: 9, color: "#475569", fontWeight: 600, letterSpacing: 0.5, marginBottom: 8 }}>‹ SLIDE THE HANDLE TO CHANGE HOLE ›</div>
         </div>
       )}
 
