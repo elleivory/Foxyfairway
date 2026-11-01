@@ -1138,7 +1138,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.68</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.69</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
           </div>
@@ -2832,8 +2832,9 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
         <h2 style={S.headerTitle}>New Round</h2><div />
       </div>
       <div style={S.content}>
+        <style>{"@keyframes ffStepIn{0%{opacity:0;transform:translateX(18px)}100%{opacity:1;transform:translateX(0)}}"}</style>
         {step === 1 && (
-          <div style={{ display: "flex", flexDirection: "column" }}>
+          <div key="step1" style={{ display: "flex", flexDirection: "column", animation: "ffStepIn 0.32s ease-out both" }}>
             <div style={{ padding: "0 0 8px" }}>
               <h3 style={S.stepTitle}>Where are you playing?</h3>
               <p style={{ ...S.hint, color: "#94a3b8", marginTop: 0 }}>Tap a course to continue</p>
@@ -2987,7 +2988,7 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
           </div>
         )}
         {step === 2 && (
-          <div style={S.stepWrap}>
+          <div key="step2" style={{ ...S.stepWrap, animation: "ffStepIn 0.32s ease-out both" }}>
             <h3 style={S.stepTitle}>What game are you playing?</h3>
             <div style={S.gameList}>
               {Object.entries(GAME_TYPES).map(([key, g]) => (
@@ -2999,7 +3000,7 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
           </div>
         )}
         {step === 3 && (
-          <div style={S.stepWrap}>
+          <div key="step3" style={{ ...S.stepWrap, animation: "ffStepIn 0.32s ease-out both" }}>
             <h3 style={S.stepTitle}>Your details</h3>
             <label style={{ ...S.label, color: "#f8fafc" }}>Your name</label>
             <input style={S.input} placeholder="e.g. Jamie" value={name} onChange={(e) => setName(e.target.value)} />
@@ -3538,25 +3539,25 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
             else if (round.game_type === "banker") { bigVal = (p.total >= 0 ? "+$" : "-$") + Math.abs(p.total); bigLbl = "Balance"; bigColor = p.total > 0 ? "#22c55e" : p.total < 0 ? "#ef4444" : "#94a3b8"; }
             else { bigVal = null; bigLbl = null; bigColor = null; } // Stroke play: Gross/Par/Nett badges say it all
             return (
-              <div key={p.id} style={{ ...S.lbRow, ...(p.id === me?.id ? S.lbRowMe : {}), flexDirection: "column", alignItems: "stretch", padding: "12px 14px" }}>
-                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 10 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                    <div style={{ fontSize: 16, fontWeight: 900, color: i === 0 ? "#f59e0b" : i === 1 ? "#94a3b8" : i === 2 ? "#cd7c2f" : "#475569", width: 18, flexShrink: 0 }}>{i + 1}</div>
-                    <div style={{ minWidth: 0 }}>
-                      <span style={{ fontSize: 15, fontWeight: 700, color: "#f8fafc" }}>{p.name.replace(" (Guest)", "")}</span>
-                      <span style={{ fontSize: 11, color: "#f8fafc", marginLeft: 6, fontWeight: 500 }}>HCP {fmtHcp(p.handicap)}</span>
+              <div key={p.id} style={{ ...S.lbRow, ...(p.id === me?.id ? S.lbRowMe : {}), flexDirection: "column", alignItems: "stretch", padding: "10px 12px", marginBottom: 0, minWidth: 0, boxSizing: "border-box", overflow: "hidden" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 10 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                    <div style={{ fontSize: 15, fontWeight: 900, color: i === 0 ? "#f59e0b" : i === 1 ? "#94a3b8" : i === 2 ? "#cd7c2f" : "#475569", width: 14, flexShrink: 0 }}>{i + 1}</div>
+                    <div style={{ minWidth: 0, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: "#f8fafc" }}>{p.name.replace(" (Guest)", "")}</span>
+                      <span style={{ fontSize: 10, color: "#94a3b8", marginLeft: 5, fontWeight: 500 }}>HCP {fmtHcp(p.handicap)}</span>
                     </div>
                   </div>
-                  <div style={{ display: "flex", gap: 5, flexShrink: 0 }}>
-                    <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: 8, padding: "4px 8px", textAlign: "center", minWidth: 34 }}>
-                      <div style={{ fontSize: 12, fontWeight: 800, color: "#22c55e", lineHeight: 1.1 }}>{gross || "—"}</div>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: 8, padding: "4px 4px", textAlign: "center", flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 800, color: "#fff", lineHeight: 1.1 }}>{gross || "—"}</div>
                       <div style={{ fontSize: 6, color: "#cbd5e1", textTransform: "uppercase" }}>Gross</div>
                     </div>
-                    <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: 8, padding: "4px 8px", textAlign: "center", minWidth: 34 }}>
+                    <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: 8, padding: "4px 4px", textAlign: "center", flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 12, fontWeight: 800, color: "#fff", lineHeight: 1.1 }}>{gross ? gtpStr : "—"}</div>
                       <div style={{ fontSize: 6, color: "#cbd5e1", textTransform: "uppercase" }}>Par</div>
                     </div>
-                    <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: 8, padding: "4px 8px", textAlign: "center", minWidth: 34 }}>
+                    <div style={{ background: "rgba(255,255,255,0.08)", borderRadius: 8, padding: "4px 4px", textAlign: "center", flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 12, fontWeight: 800, color: "#fff", lineHeight: 1.1 }}>{gross ? nettStr : "—"}</div>
                       <div style={{ fontSize: 6, color: "#cbd5e1", textTransform: "uppercase" }}>Nett</div>
                     </div>
@@ -4270,33 +4271,37 @@ function centreHoleNav(holeNumber, attempt) {
     if (attempt < 5) setTimeout(() => centreHoleNav(holeNumber, attempt + 1), 60);
     return;
   }
-  const btnLeft = btn.offsetLeft;
-  const btnWidth = btn.offsetWidth;
-  const targetPos = Math.max(0, btnLeft - (containerWidth / 2) + (btnWidth / 2));
-
   // Cancel any in-progress animation so movements never stack or fight each other
   if (_centreHoleNavAnimId !== null) {
     cancelAnimationFrame(_centreHoleNavAnimId);
     _centreHoleNavAnimId = null;
   }
 
+  // Each strip (hole-nav + every scorecard) has different cell widths, so centre
+  // EACH one on its own active-hole cell rather than copying one scrollLeft.
   const els = document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll");
-  const startPos = master.scrollLeft;
-  const distance = targetPos - startPos;
+  const plan = [];
+  els.forEach((el) => {
+    const w = el.clientWidth || containerWidth;
+    const cell = el.id === "ff-master-scroll" ? btn : el.querySelector('[data-hole="' + holeNumber + '"]');
+    if (!cell) return;
+    const target = Math.max(0, cell.offsetLeft - (w / 2) + (cell.offsetWidth / 2));
+    plan.push({ el, start: el.scrollLeft, dist: target - el.scrollLeft });
+  });
   const duration = 280; // ms - single controlled glide
   const startTime = performance.now();
+  window._ffCentring = true;
 
   function step(now) {
     const elapsed = now - startTime;
     const t = Math.min(1, elapsed / duration);
-    // ease-out cubic for a smooth tempo feel
     const eased = 1 - Math.pow(1 - t, 3);
-    const current = startPos + distance * eased;
-    els.forEach((el) => { el.scrollLeft = current; });
+    plan.forEach((p) => { p.el.scrollLeft = p.start + p.dist * eased; });
     if (t < 1) {
       _centreHoleNavAnimId = requestAnimationFrame(step);
     } else {
       _centreHoleNavAnimId = null;
+      window._ffCentring = false;
     }
   }
   _centreHoleNavAnimId = requestAnimationFrame(step);
@@ -4993,6 +4998,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
       {/* Hole nav - master scroll, drives all score rows */}
       <div style={{ backgroundImage: "linear-gradient(to bottom, rgba(11,19,28,0.62), rgba(11,19,28,0.82)), url('/IMG_8877.jpeg')", backgroundSize: "cover", backgroundPosition: "center 42%", borderBottom: "1px solid rgba(120,160,110,0.22)", padding: "10px 16px", position: "sticky", top: "calc(env(safe-area-inset-top, 44px) + 44px)", zIndex: 20 }}>
         <div id="ff-master-scroll" style={S.holeNav} onScroll={(e) => {
+          if (window._ffCentring) return;
           document.querySelectorAll(".ff-slave-scroll").forEach((el) => { if (el !== e.target) el.scrollLeft = e.target.scrollLeft; });
         }}>
           <div style={{ flexShrink: 0, width: navPadding }} />
@@ -5564,7 +5570,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
                           <div style={{ fontSize: 9, color: "#94a3b8", fontWeight: 700, height: 28, display: "flex", alignItems: "center" }}>G</div>
                           {isHandicap && <div style={{ fontSize: 9, color: "#94a3b8", fontWeight: 700, height: 28, display: "flex", alignItems: "center" }}>N</div>}
                         </div>
-                        <div className="ff-slave-scroll" style={{ ...S.playerScoresRow, flex: 1 }} onScroll={(e) => { document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { if (el !== e.target) el.scrollLeft = e.target.scrollLeft; }); }}>
+                        <div className="ff-slave-scroll" style={{ ...S.playerScoresRow, flex: 1 }} onScroll={(e) => { if (window._ffCentring) return; document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { if (el !== e.target) el.scrollLeft = e.target.scrollLeft; }); }}>
                           {holes.map((h) => {
                             const g = isMe ? myScores[h.hole_number] : (ps.find((s) => s.hole_number === h.hole_number)?.score || null);
                             const hs = getHcpStrokes(player.handicap, h.stroke_index);
@@ -5577,7 +5583,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
                             const myNet = g ? g - hs : null;
                             const isBestBall = myNet !== null && myNet === teamBestNet && teamBestNet !== Infinity;
                             return (
-                              <div key={player.id + h.hole_number} style={{ minWidth: 44, flex: "0 0 auto", display: "flex", flexDirection: "column", alignItems: "center", overflow: "visible" }}>
+                              <div key={player.id + h.hole_number} data-hole={h.hole_number} style={{ minWidth: 44, flex: "0 0 auto", display: "flex", flexDirection: "column", alignItems: "center", overflow: "visible" }}>
                                 <div style={{ fontSize: 8, color: "#94a3b8", height: 10, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>{h.hole_number}</div>
                                 <div style={{ fontSize: 7, color: "#475569", height: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>P{h.par}</div>
                                 <div style={{ height: 28, display: "flex", alignItems: "center", justifyContent: "center", overflow: "visible" }}>
@@ -5644,7 +5650,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
                     </div>
                   )}
                 </div>
-                <div className="ff-slave-scroll" style={{ ...S.playerScoresRow, flex: 1 }} onScroll={(e) => { document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { if (el !== e.target) el.scrollLeft = e.target.scrollLeft; }); }}>
+                <div className="ff-slave-scroll" style={{ ...S.playerScoresRow, flex: 1 }} onScroll={(e) => { if (window._ffCentring) return; document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { if (el !== e.target) el.scrollLeft = e.target.scrollLeft; }); }}>
                   {holes.map((h) => {
                     const g = myScores[h.hole_number];
                     const hs = getHcpStrokes(me.handicap, h.stroke_index);
@@ -5677,7 +5683,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
                       }
                     }
                     return (
-                      <div key={"me"+h.hole_number} style={{ minWidth: 44, flex: "0 0 auto", display: "flex", flexDirection: "column", alignItems: "center", overflow: "visible" }}>
+                      <div key={"me"+h.hole_number} data-hole={h.hole_number} style={{ minWidth: 44, flex: "0 0 auto", display: "flex", flexDirection: "column", alignItems: "center", overflow: "visible" }}>
                         <div style={{ fontSize: 8, color: "#94a3b8", height: 10, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>{h.hole_number}</div>
                         <div style={{ fontSize: 7, color: "#475569", height: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>P{h.par}</div>
                         <div style={{ height: 28, display: "flex", alignItems: "center", justifyContent: "center", overflow: "visible" }}>
@@ -5745,7 +5751,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
                     )}
                   </div>
                   {/* Scrollable scores */}
-                  <div className="ff-slave-scroll" style={{ ...S.playerScoresRow, flex: 1 }} onScroll={(e) => { document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { if (el !== e.target) el.scrollLeft = e.target.scrollLeft; }); }}>
+                  <div className="ff-slave-scroll" style={{ ...S.playerScoresRow, flex: 1 }} onScroll={(e) => { if (window._ffCentring) return; document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { if (el !== e.target) el.scrollLeft = e.target.scrollLeft; }); }}>
                     {holes.map((h) => {
                       const sc = ps.find((s) => s.hole_number === h.hole_number);
                       const g = sc ? sc.score : null, hs = getHcpStrokes(player.handicap, h.stroke_index);
@@ -5773,7 +5779,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
                       const plLb = round.game_type === "banker" ? scorecardLb.find((p) => p.id === player.id) : null;
                       const hd = plLb?.holeScores?.bankerHoleData?.[h.hole_number];
                       return (
-                        <div key={player.id + h.hole_number} style={{ minWidth: 44, flex: "0 0 auto", display: "flex", flexDirection: "column", alignItems: "center", overflow: "visible" }}>
+                        <div key={player.id + h.hole_number} data-hole={h.hole_number} style={{ minWidth: 44, flex: "0 0 auto", display: "flex", flexDirection: "column", alignItems: "center", overflow: "visible" }}>
                           <div style={{ fontSize: 8, color: "#94a3b8", height: 10, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>{h.hole_number}</div>
                           <div style={{ fontSize: 7, color: "#475569", height: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>P{h.par}</div>
                           <div style={{ height: 28, display: "flex", alignItems: "center", justifyContent: "center", overflow: "visible" }}>
