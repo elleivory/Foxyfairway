@@ -1138,7 +1138,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.66</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.67</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
           </div>
@@ -3431,7 +3431,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
         )}
 
         {/* Sheet panel with Leaderboard / Scorecards tabs (Option C) */}
-        <div style={{ backgroundColor: "rgba(15,26,46,0.82)", borderRadius: "18px 18px 0 0", marginTop: 8, marginLeft: -20, marginRight: -20, padding: "14px 20px 20px", boxShadow: "0 -8px 24px rgba(0,0,0,0.3)", border: "1px solid rgba(120,160,110,0.18)", borderBottom: "none", backdropFilter: "blur(3px)", WebkitBackdropFilter: "blur(3px)" }}>
+        <div style={{ backgroundColor: "rgba(15,26,46,0.9)", borderRadius: "18px 18px 0 0", marginTop: 8, marginLeft: -20, marginRight: -20, padding: "14px 20px 20px", boxShadow: "0 -8px 24px rgba(0,0,0,0.3)", border: "1px solid rgba(120,160,110,0.18)", borderBottom: "none" }}>
           <div style={{ width: 38, height: 4, borderRadius: 2, backgroundColor: "#334155", margin: "0 auto 14px" }} />
           <div style={{ display: "flex", backgroundColor: "rgba(11,18,32,0.6)", border: "1px solid #243049", borderRadius: 10, padding: 3, marginBottom: 14 }}>
             {[["leaderboard", "Leaderboard"], ["scorecards", "Scorecards"]].map(([key, lbl]) => (
@@ -3715,7 +3715,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
 
       {/* RULES PANEL */}
       {showRules && (
-        <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.9)", zIndex: 100, display: "flex", flexDirection: "column" }}>
+        <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.55)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)", zIndex: 100, display: "flex", flexDirection: "column" }}>
           <div style={{ backgroundColor: "#0f172a", borderBottom: "1px solid #334155", padding: "calc(env(safe-area-inset-top,44px) + 8px) 16px 12px", display: "flex", alignItems: "center", gap: 12 }}>
             <button onClick={() => { setShowRules(false); setRulesAnswer(null); setRulesQuestion(""); setRulesImages([]); }} style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: "6px 12px", fontFamily: "inherit" }}>← Close</button>
             <div style={{ fontSize: 16, fontWeight: 800, color: "#f8fafc" }}>📖 USGA Rules of Golf</div>
@@ -3844,7 +3844,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
 
       {/* DASHBOARD ADMIN PANEL */}
       {showDashAdmin && (
-        <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.85)", zIndex: 100, display: "flex", flexDirection: "column" }}>
+        <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.55)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)", zIndex: 100, display: "flex", flexDirection: "column" }}>
           <div style={{ backgroundColor: "#0f172a", borderBottom: "1px solid #334155", padding: "calc(env(safe-area-inset-top,44px) + 8px) 16px 12px", display: "flex", alignItems: "center", gap: 12 }}>
             <button onClick={() => setShowDashAdmin(false)} style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: "6px 12px", fontFamily: "inherit" }}>← Close</button>
             <div style={{ fontSize: 16, fontWeight: 800, color: "#f8fafc" }}>⚙️ Round Admin</div>
@@ -4716,7 +4716,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
   return (
     <BgScreen bg={BG_OTHER}>
       {celebration && <ScoreCelebration data={celebration} onDone={() => setCelebration(null)} />}
-      <div style={{ position: "sticky", top: 0, zIndex: 30, backgroundColor: "#1e293b", borderBottom: "1px solid #334155", padding: "calc(env(safe-area-inset-top,44px) + 8px) 16px 12px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ position: "sticky", top: 0, zIndex: 30, backgroundImage: "linear-gradient(to bottom, rgba(8,14,24,0.45), rgba(11,19,28,0.72)), url('/IMG_8877.jpeg')", backgroundSize: "cover", backgroundPosition: "center 30%", borderBottom: "1px solid rgba(120,160,110,0.25)", padding: "calc(env(safe-area-inset-top,44px) + 8px) 16px 12px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <button style={{ ...S.backBtn, flexShrink: 0, width: 120 }} onClick={onViewDashboard}>← Dashboard</button>
         <div style={{ textAlign: "center", flex: 1 }}>
           <div style={{ fontSize: 20, fontWeight: 900, color: "#f8fafc", lineHeight: 1, letterSpacing: -0.5 }}>
@@ -4735,7 +4735,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
 
       {/* IN-GAME ADMIN PANEL */}
       {showGameAdmin && (
-        <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.85)", zIndex: 100, display: "flex", flexDirection: "column" }}>
+        <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.55)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)", zIndex: 100, display: "flex", flexDirection: "column" }}>
           <div style={{ backgroundColor: "#0f172a", borderBottom: "1px solid #334155", padding: "calc(env(safe-area-inset-top,44px) + 8px) 16px 12px", display: "flex", alignItems: "center", gap: 12 }}>
             <button onClick={() => { setShowGameAdmin(false); setGameAdminAuthed(false); setAdminMsg(""); }} style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: "6px 12px", fontFamily: "inherit" }}>← Close</button>
             <div style={{ fontSize: 16, fontWeight: 800, color: "#f8fafc" }}>⚙️ Game Admin</div>
@@ -4989,7 +4989,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
       )}
 
       {/* Hole nav - master scroll, drives all score rows */}
-      <div style={{ backgroundColor: "#1e293b", borderBottom: "1px solid #334155", padding: "10px 16px", position: "sticky", top: "calc(env(safe-area-inset-top, 44px) + 44px)", zIndex: 20 }}>
+      <div style={{ backgroundImage: "linear-gradient(to bottom, rgba(11,19,28,0.62), rgba(11,19,28,0.82)), url('/IMG_8877.jpeg')", backgroundSize: "cover", backgroundPosition: "center 42%", borderBottom: "1px solid rgba(120,160,110,0.22)", padding: "10px 16px", position: "sticky", top: "calc(env(safe-area-inset-top, 44px) + 44px)", zIndex: 20 }}>
         <div id="ff-master-scroll" style={S.holeNav} onScroll={(e) => {
           document.querySelectorAll(".ff-slave-scroll").forEach((el) => { if (el !== e.target) el.scrollLeft = e.target.scrollLeft; });
         }}>
