@@ -1181,7 +1181,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.78</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.79</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
           </div>
@@ -6207,7 +6207,7 @@ function PastRoundDetailScreen({ round, onBack }) {
 function PastRoundsScreen({ onBack, onViewRound }) {
   const [rounds, setRounds] = useState(() => {
     const saved = getSavedRounds().map(r => ({ ...r, status: "completed" }));
-    const active = getActiveRoundRefs().filter(a => !saved.some(s => s.id === a.id)).map(a => ({ ...a, savedAt: a.savedAt || Date.now() }));
+    const active = getActiveRoundRefs().filter(a => !saved.some(s => s.id === a.id)).map(a => ({ ...a, savedAt: a.savedAt || 0 }));
     return [...active, ...saved].sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
   });
   const profile = getPlayerProfile();
@@ -6224,13 +6224,13 @@ function PastRoundsScreen({ onBack, onViewRound }) {
           const mine = await dbGetMyCreatedRounds(profile.name);
           created = mine
             .filter(r => !completedIds.has(r.id))
-            .map(r => ({ id: r.id, code: r.code, course_name: r.course_name, game_type: r.game_type, holes: r.holes || [], players: [], scores: [], status: "in_progress", createdBy: r.created_by, savedAt: new Date(r.created_at).getTime() || Date.now(), date: new Date(r.created_at).toLocaleString("en-NZ", { day: "numeric", month: "long", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true }) }));
+            .map(r => ({ id: r.id, code: r.code, course_name: r.course_name, game_type: r.game_type, holes: r.holes || [], players: [{ id: "creator", name: r.created_by || "Player", handicap: 0 }], scores: [], status: "in_progress", createdBy: r.created_by, savedAt: new Date(r.created_at).getTime() || 0, date: new Date(r.created_at).toLocaleString("en-NZ", { day: "numeric", month: "long", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true }) }));
         } catch(e) {}
         const createdIds = new Set(created.map(c => c.id));
         // Local device in-progress refs, excluding any already covered by created/completed
         const active = getActiveRoundRefs()
           .filter(a => !local.some(s => s.id === a.id) && !remote.some(s => s.id === a.id) && !createdIds.has(a.id))
-          .map(a => ({ ...a, savedAt: a.savedAt || Date.now() }));
+          .map(a => ({ ...a, savedAt: a.savedAt || 0 }));
         const merged = [...remote.map(r => ({ ...r, status: "completed" })), ...local.filter(l => !remote.some(r => r.id === l.id)), ...active, ...created];
         setRounds(merged.sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0)));
       }
