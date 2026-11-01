@@ -1138,7 +1138,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.69</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.70</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
           </div>
@@ -2755,7 +2755,13 @@ function ShareModal({ round, onClose }) {
 function CreateRoundScreen({ onBack, onRoundCreated }) {
   const profile = getPlayerProfile();
   const [step, setStep] = useState(1), [courses, setCourses] = useState([]);
-  const [course, setCourse] = useState(null), [gameType, setGameType] = useState("stroke");
+  const [course, setCourse] = useState(null), [gameType, setGameType] = useState(null);
+  const [confirmPick, setConfirmPick] = useState(null); // id of the card being confirmed
+  // Option A: fade others, hold the chosen card, then advance
+  const pickWithConfirm = (pickId, apply) => {
+    setConfirmPick(pickId);
+    setTimeout(() => { apply(); setConfirmPick(null); }, 620);
+  };
   const [name, setName] = useState(profile.name || ""), [hcp, setHcp] = useState(profile.handicap || ""), [team, setTeam] = useState("A");
   const [selectedTournament, setSelectedTournament] = useState("");
   const [showTournamentPicker, setShowTournamentPicker] = useState(false);
@@ -2832,7 +2838,7 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
         <h2 style={S.headerTitle}>New Round</h2><div />
       </div>
       <div style={S.content}>
-        <style>{"@keyframes ffStepIn{0%{opacity:0;transform:translateX(18px)}100%{opacity:1;transform:translateX(0)}}"}</style>
+        <style>{"@keyframes ffStepIn{0%{opacity:0;transform:translateX(18px)}100%{opacity:1;transform:translateX(0)}}@keyframes ffChosen{0%{transform:scale(1)}100%{transform:scale(1.03)}}"}</style>
         {step === 1 && (
           <div key="step1" style={{ display: "flex", flexDirection: "column", animation: "ffStepIn 0.32s ease-out both" }}>
             <div style={{ padding: "0 0 8px" }}>
@@ -2975,7 +2981,7 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
 
             <div style={S.courseList}>
               {courses.map((c) => (
-                <button key={c.id} style={{ ...S.courseCard, ...(course?.id === c.id ? S.courseCardSelected : {}) }} onClick={() => { setCourse(c); setStep(2); }}>
+                <button key={c.id} style={{ ...S.courseCard, ...(course?.id === c.id ? S.courseCardSelected : {}), transition: "opacity 0.4s ease, transform 0.4s ease, box-shadow 0.3s ease", ...(confirmPick ? (confirmPick === c.id ? { borderColor: "#22c55e", backgroundColor: "#13251a", boxShadow: "0 0 0 2px rgba(34,197,94,0.5)", transform: "scale(1.03)" } : { opacity: 0, transform: "translateY(8px)" }) : {}) }} disabled={!!confirmPick} onClick={() => pickWithConfirm(c.id, () => { setCourse(c); setStep(2); })}>
                   <span style={S.courseIcon}>⛳</span>
                   <div style={{ flex: 1 }}>
                     <div style={S.courseName}>{c.name}</div>
@@ -2992,7 +2998,7 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
             <h3 style={S.stepTitle}>What game are you playing?</h3>
             <div style={S.gameList}>
               {Object.entries(GAME_TYPES).map(([key, g]) => (
-                <button key={key} style={{ ...S.gameCard, ...(gameType === key ? S.gameCardSelected : {}) }} onClick={() => { setGameType(key); setStep(3); }}>
+                <button key={key} style={{ ...S.gameCard, transition: "opacity 0.4s ease, transform 0.4s ease, box-shadow 0.3s ease", ...(confirmPick ? (confirmPick === key ? { borderColor: "#22c55e", backgroundColor: "#13251a", boxShadow: "0 0 0 2px rgba(34,197,94,0.5)", transform: "scale(1.03)" } : { opacity: 0, transform: "translateY(8px)" }) : {}) }} disabled={!!confirmPick} onClick={() => pickWithConfirm(key, () => { setGameType(key); setStep(3); })}>
                   <div style={S.gameName}>{g.label}</div><div style={S.gameDesc}>{g.description}</div>
                 </button>
               ))}
@@ -6368,7 +6374,7 @@ const S = {
   btnSecondary: { backgroundColor: "transparent", color: "#e2e8f0", border: "1px solid #334155", borderRadius: 14, padding: "16px", fontSize: 16, fontWeight: 600, cursor: "pointer", width: "100%", marginTop: 8, fontFamily: "inherit", WebkitAppearance: "none", outline: "none", WebkitTapHighlightColor: "transparent" },
   btnShare: { backgroundColor: "#1e293b", color: "#f59e0b", border: "1px solid #f59e0b", borderRadius: 14, padding: "16px", fontSize: 16, fontWeight: 600, cursor: "pointer", width: "100%", fontFamily: "inherit", WebkitAppearance: "none" },
   btnDisabled: { backgroundColor: "#1e293b", color: "#475569", border: "none", borderRadius: 14, padding: "16px", fontSize: 16, fontWeight: 700, cursor: "not-allowed", width: "100%", fontFamily: "inherit", WebkitAppearance: "none", outline: "none", WebkitTapHighlightColor: "transparent" },
-  courseList: { display: "flex", flexDirection: "column", gap: 8 },
+  courseList: { display: "flex", flexDirection: "column", gap: 8, maxHeight: "calc(100vh - 320px)", overflowY: "auto", paddingBottom: 24, paddingRight: 4, scrollbarWidth: "thin", WebkitOverflowScrolling: "touch" },
   courseCard: { display: "flex", alignItems: "center", gap: 12, backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "12px 16px", cursor: "pointer", textAlign: "left", width: "100%", fontFamily: "inherit", WebkitAppearance: "none", outline: "none", WebkitTapHighlightColor: "transparent" },
   courseCardSelected: { border: "2px solid #22c55e", backgroundColor: "#022c22", outline: "none", WebkitTapHighlightColor: "transparent" },
   courseIcon: { fontSize: 24 },
