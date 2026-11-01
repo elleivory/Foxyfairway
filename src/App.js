@@ -1138,7 +1138,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.67</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.68</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
           </div>
@@ -3523,7 +3523,8 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
             </div>
           );
         })() : (
-          lb.map((p, i) => {
+          <div style={round.game_type === "banker" ? {} : { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          {lb.map((p, i) => {
             const gross = p.grossTotal || 0;
             const gtp = p.toPar || 0;
             const gtpColor = gtp < 0 ? "#22c55e" : gtp > 0 ? "#f59e0b" : "#3b82f6";
@@ -3580,7 +3581,8 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
                 </div>
               </div>
             );
-          })
+          })}
+          </div>
         )}
 
         {/* Edit player form - outside map, no hooks in loops */}
