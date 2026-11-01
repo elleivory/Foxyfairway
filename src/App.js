@@ -131,21 +131,20 @@ function fmtHcp(h) {
 function getHcpStrokes(handicap, strokeIndex, useHandicap = true) {
   if (!useHandicap) return 0; // Scratch mode
   if (!handicap || handicap === 0) return 0;
-  const hcpFloat = parseFloat(handicap);
-  if (hcpFloat < 0) {
+  // Round any decimal handicap to a whole number of strokes (13.6 -> 14).
+  // Course handicaps are whole numbers; decimals must never allocate fractional
+  // bonus holes, which previously over-granted strokes badly.
+  const hcpInt = Math.round(parseFloat(handicap));
+  if (hcpInt < 0) {
     // Plus handicapper gives strokes back on the easiest holes (highest stroke indexes)
-    const give = Math.round(Math.abs(hcpFloat));
+    const give = Math.abs(hcpInt);
     return parseInt(strokeIndex) > 18 - give ? -1 : 0;
   }
-  const hcpWhole = Math.floor(hcpFloat);
-  const fraction = hcpFloat - hcpWhole;
   const si = parseInt(strokeIndex);
-  const extraHoles = Math.round(fraction * 18);
   let strokes = 0;
-  if (hcpWhole >= 36) strokes = si <= (hcpWhole - 36) ? 3 : 2;
-  else if (hcpWhole >= 18) strokes = si <= (hcpWhole - 18) ? 2 : 1;
-  else strokes = si <= hcpWhole ? 1 : 0;
-  if (extraHoles > 0 && si <= extraHoles) strokes++;
+  if (hcpInt >= 36) strokes = si <= (hcpInt - 36) ? 3 : 2;
+  else if (hcpInt >= 18) strokes = si <= (hcpInt - 18) ? 2 : 1;
+  else strokes = si <= hcpInt ? 1 : 0;
   return strokes;
 }
 
@@ -1075,7 +1074,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.58</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.61</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
           </div>
@@ -3137,7 +3136,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
   const [showComplete, setShowComplete] = useState(false);
   const [showAddGuest, setShowAddGuest] = useState(false);
   const [showDashAdmin, setShowDashAdmin] = useState(false);
-  const [showJoinQR, setShowJoinQR] = useState(false);
+  const [showJoinQR, setShowJoinQR] = useState(true);
   const isCreator = me?.name === round.created_by;
 
   const askRules = async (question) => {
@@ -3210,6 +3209,10 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
   const [editingPlayerId, setEditingPlayerId] = useState(null);
   const [editPlayerName, setEditPlayerName] = useState("");
   const [editPlayerHcp, setEditPlayerHcp] = useState("");
+  const [dashEditId, setDashEditId] = useState(null);
+  const [dashEditName, setDashEditName] = useState("");
+  const [dashEditHcp, setDashEditHcp] = useState("");
+  const [hcpToggleSaving, setHcpToggleSaving] = useState(false);
   const [showTournamentLink, setShowTournamentLink] = useState(false);
   const [linkTournaments, setLinkTournaments] = useState([]);
   const [linkingTournament, setLinkingTournament] = useState("");
@@ -3854,6 +3857,18 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
                 {gameAdminTab === "players" && (
                   <div>
                     <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 12 }}>Edit name, handicap, or remove. This round only.</div>
+                    {/* Scratch / Handicap toggle for the whole round */}
+                    <div style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: 14, marginBottom: 12 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#f8fafc", marginBottom: 4 }}>Scoring mode</div>
+                      <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 10 }}>{isHandicap ? "Handicaps are being applied to net scores." : "Scratch: gross scores only, no handicaps."}</div>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button disabled={hcpToggleSaving} onClick={async () => { if (isHandicap) return; setHcpToggleSaving(true); try { await supabase.from("rounds").update({ use_handicap: true }).eq("id", round.id); onRoundUpdate && onRoundUpdate({ ...round, use_handicap: true }); setAdminMsg("Handicaps turned on."); setTimeout(() => setAdminMsg(""), 2500); } catch(e) { setAdminMsg("Error: " + e.message); } setHcpToggleSaving(false); }} style={{ flex: 1, padding: "10px", borderRadius: 8, border: "none", cursor: isHandicap ? "default" : "pointer", fontFamily: "inherit", fontWeight: 700, fontSize: 13, backgroundColor: isHandicap ? "#22c55e" : "transparent", color: isHandicap ? "#0f172a" : "#64748b" }}>Apply Handicaps</button>
+                        <button disabled={hcpToggleSaving} onClick={async () => { if (!isHandicap) return; setHcpToggleSaving(true); try { await supabase.from("rounds").update({ use_handicap: false }).eq("id", round.id); onRoundUpdate && onRoundUpdate({ ...round, use_handicap: false }); setAdminMsg("Switched to scratch."); setTimeout(() => setAdminMsg(""), 2500); } catch(e) { setAdminMsg("Error: " + e.message); } setHcpToggleSaving(false); }} style={{ flex: 1, padding: "10px", borderRadius: 8, border: "none", cursor: !isHandicap ? "default" : "pointer", fontFamily: "inherit", fontWeight: 700, fontSize: 13, backgroundColor: !isHandicap ? "#f59e0b" : "transparent", color: !isHandicap ? "#0f172a" : "#64748b" }}>Scratch</button>
+                      </div>
+                      {isHandicap && players.some(p => Math.round(parseFloat(p.handicap || 0)) === 0) && (
+                        <div style={{ marginTop: 10, backgroundColor: "rgba(245,158,11,0.12)", border: "1px solid #f59e0b", borderRadius: 8, padding: "8px 10px", fontSize: 11, color: "#f59e0b", fontWeight: 600 }}>⚠️ On 0 handicap: {players.filter(p => Math.round(parseFloat(p.handicap || 0)) === 0).map(p => p.name.replace(" (Guest)", "")).join(", ")}. Tap Edit to set them.</div>
+                      )}
+                    </div>
                     {round.game_type !== "banker" ? (
                       <div style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: 14, marginBottom: 12 }}>
                         <div style={{ fontSize: 13, fontWeight: 700, color: "#f8fafc", marginBottom: 10 }}>➕ Add Guest Player</div>
@@ -3867,10 +3882,25 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
                       </div>
                     )}
                     {players.map(p => (
-                      <div key={p.id} style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "12px 14px", marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                        <div><div style={{ fontSize: 14, fontWeight: 700, color: "#f8fafc" }}>{p.name}</div><div style={{ fontSize: 11, color: "#64748b" }}>HCP {fmtHcp(p.handicap)}</div></div>
-                        {p.id !== me?.id && <button onClick={async () => { if (!window.confirm("Remove " + p.name + "?")) return; await supabase.from("scores").delete().eq("player_id", p.id).eq("round_id", round.id); await supabase.from("players").delete().eq("id", p.id); const fresh = await dbGetPlayers(round.id); setPlayers(fresh); }} style={{ backgroundColor: "#1c0a0a", border: "1px solid #ef4444", borderRadius: 8, color: "#ef4444", fontSize: 11, fontWeight: 700, cursor: "pointer", padding: "5px 10px", fontFamily: "inherit" }}>Remove</button>}
-                      </div>
+                      dashEditId === p.id ? (
+                        <div key={p.id} style={{ backgroundColor: "#1e293b", border: "1px solid #22c55e", borderRadius: 12, padding: 14, marginBottom: 8 }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: "#f8fafc", marginBottom: 10 }}>Edit {p.name.replace(" (Guest)", "")}</div>
+                          <input style={{ backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 10, padding: "12px 14px", color: "#f8fafc", fontSize: 14, width: "100%", outline: "none", fontFamily: "inherit", marginBottom: 8, boxSizing: "border-box" }} placeholder="Name" value={dashEditName} onChange={(e) => setDashEditName(e.target.value)} />
+                          {isHandicap && <input style={{ backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 10, padding: "12px 14px", color: "#f8fafc", fontSize: 14, width: "100%", outline: "none", fontFamily: "inherit", marginBottom: 12, boxSizing: "border-box" }} type="text" inputMode="numeric" placeholder="Handicap (e.g. 8 or +2)" value={dashEditHcp} onChange={(e) => setDashEditHcp(e.target.value)} />}
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button onClick={async () => { const isGuest = p.name?.endsWith("(Guest)"); const finalName = isGuest && !dashEditName.endsWith("(Guest)") ? dashEditName.trim() + " (Guest)" : dashEditName.trim(); try { await supabase.from("players").update({ name: finalName, handicap: parseHcp(dashEditHcp) }).eq("id", p.id); setDashEditId(null); refresh(); setAdminMsg("Player updated!"); setTimeout(() => setAdminMsg(""), 2000); } catch(e) { setAdminMsg("Error: " + e.message); } }} style={{ flex: 1, backgroundColor: "#22c55e", color: "#0f172a", border: "none", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Save</button>
+                            <button onClick={() => setDashEditId(null)} style={{ flex: 1, backgroundColor: "transparent", color: "#94a3b8", border: "1px solid #334155", borderRadius: 10, padding: "10px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div key={p.id} style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "12px 14px", marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                          <div><div style={{ fontSize: 14, fontWeight: 700, color: "#f8fafc" }}>{p.name}</div><div style={{ fontSize: 11, color: "#64748b" }}>HCP {fmtHcp(p.handicap)}</div></div>
+                          <div style={{ display: "flex", gap: 6 }}>
+                            <button onClick={() => { setDashEditId(p.id); setDashEditName(p.name?.replace(" (Guest)", "") || p.name); setDashEditHcp(String(p.handicap)); }} style={{ backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#f8fafc", fontSize: 11, fontWeight: 700, cursor: "pointer", padding: "5px 10px", fontFamily: "inherit" }}>✏️ Edit</button>
+                            {p.id !== me?.id && <button onClick={async () => { if (!window.confirm("Remove " + p.name + "?")) return; await supabase.from("scores").delete().eq("player_id", p.id).eq("round_id", round.id); await supabase.from("players").delete().eq("id", p.id); const fresh = await dbGetPlayers(round.id); setPlayers(fresh); }} style={{ backgroundColor: "#1c0a0a", border: "1px solid #ef4444", borderRadius: 8, color: "#ef4444", fontSize: 11, fontWeight: 700, cursor: "pointer", padding: "5px 10px", fontFamily: "inherit" }}>Remove</button>}
+                          </div>
+                        </div>
+                      )
                     ))}
                   </div>
                 )}
@@ -4020,7 +4050,11 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
           return (
             <div style={{ marginTop: 24 }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: "#f8fafc", textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>Scorecards · Live</div>
-              {players.filter((player) => player.id !== "spectator").map((player, pi) => (
+              {(() => {
+                // Show scorecards in the same order as the leaderboard above
+                const lbOrder = new Map(lb.map((p, i) => [p.id, i]));
+                return [...players].sort((a, b) => (lbOrder.has(a.id) ? lbOrder.get(a.id) : 999) - (lbOrder.has(b.id) ? lbOrder.get(b.id) : 999));
+              })().filter((player) => player.id !== "spectator").map((player, pi) => (
                 <div key={player.id} style={{ marginBottom: 12 }}>
                   {/* Header */}
                   {(() => {
@@ -4716,6 +4750,18 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
                 {gameAdminTab === "players" && (
                   <div>
                     <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 12 }}>Edit name, handicap, or remove a player. This round only.</div>
+                    {/* Scratch / Handicap toggle for the whole round */}
+                    <div style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: 14, marginBottom: 12 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#f8fafc", marginBottom: 4 }}>Scoring mode</div>
+                      <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 10 }}>{isHandicap ? "Handicaps are being applied to net scores." : "Scratch: gross scores only, no handicaps."}</div>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button disabled={adminSaving} onClick={async () => { if (isHandicap) return; setAdminSaving(true); try { await supabase.from("rounds").update({ use_handicap: true }).eq("id", round.id); onRoundUpdate && onRoundUpdate({ ...round, use_handicap: true }); setAdminMsg("Handicaps turned on."); setTimeout(() => setAdminMsg(""), 2500); } catch(e) { setAdminMsg("Error: " + e.message); } setAdminSaving(false); }} style={{ flex: 1, padding: "10px", borderRadius: 8, border: "none", cursor: isHandicap ? "default" : "pointer", fontFamily: "inherit", fontWeight: 700, fontSize: 13, backgroundColor: isHandicap ? "#22c55e" : "transparent", color: isHandicap ? "#0f172a" : "#64748b" }}>Apply Handicaps</button>
+                        <button disabled={adminSaving} onClick={async () => { if (!isHandicap) return; setAdminSaving(true); try { await supabase.from("rounds").update({ use_handicap: false }).eq("id", round.id); onRoundUpdate && onRoundUpdate({ ...round, use_handicap: false }); setAdminMsg("Switched to scratch."); setTimeout(() => setAdminMsg(""), 2500); } catch(e) { setAdminMsg("Error: " + e.message); } setAdminSaving(false); }} style={{ flex: 1, padding: "10px", borderRadius: 8, border: "none", cursor: !isHandicap ? "default" : "pointer", fontFamily: "inherit", fontWeight: 700, fontSize: 13, backgroundColor: !isHandicap ? "#f59e0b" : "transparent", color: !isHandicap ? "#0f172a" : "#64748b" }}>Scratch</button>
+                      </div>
+                      {isHandicap && [...others, me].some(p => Math.round(parseFloat(p.handicap || 0)) === 0) && (
+                        <div style={{ marginTop: 10, backgroundColor: "rgba(245,158,11,0.12)", border: "1px solid #f59e0b", borderRadius: 8, padding: "8px 10px", fontSize: 11, color: "#f59e0b", fontWeight: 600 }}>⚠️ On 0 handicap: {[...others, me].filter(p => Math.round(parseFloat(p.handicap || 0)) === 0).map(p => p.name.replace(" (Guest)", "")).join(", ")}. Tap Edit to set them.</div>
+                      )}
+                    </div>
 
                     {adminConfirmRemove && (
                       <div style={{ backgroundColor: "#1c0a0a", border: "1px solid #ef4444", borderRadius: 10, padding: 14, marginBottom: 16 }}>
