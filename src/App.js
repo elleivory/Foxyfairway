@@ -1138,7 +1138,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.65</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.66</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
           </div>
@@ -2598,7 +2598,7 @@ function TournamentScreen({ onBack }) {
     const seasonMetricColor = (p, gt) => {
       if (gt === "banker") return p.total > 0 ? "#22c55e" : p.total < 0 ? "#ef4444" : "#94a3b8";
       if (gt === "stableford" || gt === "matchplay" || gt === "matchplay_teams") return "#22c55e";
-      return p.toPar < 0 ? "#22c55e" : p.toPar > 0 ? "#ef4444" : "#3b82f6";
+      return p.toPar < 0 ? "#22c55e" : p.toPar > 0 ? "#f59e0b" : "#3b82f6";
     };
 
     const tileMetricValue = (p, gt) => {
@@ -2609,7 +2609,7 @@ function TournamentScreen({ onBack }) {
     };
     const tileMetricColor = (p, gt) => {
       if (gt === "banker") return p.total > 0 ? "#22c55e" : p.total < 0 ? "#ef4444" : "#94a3b8";
-      return gt === "stroke" ? (p.toPar < 0 ? "#22c55e" : p.toPar > 0 ? "#ef4444" : "#3b82f6") : "#22c55e";
+      return gt === "stroke" ? (p.toPar < 0 ? "#22c55e" : p.toPar > 0 ? "#f59e0b" : "#3b82f6") : "#22c55e";
     };
 
     return (
@@ -3274,6 +3274,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
   const [dashEditName, setDashEditName] = useState("");
   const [dashEditHcp, setDashEditHcp] = useState("");
   const [hcpToggleSaving, setHcpToggleSaving] = useState(false);
+  const [dashTab, setDashTab] = useState("leaderboard");
   const [showTournamentLink, setShowTournamentLink] = useState(false);
   const [linkTournaments, setLinkTournaments] = useState([]);
   const [linkingTournament, setLinkingTournament] = useState("");
@@ -3429,8 +3430,17 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
           </div>
         )}
 
+        {/* Sheet panel with Leaderboard / Scorecards tabs (Option C) */}
+        <div style={{ backgroundColor: "rgba(15,26,46,0.82)", borderRadius: "18px 18px 0 0", marginTop: 8, marginLeft: -20, marginRight: -20, padding: "14px 20px 20px", boxShadow: "0 -8px 24px rgba(0,0,0,0.3)", border: "1px solid rgba(120,160,110,0.18)", borderBottom: "none", backdropFilter: "blur(3px)", WebkitBackdropFilter: "blur(3px)" }}>
+          <div style={{ width: 38, height: 4, borderRadius: 2, backgroundColor: "#334155", margin: "0 auto 14px" }} />
+          <div style={{ display: "flex", backgroundColor: "rgba(11,18,32,0.6)", border: "1px solid #243049", borderRadius: 10, padding: 3, marginBottom: 14 }}>
+            {[["leaderboard", "Leaderboard"], ["scorecards", "Scorecards"]].map(([key, lbl]) => (
+              <button key={key} onClick={() => setDashTab(key)} style={{ flex: 1, textAlign: "center", padding: "9px", borderRadius: 8, border: "none", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", backgroundColor: dashTab === key ? "#22c55e" : "transparent", color: dashTab === key ? "#0f172a" : "#94a3b8" }}>{lbl}</button>
+            ))}
+          </div>
+
+        {dashTab === "leaderboard" && (<>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-          <h3 style={{ ...S.stepTitle, margin: 0 }}>Leaderboard</h3>
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
             <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: "#22c55e", animation: "pulse 1.5s infinite" }} />
             <span style={{ fontSize: 11, color: "#f8fafc" }}>Live</span>
@@ -3516,7 +3526,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
           lb.map((p, i) => {
             const gross = p.grossTotal || 0;
             const gtp = p.toPar || 0;
-            const gtpColor = gtp < 0 ? "#22c55e" : gtp > 0 ? "#ef4444" : "#3b82f6";
+            const gtpColor = gtp < 0 ? "#22c55e" : gtp > 0 ? "#f59e0b" : "#3b82f6";
             const gtpStr = formatToPar(gtp);
             // NETT = net to par using only strokes earned on holes played (matches the scorecard header)
             const lbNetToPar = Object.values(p.holeScores || {}).reduce((sum, hs) => sum + (hs.net - hs.par), 0);
@@ -4070,7 +4080,9 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
           )}
         </div>
       )}
+        </>)}
 
+        {dashTab === "scorecards" && (<>
         {/* Live scorecards - all game modes */}
         {players.length > 0 && holes.length > 0 && (() => {
           const front9 = holes.filter((h) => h.hole_number <= 9);
@@ -4089,7 +4101,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
           const nineParFull = (nine) => nine.reduce((sum, h) => sum + h.par, 0);
           const ninePar = (p, nine) => nine.reduce((sum, h) => { const s = scores.find((sc) => sc.player_id === p.id && sc.hole_number === h.hole_number); return s?.score ? sum + h.par : sum; }, 0);
           const tparStr = (val, par) => { if (par === 0) return "—"; const d = val - par; return d === 0 ? "E" : d > 0 ? "+" + d : "" + d; };
-          const tparColor = (val, par) => { if (par === 0) return "#64748b"; const d = val - par; return d < 0 ? "#22c55e" : d > 0 ? "#ef4444" : "#64748b"; };
+          const tparColor = (val, par) => { if (par === 0) return "#64748b"; const d = val - par; return d < 0 ? "#22c55e" : d > 0 ? "#f59e0b" : "#64748b"; };
 
           const cellStyle = { textAlign: "center", padding: "2px 0", borderRight: "1px solid #e8edf2", fontSize: 8, overflow: "hidden", whiteSpace: "nowrap" };
           const hdrStyle = { ...cellStyle, background: "#f1f5f9", fontWeight: 700, color: "#475569", fontSize: 7, textTransform: "uppercase" };
@@ -4215,6 +4227,8 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
             </div>
           );
         })()}
+        </>)}
+        </div>
 
 
       </div>
@@ -4693,7 +4707,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
 
   const RunningTotal = ({ value, label, color }) => (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minWidth: 48, paddingLeft: 8, borderLeft: "1px solid #334155", flexShrink: 0 }}>
-      <span style={{ fontSize: 13, fontWeight: 800, color: color || (value > 0 ? "#ef4444" : value < 0 ? "#22c55e" : "#94a3b8") }}>
+      <span style={{ fontSize: 13, fontWeight: 800, color: color || (value > 0 ? "#f59e0b" : value < 0 ? "#22c55e" : "#94a3b8") }}>
         {label || (value === 0 ? "E" : value > 0 ? "+" + value : value)}
       </span>
     </div>
@@ -5034,7 +5048,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
             } else if (round.game_type === "banker") {
               totalLabel = "Balance"; totalVal = (myBankerTotal >= 0 ? "+$" : "-$") + Math.abs(myBankerTotal); totalColor = myBankerTotal > 0 ? "#22c55e" : myBankerTotal < 0 ? "#ef4444" : "#94a3b8";
             } else {
-              totalLabel = "Gross"; totalVal = myToPar === 0 ? "E" : myToPar > 0 ? "+" + myToPar : "" + myToPar; totalColor = myToPar < 0 ? "#22c55e" : myToPar > 0 ? "#ef4444" : "#94a3b8";
+              totalLabel = "Gross"; totalVal = myToPar === 0 ? "E" : myToPar > 0 ? "+" + myToPar : "" + myToPar; totalColor = myToPar < 0 ? "#22c55e" : myToPar > 0 ? "#f59e0b" : "#94a3b8";
             }
             return (
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 12, borderTop: "1px solid #334155", marginTop: 4, gap: 8 }}>
@@ -5043,7 +5057,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
                   {round.game_type !== "stroke" && (
                     <>
                       <div style={{ textAlign: "center" }}>
-                        <div style={{ fontSize: 20, fontWeight: 900, color: myToPar < 0 ? "#22c55e" : myToPar > 0 ? "#ef4444" : "#94a3b8", lineHeight: 1 }}>{myToPar === 0 ? "E" : myToPar > 0 ? "+" + myToPar : myToPar}</div>
+                        <div style={{ fontSize: 20, fontWeight: 900, color: myToPar < 0 ? "#22c55e" : myToPar > 0 ? "#f59e0b" : "#94a3b8", lineHeight: 1 }}>{myToPar === 0 ? "E" : myToPar > 0 ? "+" + myToPar : myToPar}</div>
                         <div style={{ fontSize: 9, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5, marginTop: 2 }}>To Par</div>
                       </div>
                       <div style={{ width: 1, height: 32, background: "#334155" }} />
@@ -5457,7 +5471,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
             const gross = ps.reduce((sum, s) => sum + (s.score || 0), 0);
             const par = holes.filter((h) => ps.some((s) => s.hole_number === h.hole_number)).reduce((sum, h) => sum + h.par, 0);
             const diff = gross - par;
-            return { val: diff === 0 ? "E" : (diff > 0 ? "+" : "") + diff, color: diff < 0 ? "#22c55e" : diff > 0 ? "#ef4444" : "#94a3b8" };
+            return { val: diff === 0 ? "E" : (diff > 0 ? "+" : "") + diff, color: diff < 0 ? "#22c55e" : diff > 0 ? "#f59e0b" : "#94a3b8" };
           }
         };
 
@@ -5539,8 +5553,8 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                         <div style={{ ...S.playerCardName, color: isMe ? "#22c55e" : "#f8fafc" }}>{player.name} (HCP {fmtHcp(player.handicap)}) {isMe && <span style={{ fontSize: 9, color: "#22c55e", fontWeight: 600 }}>YOU</span>}</div>
                         <div style={{ fontSize: 11, color: "#64748b" }}>
-                          G: <span style={{ color: myGrossTotal2 === 0 ? "#94a3b8" : myGrossTotal2 > 0 ? "#ef4444" : "#22c55e", fontWeight: 700 }}>{formatToPar(myGrossTotal2)}</span>
-                          {isHandicap && <>{" "}N: <span style={{ color: myNetTotal2 === 0 ? "#94a3b8" : myNetTotal2 > 0 ? "#ef4444" : "#22c55e", fontWeight: 700 }}>{formatToPar(myNetTotal2)}</span></>}
+                          G: <span style={{ color: myGrossTotal2 === 0 ? "#94a3b8" : myGrossTotal2 > 0 ? "#f59e0b" : "#22c55e", fontWeight: 700 }}>{formatToPar(myGrossTotal2)}</span>
+                          {isHandicap && <>{" "}N: <span style={{ color: myNetTotal2 === 0 ? "#94a3b8" : myNetTotal2 > 0 ? "#f59e0b" : "#22c55e", fontWeight: 700 }}>{formatToPar(myNetTotal2)}</span></>}
                         </div>
                       </div>
                       <div style={{ display: "flex", alignItems: "flex-start" }}>
@@ -5594,8 +5608,8 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
                           })}
                         </div>
                         <div style={{ display: "flex", flexDirection: "column", paddingTop: 14, marginLeft: 6, paddingLeft: 6, borderLeft: "1px solid #334155", flexShrink: 0 }}>
-                          <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800, color: myGrossTotal2 === 0 ? "#94a3b8" : myGrossTotal2 > 0 ? "#ef4444" : "#22c55e" }}>{formatToPar(myGrossTotal2)}</div>
-                          {isHandicap && <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800, color: myNetTotal2 === 0 ? "#94a3b8" : myNetTotal2 > 0 ? "#ef4444" : "#22c55e" }}>{formatToPar(myNetTotal2)}</div>}
+                          <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800, color: myGrossTotal2 === 0 ? "#94a3b8" : myGrossTotal2 > 0 ? "#f59e0b" : "#22c55e" }}>{formatToPar(myGrossTotal2)}</div>
+                          {isHandicap && <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800, color: myNetTotal2 === 0 ? "#94a3b8" : myNetTotal2 > 0 ? "#f59e0b" : "#22c55e" }}>{formatToPar(myNetTotal2)}</div>}
                         </div>
                       </div>
                     </div>
@@ -5695,8 +5709,8 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
                   })}
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", paddingTop: 14, marginLeft: 6, paddingLeft: 6, borderLeft: "1px solid #334155", flexShrink: 0 }}>
-                  <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800, color: myGrossTotal2 === 0 ? "#94a3b8" : myGrossTotal2 > 0 ? "#ef4444" : "#22c55e" }}>{formatToPar(myGrossTotal2)}</div>
-                  {isHandicap && <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800, color: myNetTotal2 === 0 ? "#94a3b8" : myNetTotal2 > 0 ? "#ef4444" : "#22c55e" }}>{formatToPar(myNetTotal2)}</div>}
+                  <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800, color: myGrossTotal2 === 0 ? "#94a3b8" : myGrossTotal2 > 0 ? "#f59e0b" : "#22c55e" }}>{formatToPar(myGrossTotal2)}</div>
+                  {isHandicap && <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800, color: myNetTotal2 === 0 ? "#94a3b8" : myNetTotal2 > 0 ? "#f59e0b" : "#22c55e" }}>{formatToPar(myNetTotal2)}</div>}
                   {round.game_type === "stableford" && <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800, color: "#22c55e" }}>{myStablefordTotal}pts</div>}
                   {round.game_type === "matchplay" && <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800, color: myMatchTotal > 0 ? "#22c55e" : "#94a3b8" }}>{myMatchTotal === 0 ? "0" : myMatchTotal + (myMatchTotal === 1 ? " pt" : " pts")}</div>}
                   {round.game_type === "banker" && <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800, color: myBankerTotal > 0 ? "#22c55e" : myBankerTotal < 0 ? "#ef4444" : "#94a3b8" }}>{myBankerTotal >= 0 ? "+$" : "-$"}{Math.abs(myBankerTotal)}</div>}
@@ -5806,8 +5820,8 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
                   </div>
                   {/* Running totals pinned right */}
                   <div style={{ display: "flex", flexDirection: "column", paddingTop: 14, marginLeft: 6, paddingLeft: 6, borderLeft: "1px solid #334155", flexShrink: 0 }}>
-                    <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800, color: pGrossTotal === 0 ? "#94a3b8" : pGrossTotal > 0 ? "#ef4444" : "#22c55e" }}>{formatToPar(pGrossTotal)}</div>
-                    {isHandicap && <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800, color: pNetTotal === 0 ? "#94a3b8" : pNetTotal > 0 ? "#ef4444" : "#22c55e" }}>{formatToPar(pNetTotal)}</div>}
+                    <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800, color: pGrossTotal === 0 ? "#94a3b8" : pGrossTotal > 0 ? "#f59e0b" : "#22c55e" }}>{formatToPar(pGrossTotal)}</div>
+                    {isHandicap && <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800, color: pNetTotal === 0 ? "#94a3b8" : pNetTotal > 0 ? "#f59e0b" : "#22c55e" }}>{formatToPar(pNetTotal)}</div>}
                     {round.game_type === "stableford" && (
                       <div style={{ height: 28, display: "flex", alignItems: "center", fontSize: 11, fontWeight: 800, color: "#22c55e" }}>
                         {holes.reduce((sum, h) => { const s = ps.find((x) => x.hole_number === h.hole_number); if (!s) return sum; return sum + stablefordPoints(s.score, h.par, getHcpStrokes(player.handicap, h.stroke_index)); }, 0)}pts
@@ -5924,7 +5938,7 @@ function PastRoundDetailScreen({ round, onBack }) {
   const metricColor = (p) => {
     if (round.game_type === "banker") return p.total > 0 ? "#22c55e" : p.total < 0 ? "#ef4444" : "#94a3b8";
     if (round.game_type === "stableford" || round.game_type === "matchplay" || round.game_type === "matchplay_teams") return "#22c55e";
-    return p.toPar < 0 ? "#22c55e" : p.toPar > 0 ? "#ef4444" : "#3b82f6";
+    return p.toPar < 0 ? "#22c55e" : p.toPar > 0 ? "#f59e0b" : "#3b82f6";
   };
   const metricValue = (p) => {
     if (round.game_type === "banker") return (p.total >= 0 ? "+$" : "-$") + Math.abs(p.total);
@@ -6299,7 +6313,7 @@ const BG_OTHER = "url('/IMG_8886.jpeg')";
 const BG_POS = { HOME: "center top", GAME: "center center", OTHER: "center center" };
 
 // Lighter overlay so backgrounds show through more
-const BG_OVERLAY = "linear-gradient(to bottom, rgba(10,18,35,0.4) 0%, rgba(10,18,35,0.35) 40%, rgba(10,18,35,0.65) 70%, rgba(10,18,35,0.92) 100%)";
+const BG_OVERLAY = "linear-gradient(to bottom, rgba(14,24,20,0.32) 0%, rgba(13,22,20,0.3) 40%, rgba(11,19,28,0.55) 72%, rgba(11,18,30,0.82) 100%)";
 
 // iOS Safari fix: use a fixed-position div as background instead of background-attachment:fixed
 const BgScreen = ({ bg, children, style }) => {
@@ -6371,7 +6385,7 @@ const S = {
   holeNavBtn: { minWidth: 40, width: 40, height: 36, borderRadius: 8, border: "none", outline: "1px solid #334155", outlineOffset: -1, backgroundColor: "#0f172a", color: "#94a3b8", fontSize: 13, fontWeight: 600, cursor: "pointer", flexShrink: 0, fontFamily: "inherit", WebkitAppearance: "none" },
   holeNavActive: { outline: "2px solid #22c55e", outlineOffset: -1, color: "#22c55e", backgroundColor: "#022c22", fontSize: 15, fontWeight: 900, zIndex: 1 },
   holeNavDone: { backgroundColor: "#1e3a1e", color: "#22c55e", border: "1px solid #22c55e" },
-  holeCard: { margin: "16px", backgroundColor: "#1e293b", borderRadius: 16, padding: "20px", border: "1px solid #334155" },
+  holeCard: { margin: "16px", backgroundColor: "rgba(21,33,52,0.72)", borderRadius: 16, padding: "20px", border: "1px solid rgba(120,160,110,0.22)", backdropFilter: "blur(3px)", WebkitBackdropFilter: "blur(3px)", boxShadow: "0 6px 24px rgba(0,0,0,0.25)" },
   holeTop: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 },
   holeNum: { fontSize: 24, fontWeight: 800, color: "#f8fafc" },
   holeMeta: { fontSize: 12, color: "#f8fafc", marginTop: 4 },
@@ -6409,7 +6423,7 @@ const S = {
   urlBox: { backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, padding: "10px 14px", fontSize: 12, color: "#64748b", wordBreak: "break-all", width: "100%", boxSizing: "border-box", marginBottom: 12 },
   otherPlayersSection: { margin: "16px", backgroundColor: "#1e293b", borderRadius: 12, padding: "16px", border: "1px solid #334155" },
   otherPlayersTitle: { fontSize: 14, fontWeight: 700, color: "#f8fafc", marginBottom: 12, textTransform: "uppercase", letterSpacing: 0.5 },
-  playerCard: { backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, padding: "12px", marginBottom: 12 },
+  playerCard: { backgroundColor: "rgba(17,28,46,0.68)", border: "1px solid rgba(120,160,110,0.2)", borderRadius: 8, padding: "12px", marginBottom: 12, backdropFilter: "blur(2px)", WebkitBackdropFilter: "blur(2px)" },
   playerCardName: { fontSize: 12, fontWeight: 700, color: "#f8fafc", textTransform: "uppercase", letterSpacing: 0.5 },
   playerScoresRow: { display: "flex", gap: 6, overflowX: "auto", paddingBottom: 4, paddingTop: 4, scrollbarWidth: "none" },
   playerHoleCell: { display: "flex", flexDirection: "column", alignItems: "center", minWidth: 44, flex: "0 0 auto", overflow: "visible" },
