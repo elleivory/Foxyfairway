@@ -1138,7 +1138,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.62</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.63</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
           </div>
@@ -3200,7 +3200,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
   const [showComplete, setShowComplete] = useState(false);
   const [showAddGuest, setShowAddGuest] = useState(false);
   const [showDashAdmin, setShowDashAdmin] = useState(false);
-  const [showJoinQR, setShowJoinQR] = useState(true);
+  const [showJoinQR, setShowJoinQR] = useState(false);
   const isCreator = me?.name === round.created_by;
 
   const askRules = async (question) => {
@@ -3327,57 +3327,74 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
       </div>
 
       <div style={S.content}>
-        {/* Round Tools group - compact utility strip */}
-        <div style={{ marginBottom: 8, marginTop: 2 }}>
-          <div style={{ display: "flex", gap: 5 }}>
-            {!isSpectator && <button style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, backgroundColor: "rgba(30,41,59,0.6)", border: "none", borderRadius: 7, padding: "4px 2px", color: "#94a3b8", fontSize: 7, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }} onClick={() => { saveRoundToHistory(round, players, scores, holes); alert("Round saved!"); }}><span style={{ fontSize: 12 }}>💾</span>Save</button>}
-            {!isSpectator && round.is_scanned && <button style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, backgroundColor: "rgba(34,197,94,0.15)", border: "1px solid #22c55e", borderRadius: 7, padding: "4px 2px", color: "#22c55e", fontSize: 7, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }} onClick={() => { saveRoundToHistory(round, players, scores, holes); setShowComplete(true); }}><span style={{ fontSize: 12 }}>✅</span>Complete</button>}
-            <button style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, backgroundColor: "rgba(30,41,59,0.6)", border: "none", borderRadius: 7, padding: "4px 2px", color: "#94a3b8", fontSize: 7, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }} onClick={async () => { try { await exportScorecardPDF(round, players, scores, holes); } catch(e) { alert("Please allow popups to export scorecard"); } }}><span style={{ fontSize: 12 }}>📄</span>Card</button>
-            <button style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, backgroundColor: "rgba(30,41,59,0.6)", border: "none", borderRadius: 7, padding: "4px 2px", color: "#f8fafc", fontSize: 7, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }} onClick={() => setShowRules(true)}><span style={{ fontSize: 12 }}>📖</span>Rules</button>
-            <button style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, backgroundColor: "rgba(245,158,11,0.12)", border: "1px solid #f59e0b", borderRadius: 7, padding: "4px 2px", color: "#f59e0b", fontSize: 7, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }} onClick={() => { setShowDashAdmin(true); setGameAdminTab("scores"); setAdminMsg(""); setAdminEditHoles(JSON.parse(JSON.stringify(holes || []))); const sc = {}; scores.forEach(s => { if (!sc[s.player_id]) sc[s.player_id] = {}; sc[s.player_id][s.hole_number] = s.score; }); setAdminEditScores(sc); }}><span style={{ fontSize: 12 }}>⚙️</span>Admin</button>
-          </div>
+        {/* Round Tools - ghosted utility strip, sits quietly up top */}
+        <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 2, marginBottom: 16 }}>
+          {!isSpectator && <button style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1, background: "none", border: "none", padding: "2px 4px", color: "#8a97a8", fontSize: 8, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: 0.85 }} onClick={() => { saveRoundToHistory(round, players, scores, holes); alert("Round saved!"); }}><span style={{ fontSize: 14 }}>💾</span>Save</button>}
+          {!isSpectator && round.is_scanned && <button style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1, background: "none", border: "none", padding: "2px 4px", color: "#22c55e", fontSize: 8, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }} onClick={() => { saveRoundToHistory(round, players, scores, holes); setShowComplete(true); }}><span style={{ fontSize: 14 }}>✅</span>Complete</button>}
+          <button style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1, background: "none", border: "none", padding: "2px 4px", color: "#8a97a8", fontSize: 8, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: 0.85 }} onClick={async () => { try { await exportScorecardPDF(round, players, scores, holes); } catch(e) { alert("Please allow popups to export scorecard"); } }}><span style={{ fontSize: 14 }}>📄</span>Card</button>
+          <button style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1, background: "none", border: "none", padding: "2px 4px", color: "#8a97a8", fontSize: 8, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: 0.85 }} onClick={() => setShowRules(true)}><span style={{ fontSize: 14 }}>📖</span>Rules</button>
+          <button style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1, background: "none", border: "none", padding: "2px 4px", color: "#c69749", fontSize: 8, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }} onClick={() => { setShowDashAdmin(true); setGameAdminTab("scores"); setAdminMsg(""); setAdminEditHoles(JSON.parse(JSON.stringify(holes || []))); const sc = {}; scores.forEach(s => { if (!sc[s.player_id]) sc[s.player_id] = {}; sc[s.player_id][s.hole_number] = s.score; }); setAdminEditScores(sc); }}><span style={{ fontSize: 14 }}>⚙️</span>Admin</button>
         </div>
 
-        {/* Invite Players group */}
-        <div style={{ backgroundColor: "rgba(15,23,42,0.4)", border: "1px solid #334155", borderRadius: 10, padding: "8px 10px", marginBottom: 6 }}>
-          {!showJoinQR ? (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-                <span style={{ fontSize: 9, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 1, fontWeight: 700 }}>{isSpectator ? "Round code" : "Join code"}</span>
-                <span style={{ fontSize: 14, color: "#22c55e", fontWeight: 800, letterSpacing: 2 }}>{round.code}</span>
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                {!isSpectator && <button onClick={() => setShowSpectatorQR(true)} style={{ backgroundColor: "rgba(30,41,59,0.6)", border: "1px solid #334155", color: "#94a3b8", borderRadius: 7, padding: "6px 10px", fontSize: 10, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>👀 Spectate</button>}
-                <button onClick={() => setShowJoinQR(true)} style={{ backgroundColor: "rgba(34,197,94,0.15)", border: "1px solid #22c55e", color: "#22c55e", borderRadius: 7, padding: "6px 10px", fontSize: 10, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Show QR</button>
-              </div>
+        {/* Invite Players - big green button opens a blurred popup */}
+        {!isSpectator ? (
+          <button onClick={() => setShowJoinQR(true)} style={{ ...S.btnPrimary, width: "100%", fontSize: 16, marginBottom: 6, padding: "15px", display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>➕ Invite Players</button>
+        ) : (
+          <div style={{ backgroundColor: "rgba(15,23,42,0.4)", border: "1px solid #334155", borderRadius: 10, padding: "10px 12px", marginBottom: 6, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+              <span style={{ fontSize: 9, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 1, fontWeight: 700 }}>Round code</span>
+              <span style={{ fontSize: 14, color: "#22c55e", fontWeight: 800, letterSpacing: 2 }}>{round.code}</span>
             </div>
-          ) : (
-            <div style={{ textAlign: "center" }}>
-              {isSpectator
-                ? <div style={{ display: "inline-block", backgroundColor: "#fff", borderRadius: 8, padding: 8, marginBottom: 8 }}>
-                    <QRCodeSVG value={window.location.origin + window.location.pathname + "?watch=" + round.code} size={72} bgColor="#ffffff" fgColor="#0f172a" />
+            <button onClick={() => setShowJoinQR(true)} style={{ backgroundColor: "rgba(34,197,94,0.15)", border: "1px solid #22c55e", color: "#22c55e", borderRadius: 7, padding: "6px 10px", fontSize: 10, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Show QR</button>
+          </div>
+        )}
+
+        {/* Invite / QR popup */}
+        {showJoinQR && (
+          <div style={{ position: "fixed", inset: 0, zIndex: 120, overflowY: "auto", WebkitOverflowScrolling: "touch" }} onClick={(e) => { if (e.target === e.currentTarget) { setShowJoinQR(false); setShowAddGuest(false); } }}>
+            <div style={{ position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.55)", backdropFilter: "blur(5px)", WebkitBackdropFilter: "blur(5px)", zIndex: -1 }} />
+            <div style={{ width: "100%", maxWidth: 360, margin: "0 auto", minHeight: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: "calc(env(safe-area-inset-top,20px) + 16px) 16px calc(env(safe-area-inset-bottom,20px) + 16px)" }}>
+              <div style={{ width: "100%", backgroundColor: "#111c2e", border: "1px solid #334155", borderRadius: 16, padding: 16, boxShadow: "0 20px 60px rgba(0,0,0,0.6)" }}>
+                <div style={{ fontSize: 16, fontWeight: 800, color: "#f8fafc", marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>{isSpectator ? "👀 Watch Round" : "➕ Invite Players"}</div>
+                <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                  <div style={{ backgroundColor: "#fff", borderRadius: 10, padding: 8, flexShrink: 0, lineHeight: 0 }}>
+                    <QRCodeSVG value={window.location.origin + window.location.pathname + (isSpectator ? "?watch=" : "?join=") + round.code} size={108} bgColor="#ffffff" fgColor="#0f172a" />
                   </div>
-                : <div style={{ display: "inline-block", backgroundColor: "#fff", borderRadius: 10, padding: 12, marginBottom: 8 }}>
-                    <QRCodeSVG value={window.location.origin + window.location.pathname + "?join=" + round.code} size={100} bgColor="#ffffff" fgColor="#0f172a" />
-                  </div>}
-              <div style={{ fontSize: 13, color: "#94a3b8" }}>{isSpectator ? "Round code: " : "Scan to join · Code: "}<span style={{ color: "#22c55e", fontWeight: 700, letterSpacing: 2 }}>{round.code}</span></div>
-              {isSpectator
-                ? <button onClick={(e) => { navigator.clipboard.writeText(window.location.origin + window.location.pathname + "?watch=" + round.code); const btn = e.target; btn.textContent = "✓ Copied!"; btn.style.color = "#22c55e"; btn.style.borderColor = "#22c55e"; setTimeout(() => { btn.textContent = "👀 Copy Watch Link"; btn.style.color = "#94a3b8"; btn.style.borderColor = "#334155"; }, 1500); }} style={{ marginTop: 10, backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 12, fontWeight: 600, cursor: "pointer", padding: "8px 16px", fontFamily: "inherit" }}>👀 Copy Watch Link</button>
-                : <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-                    <button onClick={(e) => { navigator.clipboard.writeText(window.location.origin + window.location.pathname + "?join=" + round.code); const btn = e.target; btn.textContent = "✓ Copied!"; setTimeout(() => { btn.textContent = "🏌️ Players Link"; }, 1500); }} style={{ flex: 1, backgroundColor: "rgba(34,197,94,0.15)", border: "1px solid #22c55e", borderRadius: 9, color: "#22c55e", fontSize: 13, fontWeight: 800, cursor: "pointer", padding: "11px 10px", fontFamily: "inherit" }}>🏌️ Players Link</button>
-                    <button onClick={() => setShowSpectatorQR(true)} style={{ flex: 1, backgroundColor: "rgba(59,130,246,0.15)", border: "1px solid #3b82f6", borderRadius: 9, color: "#60a5fa", fontSize: 13, fontWeight: 800, cursor: "pointer", padding: "11px 10px", fontFamily: "inherit" }}>👀 Spectators</button>
-                  </div>}
-              <button onClick={() => setShowJoinQR(false)} style={{ marginTop: 12, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: "rgba(30,41,59,0.9)", border: "1px solid #475569", borderRadius: 9, color: "#e2e8f0", fontSize: 13, fontWeight: 700, cursor: "pointer", padding: "11px 10px", fontFamily: "inherit" }}><span style={{ fontSize: 14 }}>▲</span> Hide QR</button>
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, color: "#94a3b8" }}>Scan to {isSpectator ? "watch" : "join"} · <span style={{ color: "#22c55e", fontWeight: 800, letterSpacing: 2 }}>{round.code}</span></div>
+                    <button onClick={(e) => { navigator.clipboard.writeText(window.location.origin + window.location.pathname + "?join=" + round.code); const b = e.currentTarget; b.textContent = "✓ Copied!"; setTimeout(() => { b.textContent = "🏌️ Players Link"; }, 1500); }} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: "rgba(30,41,59,0.6)", border: "1px solid #334155", borderRadius: 8, color: "#cbd5e1", fontSize: 12, fontWeight: 700, cursor: "pointer", padding: "9px 10px", fontFamily: "inherit", width: "100%" }}>🏌️ Players Link</button>
+                    <button onClick={(e) => { navigator.clipboard.writeText(window.location.origin + window.location.pathname + "?watch=" + round.code); const b = e.currentTarget; b.textContent = "✓ Copied!"; setTimeout(() => { b.textContent = "👀 Spectators Link"; }, 1500); }} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: "rgba(30,41,59,0.6)", border: "1px solid #334155", borderRadius: 8, color: "#cbd5e1", fontSize: 12, fontWeight: 700, cursor: "pointer", padding: "9px 10px", fontFamily: "inherit", width: "100%" }}>👀 Spectators Link</button>
+                  </div>
+                </div>
+
+                {!isSpectator && (me?.name === round.created_by || round.is_scanned) && (
+                  <>
+                    <div style={{ height: 1, backgroundColor: "#334155", margin: "14px 0" }} />
+                    <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>Add a guest manually</div>
+                    <input style={{ backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 9, padding: "11px 12px", color: "#f8fafc", fontSize: 14, width: "100%", outline: "none", fontFamily: "inherit", marginBottom: 8, boxSizing: "border-box" }} placeholder="Guest name" value={guestName} onChange={(e) => setGuestName(e.target.value)} />
+                    {round.use_handicap !== false && <input style={{ backgroundColor: "#0f172a", border: "1px solid #334155", borderRadius: 9, padding: "11px 12px", color: "#f8fafc", fontSize: 14, width: "100%", outline: "none", fontFamily: "inherit", marginBottom: 8, boxSizing: "border-box" }} type="text" inputMode="text" placeholder="Handicap (e.g. 8 or +2)" value={guestHcp} onChange={(e) => setGuestHcp(e.target.value)} />}
+                    {round.game_type === "matchplay_teams" && (
+                      <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                        {["A", "B"].map((t) => (
+                          <button key={t} onClick={() => setGuestTeam(t)} style={{ flex: 1, backgroundColor: guestTeam === t ? "#22c55e" : "#0f172a", color: guestTeam === t ? "#0f172a" : "#94a3b8", border: "1px solid " + (guestTeam === t ? "#22c55e" : "#334155"), borderRadius: 9, padding: "9px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Team {t}</button>
+                        ))}
+                      </div>
+                    )}
+                    <button onClick={addGuest} disabled={!guestName.trim() || addingGuest} style={{ width: "100%", backgroundColor: "rgba(30,41,59,0.8)", border: "1px solid #475569", borderRadius: 9, color: guestName.trim() ? "#e2e8f0" : "#64748b", fontSize: 13, fontWeight: 700, cursor: guestName.trim() ? "pointer" : "not-allowed", padding: "11px", fontFamily: "inherit" }}>{addingGuest ? "Adding..." : "➕ Add Guest"}</button>
+                  </>
+                )}
+
+                <button onClick={() => { setShowJoinQR(false); setShowAddGuest(false); }} style={{ marginTop: 16, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#22c55e", border: "none", borderRadius: 11, color: "#0f172a", fontSize: 15, fontWeight: 800, cursor: "pointer", padding: "14px", fontFamily: "inherit" }}><span style={{ fontSize: 15 }}>▲</span> Close</button>
+              </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Spacer for breathing room before Start Game - sized against viewport since content area scrolls */}
         <div style={{ minHeight: "18vh" }} />
 
-        <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
-          <button style={{ ...S.btnPrimary, flex: 1, fontSize: 17, marginBottom: 0, padding: "18px" }} onClick={onViewScorecard}>▶️ Start Game</button>
-          {!isSpectator && (me?.name === round.created_by || round.is_scanned) && <button onClick={() => setShowAddGuest(true)} style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, color: "#94a3b8", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", padding: "0 14px", flexShrink: 0 }}>+ Guest</button>}
+        <div style={{ marginBottom: 20 }}>
+          <button style={{ ...S.btnPrimary, width: "100%", fontSize: 17, marginBottom: 0, padding: "18px" }} onClick={onViewScorecard}>▶️ Start Game</button>
         </div>
 
         {/* Link to Tournament - creator only, not spectator */}
@@ -3412,32 +3429,6 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
                   {!linkSuccess && <button onClick={() => { setShowTournamentLink(false); setLinkingTournament(""); }} style={{ background: "none", border: "none", color: "#475569", fontSize: 12, cursor: "pointer", fontFamily: "inherit", marginTop: 8, padding: 0 }}>Cancel</button>}
                 </div>
             }
-          </div>
-        )}
-
-        {showAddGuest && !isSpectator && (
-          <div style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 14, padding: 16, marginBottom: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#f8fafc", marginBottom: 12 }}>Add Guest Player</div>
-            <label style={S.label}>Name</label>
-            <input style={{ ...S.input, marginBottom: 10 }} placeholder="e.g. Matt" value={guestName} onChange={(e) => setGuestName(e.target.value)} />
-            {round.use_handicap !== false && <>
-              <label style={S.label}>Handicap</label>
-              <input style={{ ...S.input, marginBottom: 10 }} type="text" placeholder="e.g. 8 or +2" value={guestHcp} onChange={(e) => setGuestHcp(e.target.value)} />
-            </>}
-            {round.game_type === "matchplay_teams" && (
-              <div style={{ marginBottom: 10 }}>
-                <label style={S.label}>Team</label>
-                <div style={{ display: "flex", gap: 8 }}>
-                  {["A", "B"].map((t) => (
-                    <button key={t} onClick={() => setGuestTeam(t)} style={{ flex: 1, backgroundColor: guestTeam === t ? "#22c55e" : "#0f172a", color: guestTeam === t ? "#0f172a" : "#94a3b8", border: "1px solid " + (guestTeam === t ? "#22c55e" : "#334155"), borderRadius: 10, padding: "10px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Team {t}</button>
-                  ))}
-                </div>
-              </div>
-            )}
-            <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={addGuest} disabled={!guestName.trim() || addingGuest} style={{ flex: 1, backgroundColor: guestName.trim() ? "#22c55e" : "#334155", color: guestName.trim() ? "#0f172a" : "#64748b", border: "none", borderRadius: 10, padding: "12px", fontSize: 14, fontWeight: 700, cursor: guestName.trim() ? "pointer" : "not-allowed", fontFamily: "inherit" }}>{addingGuest ? "Adding..." : "Add Guest"}</button>
-              <button onClick={() => { setShowAddGuest(false); setGuestName(""); setGuestHcp(""); }} style={{ flex: 1, backgroundColor: "transparent", color: "#64748b", border: "1px solid #334155", borderRadius: 10, padding: "12px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
-            </div>
           </div>
         )}
 
