@@ -1181,7 +1181,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.80</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.81</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
           </div>
@@ -4328,15 +4328,19 @@ function centreHoleNav(holeNumber, attempt) {
     _centreHoleNavAnimId = null;
   }
 
-  // Each strip (hole-nav + every scorecard) has different cell widths, so centre
-  // EACH one on its own active-hole cell rather than copying one scrollLeft.
+  // Centre EACH strip on its own active-hole cell using real on-screen positions
+  // (getBoundingClientRect), so padding/borders/checkmarks/timing can't throw it off.
   const els = document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll");
   const plan = [];
   els.forEach((el) => {
-    const w = el.clientWidth || containerWidth;
     const cell = el.id === "ff-master-scroll" ? btn : el.querySelector('[data-hole="' + holeNumber + '"]');
     if (!cell) return;
-    const target = Math.max(0, cell.offsetLeft - (w / 2) + (cell.offsetWidth / 2));
+    const cellRect = cell.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    const cellCentre = cellRect.left + cellRect.width / 2;
+    const elCentre = elRect.left + elRect.width / 2;
+    const maxScroll = el.scrollWidth - el.clientWidth;
+    const target = Math.max(0, Math.min(maxScroll, el.scrollLeft + (cellCentre - elCentre)));
     plan.push({ el, start: el.scrollLeft, dist: target - el.scrollLeft });
   });
   const duration = 280; // ms - single controlled glide
