@@ -36,6 +36,27 @@ function getPlayerProfile() {
 function savePlayerProfile(name, handicap) {
   localStorage.setItem("ff_profile", JSON.stringify({ name, handicap }));
 }
+// Record, on this device, that I host a round (set when I create it), so "am I
+// the host" never depends on a fragile exact name match.
+function markRoundHosted(roundCode) {
+  try {
+    const list = JSON.parse(localStorage.getItem("ff_hosted_rounds") || "[]");
+    if (!list.includes(roundCode)) localStorage.setItem("ff_hosted_rounds", JSON.stringify([roundCode, ...list].slice(0, 200)));
+  } catch {}
+}
+// True if I run this round: I created it on this device, OR my name matches the
+// creator name (trimmed, case-insensitive) as a fallback for older rounds.
+function isRoundHost(round, me) {
+  if (!round) return false;
+  try {
+    const list = JSON.parse(localStorage.getItem("ff_hosted_rounds") || "[]");
+    if (round.code && list.includes(round.code)) return true;
+  } catch {}
+  if (round.is_scanned) return true;
+  const a = (me?.name || "").trim().toLowerCase();
+  const b = (round.created_by || "").trim().toLowerCase();
+  return !!a && a === b;
+}
 
 // =============================================================================
 // TOURNAMENT HELPERS (localStorage)
@@ -1181,7 +1202,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.82</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.84</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
           </div>
@@ -2862,6 +2883,7 @@ function CreateRoundScreen({ onBack, onRoundCreated }) {
       const round = await dbCreateRound({ code, course_name: course.name, course_id: course.id, game_type: gameType, holes: course.holes, use_handicap: useHandicap, created_at: new Date().toISOString(), created_by: name });
       const me = await dbCreatePlayer({ name: (name || "").trim(), handicap: useHandicap ? (parseHcp(hcp)) : 0, round_id: round.id, team: gameType === "matchplay_teams" ? team : null, is_placeholder: false });
       rememberMyPlayer(round.code, me.id);
+      markRoundHosted(round.code);
       savePlayerProfile(name, parseHcp(hcp));
       const fullRound = { ...round, holes: course.holes };
       saveLastRound(fullRound, me);
@@ -3250,7 +3272,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
   const [showAddGuest, setShowAddGuest] = useState(false);
   const [showDashAdmin, setShowDashAdmin] = useState(false);
   const [showJoinQR, setShowJoinQR] = useState(false);
-  const isCreator = me?.name === round.created_by;
+  const isCreator = isRoundHost(round, me);
 
   const askRules = async (question) => {
     if (!question?.trim()) return;
@@ -3448,7 +3470,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
         </div>
 
         {/* Link to Tournament - creator only, not spectator */}
-        {me?.name === round.created_by && !isSpectator && (
+        {isRoundHost(round, me) && !isSpectator && (
           <div style={{ marginBottom: 12 }}>
             {!showTournamentLink
               ? <button onClick={async () => { setShowTournamentLink(true); const t = await dbGetTournaments(); setLinkTournaments(t); }} style={{ background: "none", border: "none", color: "#f8fafc", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", padding: 0, textDecoration: "underline" }}>🏆 Link to Tournament</button>
@@ -3617,7 +3639,7 @@ function PlayerDashboardScreen({ round, me, onViewScorecard, onBack, isSpectator
                 <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <span style={{ fontSize: 11, color: "#94a3b8" }}>{p.holesPlayed}/18 holes</span>
-                    {!isSpectator && (me?.name === round.created_by || round.is_scanned) && p.id !== me?.id && (round.is_scanned || scores.filter(s => s.score > 0).length === 0) && (
+                    {!isSpectator && isRoundHost(round, me) && p.id !== me?.id && (round.is_scanned || scores.filter(s => s.score > 0).length === 0) && (
                       <>
                         <span onClick={() => { setEditingPlayerId(p.id); setEditPlayerName(p.name?.replace(" (Guest)", "") || p.name); setEditPlayerHcp(String(p.handicap)); }} style={{ fontSize: 12, cursor: "pointer", padding: "2px 4px" }}>✏️</span>
                         <span onClick={async () => { await supabase.from("players").delete().eq("id", p.id); refresh(); }} style={{ fontSize: 12, cursor: "pointer", color: "#ef4444", padding: "2px 4px", fontWeight: 700 }}>✕</span>
@@ -4399,7 +4421,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
   const [showGameAdmin, setShowGameAdmin] = useState(false);
   const [gameAdminCode, setGameAdminCode] = useState("");
   const [gameAdminAuthed, setGameAdminAuthed] = useState(false);
-  const isScorecardCreator = me?.name === round.created_by;
+  const isScorecardCreator = isRoundHost(round, me);
   const [gameAdminTab, setGameAdminTab] = useState("scores");
   const [adminEditScores, setAdminEditScores] = useState({});
   const [scanCardFor, setScanCardFor] = useState(null); // player id being scanned, doubles as busy flag
@@ -4660,7 +4682,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
       if (round.game_type !== "banker") {
         // Auto-advance based on local device scores only - don't wait for other devices
         // Only round creator has guests to score; other devices advance immediately
-        const myGuests = (me.name === round.created_by || round.is_scanned)
+        const myGuests = isRoundHost(round, me)
           ? others.filter((p) => p.name?.endsWith("(Guest)"))
           : [];
         const allLocalGuestsScored = myGuests.every((g) =>
@@ -4681,7 +4703,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
 
   const tryAdvanceHole = (holeNum, updatedGuestScores) => {
     if (round.game_type === "banker" || holeNum >= 18) return;
-    const myGuests = (me.name === round.created_by || round.is_scanned)
+    const myGuests = isRoundHost(round, me)
       ? others.filter((p) => p.name?.endsWith("(Guest)"))
       : [];
     const myScored = myScores[holeNum] > 0;
@@ -4815,9 +4837,9 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
                 style={{ backgroundColor: "#1e293b", border: "1px solid #334155", borderRadius: 12, padding: "14px 16px", color: "#f8fafc", fontSize: 22, fontWeight: 800, textAlign: "center", letterSpacing: 6, width: "100%", maxWidth: 260, outline: "none", fontFamily: "inherit", marginBottom: 16 }}
                 type="password" placeholder="••••" value={gameAdminCode}
                 onChange={(e) => setGameAdminCode(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") { const isCreator = me?.name === round.created_by; const codeLower = gameAdminCode.toLowerCase(); if (codeLower === "ch24" || (codeLower === "ch" && isCreator)) { setGameAdminAuthed(true); setAdminEditHoles(JSON.parse(JSON.stringify(round.holes || []))); const sc = {}; allScores.forEach(s => { if (!sc[s.player_id]) sc[s.player_id] = {}; sc[s.player_id][s.hole_number] = s.score; }); setAdminEditScores(sc); } else { setAdminMsg("Incorrect code"); } } }}
+                onKeyDown={(e) => { if (e.key === "Enter") { const isCreator = isRoundHost(round, me); const codeLower = gameAdminCode.toLowerCase(); if (codeLower === "ch24" || (codeLower === "ch" && isCreator)) { setGameAdminAuthed(true); setAdminEditHoles(JSON.parse(JSON.stringify(round.holes || []))); const sc = {}; allScores.forEach(s => { if (!sc[s.player_id]) sc[s.player_id] = {}; sc[s.player_id][s.hole_number] = s.score; }); setAdminEditScores(sc); } else { setAdminMsg("Incorrect code"); } } }}
               />
-              <button onClick={() => { const isCreator = me?.name === round.created_by; const codeLower = gameAdminCode.toLowerCase(); if (codeLower === "ch24" || (codeLower === "ch" && isCreator)) { setGameAdminAuthed(true); setAdminEditHoles(JSON.parse(JSON.stringify(round.holes || []))); const sc = {}; allScores.forEach(s => { if (!sc[s.player_id]) sc[s.player_id] = {}; sc[s.player_id][s.hole_number] = s.score; }); setAdminEditScores(sc); } else { setAdminMsg("Incorrect code"); } }}
+              <button onClick={() => { const isCreator = isRoundHost(round, me); const codeLower = gameAdminCode.toLowerCase(); if (codeLower === "ch24" || (codeLower === "ch" && isCreator)) { setGameAdminAuthed(true); setAdminEditHoles(JSON.parse(JSON.stringify(round.holes || []))); const sc = {}; allScores.forEach(s => { if (!sc[s.player_id]) sc[s.player_id] = {}; sc[s.player_id][s.hole_number] = s.score; }); setAdminEditScores(sc); } else { setAdminMsg("Incorrect code"); } }}
                 style={{ backgroundColor: "#22c55e", color: "#0f172a", border: "none", borderRadius: 12, padding: "14px 32px", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", width: "100%", maxWidth: 260 }}>
                 Enter
               </button>
@@ -5149,7 +5171,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
             const thisBanker = currentBankerId || initialBankerId;
             const bankerPlayer = [...others, me].find((p) => p.id === thisBanker);
             const isActualBanker = thisBanker === me.id;
-            const isManagingGuestBanker = bankerPlayer?.name?.endsWith("(Guest)") && me.name === round.created_by && !isActualBanker;
+            const isManagingGuestBanker = bankerPlayer?.name?.endsWith("(Guest)") && isRoundHost(round, me) && !isActualBanker;
             const iAmBanker = isActualBanker || isManagingGuestBanker;
             const nonBankerPlayers = [...others, me].filter((p) => p.id !== thisBanker);
             // Get bets - if thisBanker is null show all bets
@@ -5209,7 +5231,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
                       const playerBet = allScores.find((s) => s.player_id === player.id && s.hole_number === activeHole && s.bet > 0)?.bet;
                       const playerPending = isMe ? pendingBets[activeHole] : (guestPendingBets[player.id] || "");
                       const isGuest = player.name?.endsWith("(Guest)");
-                      const canEdit = isMe || (isGuest && me.name === round.created_by);
+                      const canEdit = isMe || (isGuest && isRoundHost(round, me));
 
                       const submitBet = async () => {
                         const betVal = isMe ? pendingBets[activeHole] : guestPendingBets[player.id];
@@ -5382,7 +5404,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
             return (
               <div>
                 {/* COMPACT SCORE ROWS - me first, then guests, all non-banker */}
-                {[{ player: me, isMe: true }, ...(me.name === round.created_by || round.is_scanned ? others.filter(p => p.name?.endsWith("(Guest)")) : []).map(g => ({ player: g, isMe: false }))].map(({ player, isMe }) => {
+                {[{ player: me, isMe: true }, ...others.filter(p => p.name?.endsWith("(Guest)")).map(g => ({ player: g, isMe: false }))].map(({ player, isMe }) => {
                   const pScore = isMe ? myScores[activeHole] : ((guestScores[player.id] || {})[activeHole] || allScores.find(s => s.player_id === player.id && s.hole_number === activeHole)?.score);
                   const pHcpS = curHole ? getHcpStrokes(player.handicap, curHole.stroke_index) : 0;
                   const shortName = player.name.replace(" (Guest)", "").split(" ")[0].toUpperCase();
