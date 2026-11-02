@@ -1181,7 +1181,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.81</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.82</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
           </div>
@@ -4379,7 +4379,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
     const measure = () => {
       const master = document.getElementById("ff-master-scroll");
       if (master && master.clientWidth > 0) {
-        setNavPadding(Math.max(0, (master.clientWidth / 2) - 20));
+        setNavPadding(Math.max(0, (master.clientWidth / 2) + 30));
       }
     };
     measure();
@@ -5059,7 +5059,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
       <div style={{ backgroundImage: "linear-gradient(to bottom, rgba(11,19,28,0.6), rgba(11,19,28,0.82)), url('/IMG_8877.jpeg')", backgroundSize: "cover", backgroundPosition: "center 42%", border: "1px solid rgba(255,255,255,0.09)", borderRadius: 18, margin: "10px 12px 0", padding: "12px 16px", position: "sticky", top: "calc(env(safe-area-inset-top, 44px) + 44px)", zIndex: 20, boxShadow: "0 8px 24px rgba(0,0,0,0.3)" }}>
         <div id="ff-master-scroll" style={S.holeNav} onScroll={(e) => {
           if (window._ffCentring) return;
-          document.querySelectorAll(".ff-slave-scroll").forEach((el) => { if (el !== e.target) el.scrollLeft = e.target.scrollLeft; });
+          /* cross-sync removed */
         }}>
           <div style={{ flexShrink: 0, width: navPadding }} />
           {holes.map((h) => {
@@ -5632,7 +5632,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
                           <div style={{ fontSize: 9, color: "#94a3b8", fontWeight: 700, height: 28, display: "flex", alignItems: "center" }}>G</div>
                           {isHandicap && <div style={{ fontSize: 9, color: "#94a3b8", fontWeight: 700, height: 28, display: "flex", alignItems: "center" }}>N</div>}
                         </div>
-                        <div className="ff-slave-scroll" style={{ ...S.playerScoresRow, flex: 1 }} onScroll={(e) => { if (window._ffCentring) return; document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { if (el !== e.target) el.scrollLeft = e.target.scrollLeft; }); }}>
+                        <div className="ff-slave-scroll" style={{ ...S.playerScoresRow, flex: 1 }} onScroll={(e) => { if (window._ffCentring) return; /* cross-sync removed: each strip centres itself via centreHoleNav */ }}>
                           {holes.map((h) => {
                             const g = isMe ? myScores[h.hole_number] : (ps.find((s) => s.hole_number === h.hole_number)?.score || null);
                             const hs = getHcpStrokes(player.handicap, h.stroke_index);
@@ -5712,7 +5712,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
                     </div>
                   )}
                 </div>
-                <div className="ff-slave-scroll" style={{ ...S.playerScoresRow, flex: 1 }} onScroll={(e) => { if (window._ffCentring) return; document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { if (el !== e.target) el.scrollLeft = e.target.scrollLeft; }); }}>
+                <div className="ff-slave-scroll" style={{ ...S.playerScoresRow, flex: 1 }} onScroll={(e) => { if (window._ffCentring) return; /* cross-sync removed: each strip centres itself via centreHoleNav */ }}>
                   {holes.map((h) => {
                     const g = myScores[h.hole_number];
                     const hs = getHcpStrokes(me.handicap, h.stroke_index);
@@ -5813,7 +5813,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
                     )}
                   </div>
                   {/* Scrollable scores */}
-                  <div className="ff-slave-scroll" style={{ ...S.playerScoresRow, flex: 1 }} onScroll={(e) => { if (window._ffCentring) return; document.querySelectorAll("#ff-master-scroll, .ff-slave-scroll").forEach((el) => { if (el !== e.target) el.scrollLeft = e.target.scrollLeft; }); }}>
+                  <div className="ff-slave-scroll" style={{ ...S.playerScoresRow, flex: 1 }} onScroll={(e) => { if (window._ffCentring) return; /* cross-sync removed: each strip centres itself via centreHoleNav */ }}>
                     {holes.map((h) => {
                       const sc = ps.find((s) => s.hole_number === h.hole_number);
                       const g = sc ? sc.score : null, hs = getHcpStrokes(player.handicap, h.stroke_index);
