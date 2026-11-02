@@ -58,6 +58,12 @@ function isRoundHost(round, me) {
   return !!a && a === b;
 }
 
+// A guest belongs to the device that added them. Only that device scores them.
+function ownsGuest(player) {
+  if (!player || !player.name || !player.name.endsWith("(Guest)")) return false;
+  try { return !!player.device_id && player.device_id === getDeviceId(); } catch { return false; }
+}
+
 // =============================================================================
 // TOURNAMENT HELPERS (localStorage)
 // =============================================================================
@@ -1202,7 +1208,7 @@ function HomeScreen({ onCreateRound, onJoinRound, onWatchRound, onAdminLogin, on
 
         {/* Top bar */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "calc(env(safe-area-inset-top, 44px) + 8px) 16px 0" }}>
-          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.84</span>
+          <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>v1.1.85</span>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={onAdminLogin} style={{ background: "rgba(15,23,42,0.6)", border: "1px solid #334155", borderRadius: 6, color: "#94a3b8", fontSize: 10, fontWeight: 700, padding: "5px 10px", cursor: "pointer", fontFamily: "inherit", letterSpacing: "0.5px", backdropFilter: "blur(4px)" }}>ADMIN</button>
           </div>
@@ -4682,9 +4688,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
       if (round.game_type !== "banker") {
         // Auto-advance based on local device scores only - don't wait for other devices
         // Only round creator has guests to score; other devices advance immediately
-        const myGuests = isRoundHost(round, me)
-          ? others.filter((p) => p.name?.endsWith("(Guest)"))
-          : [];
+        const myGuests = others.filter(ownsGuest);
         const allLocalGuestsScored = myGuests.every((g) =>
           (guestScores[g.id]?.[holeNum] > 0)
         );
@@ -4703,9 +4707,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
 
   const tryAdvanceHole = (holeNum, updatedGuestScores) => {
     if (round.game_type === "banker" || holeNum >= 18) return;
-    const myGuests = isRoundHost(round, me)
-      ? others.filter((p) => p.name?.endsWith("(Guest)"))
-      : [];
+    const myGuests = others.filter(ownsGuest);
     const myScored = myScores[holeNum] > 0;
     if (!myScored) return;
     const scores = updatedGuestScores || guestScores;
@@ -5231,7 +5233,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
                       const playerBet = allScores.find((s) => s.player_id === player.id && s.hole_number === activeHole && s.bet > 0)?.bet;
                       const playerPending = isMe ? pendingBets[activeHole] : (guestPendingBets[player.id] || "");
                       const isGuest = player.name?.endsWith("(Guest)");
-                      const canEdit = isMe || (isGuest && isRoundHost(round, me));
+                      const canEdit = isMe || ownsGuest(player);
 
                       const submitBet = async () => {
                         const betVal = isMe ? pendingBets[activeHole] : guestPendingBets[player.id];
@@ -5404,7 +5406,7 @@ function ScorecardScreen({ round, me, onViewDashboard, isSpectator, onRoundUpdat
             return (
               <div>
                 {/* COMPACT SCORE ROWS - me first, then guests, all non-banker */}
-                {[{ player: me, isMe: true }, ...others.filter(p => p.name?.endsWith("(Guest)")).map(g => ({ player: g, isMe: false }))].map(({ player, isMe }) => {
+                {[{ player: me, isMe: true }, ...others.filter(ownsGuest).map(g => ({ player: g, isMe: false }))].map(({ player, isMe }) => {
                   const pScore = isMe ? myScores[activeHole] : ((guestScores[player.id] || {})[activeHole] || allScores.find(s => s.player_id === player.id && s.hole_number === activeHole)?.score);
                   const pHcpS = curHole ? getHcpStrokes(player.handicap, curHole.stroke_index) : 0;
                   const shortName = player.name.replace(" (Guest)", "").split(" ")[0].toUpperCase();
